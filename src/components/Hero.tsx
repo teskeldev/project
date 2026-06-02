@@ -34,14 +34,14 @@ export default function Hero() {
           className="mt-10 flex flex-col gap-4 sm:flex-row"
         >
           <Link
-            href="#download"
+            href="/download"
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-gray-900 px-6 py-3.5 text-base font-medium text-white shadow-lg transition-all hover:bg-gray-800 hover:shadow-xl"
           >
             <Download size={18} />
             Download for free
           </Link>
           <Link
-            href="#demo"
+            href="/enterprise"
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-6 py-3.5 text-base font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-50"
           >
             Request a demo
