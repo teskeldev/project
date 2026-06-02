@@ -5,10 +5,10 @@ import Link from "next/link";
 import { Menu, X } from "lucide-react";
 
 const navLinks = [
-  { label: "Product", href: "#product" },
-  { label: "Enterprise", href: "#enterprise" },
-  { label: "Pricing", href: "#pricing" },
-  { label: "Resources", href: "#resources" },
+  { label: "Product", href: "/#product" },
+  { label: "Enterprise", href: "/enterprise" },
+  { label: "Pricing", href: "/pricing" },
+  { label: "Resources", href: "/docs" },
 ];
 
 export default function Navbar() {
@@ -53,19 +53,19 @@ export default function Navbar() {
         {/* Desktop CTA */}
         <div className="hidden items-center gap-4 md:flex">
           <Link
-            href="#signin"
+            href="/login"
             className="text-sm font-medium text-gray-600 transition-colors hover:text-gray-900"
           >
             Sign in
           </Link>
           <Link
-            href="#contact"
+            href="/enterprise"
             className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
           >
             Contact sales
           </Link>
           <Link
-            href="#download"
+            href="/download"
             className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800"
           >
             Download
@@ -98,19 +98,19 @@ export default function Navbar() {
             ))}
             <hr className="border-rose-100" />
             <Link
-              href="#signin"
+              href="/login"
               className="text-sm font-medium text-gray-600"
             >
               Sign in
             </Link>
             <Link
-              href="#contact"
+              href="/enterprise"
               className="rounded-lg border border-gray-300 px-4 py-2 text-center text-sm font-medium text-gray-700"
             >
               Contact sales
             </Link>
             <Link
-              href="#download"
+              href="/download"
               className="rounded-lg bg-gray-900 px-4 py-2 text-center text-sm font-medium text-white"
             >
               Download

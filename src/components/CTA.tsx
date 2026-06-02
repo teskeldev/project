@@ -25,7 +25,7 @@ export default function CTA() {
           className="mt-10 flex justify-center"
         >
           <Link
-            href="#download"
+            href="/download"
             className="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-8 py-4 text-lg font-medium text-white shadow-lg transition-all hover:bg-gray-800 hover:shadow-xl"
           >
             <Download size={20} />

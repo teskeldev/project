@@ -4,54 +4,59 @@ const footerColumns = [
   {
     title: "Product",
     links: [
-      "Agents",
-      "Teams",
-      "Enterprise",
-      "Pricing",
-      "Code Review",
-      "Tab",
-      "CLI",
-      "Cloud Agents",
-      "Marketplace",
+      { label: "Agents", href: "/#product" },
+      { label: "Teams", href: "/enterprise" },
+      { label: "Enterprise", href: "/enterprise" },
+      { label: "Pricing", href: "/pricing" },
+      { label: "Code Review", href: "/#product" },
+      { label: "Tab", href: "/#product" },
+      { label: "CLI", href: "/download" },
+      { label: "Cloud Agents", href: "/#product" },
+      { label: "Marketplace", href: "/docs" },
     ],
   },
   {
     title: "Resources",
     links: [
-      "Download",
-      "Changelog",
-      "Docs",
-      "Learn",
-      "Forum",
-      "Help",
-      "Workshops",
-      "Status",
+      { label: "Download", href: "/download" },
+      { label: "Changelog", href: "/changelog" },
+      { label: "Docs", href: "/docs" },
+      { label: "Learn", href: "/docs" },
+      { label: "Forum", href: "#" },
+      { label: "Help", href: "#" },
+      { label: "Workshops", href: "#" },
+      { label: "Status", href: "#" },
     ],
   },
   {
     title: "Company",
     links: [
-      "Careers",
-      "Blog",
-      "Community",
-      "Students",
-      "Brand",
-      "Future",
-      "Teskel Labs",
+      { label: "Careers", href: "#" },
+      { label: "Blog", href: "/blog" },
+      { label: "Community", href: "#" },
+      { label: "Students", href: "#" },
+      { label: "Brand", href: "#" },
+      { label: "Future", href: "#" },
+      { label: "Teskel Labs", href: "#" },
     ],
   },
   {
     title: "Legal",
     links: [
-      "Terms of Service",
-      "Privacy Policy",
-      "Data Use",
-      "Security",
+      { label: "Terms of Service", href: "#" },
+      { label: "Privacy Policy", href: "#" },
+      { label: "Data Use", href: "#" },
+      { label: "Security", href: "#" },
     ],
   },
   {
     title: "Connect",
-    links: ["X", "LinkedIn", "YouTube", "GitHub"],
+    links: [
+      { label: "X", href: "#" },
+      { label: "LinkedIn", href: "#" },
+      { label: "YouTube", href: "#" },
+      { label: "GitHub", href: "#" },
+    ],
   },
 ];
 
@@ -67,12 +72,12 @@ export default function Footer() {
               </h4>
               <ul className="space-y-2.5">
                 {col.links.map((link) => (
-                  <li key={link}>
+                  <li key={link.label}>
                     <Link
-                      href="#"
+                      href={link.href}
                       className="text-sm text-gray-500 transition-colors hover:text-gray-900"
                     >
-                      {link}
+                      {link.label}
                     </Link>
                   </li>
                 ))}
