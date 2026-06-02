@@ -1,16 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   Plus,
   Search,
   GitBranch,
-  Star,
   Clock,
-  MoreHorizontal,
   FolderOpen,
   Globe,
   Lock,
+  Activity,
+  Users,
+  ArrowUpRight,
 } from "lucide-react";
 
 const projects = [
@@ -23,6 +25,8 @@ const projects = [
     updated: "2 hours ago",
     isPrivate: false,
     branch: "main",
+    status: "active",
+    contributors: 5,
   },
   {
     name: "teskel-api",
@@ -33,6 +37,8 @@ const projects = [
     updated: "5 hours ago",
     isPrivate: true,
     branch: "develop",
+    status: "active",
+    contributors: 3,
   },
   {
     name: "teskel-editor",
@@ -43,6 +49,8 @@ const projects = [
     updated: "1 day ago",
     isPrivate: true,
     branch: "main",
+    status: "active",
+    contributors: 8,
   },
   {
     name: "teskel-extension",
@@ -53,6 +61,8 @@ const projects = [
     updated: "3 days ago",
     isPrivate: false,
     branch: "release/v2",
+    status: "idle",
+    contributors: 2,
   },
   {
     name: "teskel-docs",
@@ -63,6 +73,8 @@ const projects = [
     updated: "1 week ago",
     isPrivate: false,
     branch: "main",
+    status: "idle",
+    contributors: 4,
   },
   {
     name: "teskel-mobile",
@@ -73,21 +85,21 @@ const projects = [
     updated: "2 weeks ago",
     isPrivate: true,
     branch: "feat/notifications",
+    status: "idle",
+    contributors: 2,
   },
 ];
 
 export default function ProjectsPage() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [filter, setFilter] = useState<"all" | "public" | "private">("all");
+  const [filter, setFilter] = useState<"all" | "active" | "idle">("all");
 
   const filtered = projects.filter((p) => {
     const matchesSearch =
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFilter =
-      filter === "all" ||
-      (filter === "public" && !p.isPrivate) ||
-      (filter === "private" && p.isPrivate);
+      filter === "all" || p.status === filter;
     return matchesSearch && matchesFilter;
   });
 
@@ -97,14 +109,14 @@ export default function ProjectsPage() {
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Projects</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Repositories</h1>
             <p className="mt-1 text-sm text-gray-500">
-              Manage and access your coding projects
+              Your connected repositories and projects
             </p>
           </div>
-          <button className="flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-rose-700">
+          <button className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gray-800">
             <Plus size={16} />
-            New project
+            Connect repository
           </button>
         </div>
 
@@ -116,12 +128,12 @@ export default function ProjectsPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Find a project..."
+              placeholder="Search repositories..."
               className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
             />
           </div>
           <div className="flex rounded-lg border border-gray-200">
-            {(["all", "public", "private"] as const).map((f) => (
+            {(["all", "active", "idle"] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -129,7 +141,7 @@ export default function ProjectsPage() {
                   filter === f
                     ? "bg-gray-100 text-gray-900"
                     : "text-gray-500 hover:text-gray-700"
-                } ${f === "all" ? "rounded-l-lg" : ""} ${f === "private" ? "rounded-r-lg" : ""}`}
+                } ${f === "all" ? "rounded-l-lg" : ""} ${f === "idle" ? "rounded-r-lg" : ""}`}
               >
                 {f}
               </button>
@@ -138,70 +150,67 @@ export default function ProjectsPage() {
         </div>
 
         {/* Project list */}
-        <div className="space-y-3">
+        <div className="space-y-2">
           {filtered.map((project) => (
-            <div
+            <Link
               key={project.name}
-              className="group rounded-xl border border-gray-200 bg-white p-5 transition-colors hover:border-gray-300 hover:shadow-sm"
+              href="/dashboard"
+              className="group flex items-center justify-between rounded-xl border border-gray-200 bg-white px-5 py-4 transition-all hover:border-gray-300 hover:shadow-sm"
             >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <FolderOpen
-                    size={20}
-                    className="mt-0.5 text-gray-400"
-                  />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-semibold text-rose-600 hover:underline">
-                        {project.name}
-                      </h3>
-                      <span
-                        className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${
-                          project.isPrivate
-                            ? "border-gray-200 text-gray-500"
-                            : "border-gray-200 text-gray-500"
-                        }`}
-                      >
-                        {project.isPrivate ? (
-                          <Lock size={10} />
-                        ) : (
-                          <Globe size={10} />
-                        )}
-                        {project.isPrivate ? "Private" : "Public"}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-sm text-gray-500">
-                      {project.description}
-                    </p>
-                  </div>
+              <div className="flex items-center gap-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-50 text-gray-400 group-hover:bg-gray-100">
+                  <FolderOpen size={20} />
                 </div>
-                <button className="text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 hover:text-gray-500">
-                  <MoreHorizontal size={16} />
-                </button>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-gray-900 group-hover:text-rose-600">
+                      {project.name}
+                    </h3>
+                    <span className="flex items-center gap-1 rounded-full border border-gray-200 px-2 py-0.5 text-[10px] text-gray-500">
+                      {project.isPrivate ? <Lock size={10} /> : <Globe size={10} />}
+                      {project.isPrivate ? "Private" : "Public"}
+                    </span>
+                    {project.status === "active" && (
+                      <span className="flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-medium text-green-600">
+                        <Activity size={10} />
+                        Active
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-sm text-gray-500">
+                    {project.description}
+                  </p>
+                </div>
               </div>
 
-              <div className="mt-4 flex items-center gap-6 text-xs text-gray-400">
-                <span className="flex items-center gap-1.5">
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: project.languageColor }}
-                  />
-                  {project.language}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Star size={12} />
-                  {project.stars}
-                </span>
-                <span className="flex items-center gap-1">
-                  <GitBranch size={12} />
-                  {project.branch}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Clock size={12} />
-                  Updated {project.updated}
-                </span>
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-4 text-xs text-gray-400">
+                  <span className="flex items-center gap-1.5">
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: project.languageColor }}
+                    />
+                    {project.language}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <GitBranch size={12} />
+                    {project.branch}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Users size={12} />
+                    {project.contributors}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Clock size={12} />
+                    {project.updated}
+                  </span>
+                </div>
+                <ArrowUpRight
+                  size={16}
+                  className="text-gray-300 opacity-0 transition-opacity group-hover:opacity-100"
+                />
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </div>

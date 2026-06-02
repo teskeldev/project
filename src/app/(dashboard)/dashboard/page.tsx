@@ -2,412 +2,447 @@
 
 import { useState } from "react";
 import {
-  ChevronRight,
-  ChevronDown,
-  File,
-  Folder,
-  Play,
-  GitBranch,
-  Bell,
-  Search,
-  MoreHorizontal,
-  Send,
   Sparkles,
-  PanelLeftClose,
-  PanelBottomClose,
-  X,
+  ArrowLeft,
+  ArrowRight,
+  Globe,
+  Code,
+  Terminal,
+  FileText,
+  Copy,
+  RotateCcw,
+  ThumbsUp,
+  ThumbsDown,
+  ChevronDown,
+  Mic,
   Plus,
+  Maximize2,
+  MoreHorizontal,
+  X,
 } from "lucide-react";
 
-interface FileNode {
-  name: string;
-  type: "file" | "folder";
-  children?: FileNode[];
+interface Message {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  codeBlocks?: { language: string; code: string }[];
+  thinking?: string;
 }
 
-const fileTree: FileNode[] = [
+const sampleConversation: Message[] = [
   {
-    name: "src",
-    type: "folder",
-    children: [
+    id: 1,
+    role: "user",
+    content: "Build a responsive navbar component with a mobile hamburger menu using Next.js and Tailwind CSS.",
+  },
+  {
+    id: 2,
+    role: "assistant",
+    content:
+      "I'll create a responsive navbar component with a hamburger menu for mobile. Here's the implementation:",
+    codeBlocks: [
       {
-        name: "app",
-        type: "folder",
-        children: [
-          { name: "layout.tsx", type: "file" },
-          { name: "page.tsx", type: "file" },
-          { name: "globals.css", type: "file" },
-        ],
-      },
-      {
-        name: "components",
-        type: "folder",
-        children: [
-          { name: "Navbar.tsx", type: "file" },
-          { name: "Hero.tsx", type: "file" },
-          { name: "Features.tsx", type: "file" },
-          { name: "Footer.tsx", type: "file" },
-        ],
-      },
-      {
-        name: "lib",
-        type: "folder",
-        children: [{ name: "utils.ts", type: "file" }],
+        language: "tsx",
+        code: `"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { Menu, X } from "lucide-react";
+
+export default function Navbar() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <nav className="sticky top-0 z-50 border-b bg-white">
+      <div className="mx-auto max-w-7xl px-4">
+        <div className="flex h-16 items-center justify-between">
+          <Link href="/" className="text-xl font-bold">
+            Logo
+          </Link>
+
+          {/* Desktop menu */}
+          <div className="hidden md:flex items-center gap-6">
+            <Link href="/features">Features</Link>
+            <Link href="/pricing">Pricing</Link>
+            <Link href="/docs">Docs</Link>
+          </div>
+
+          {/* Mobile toggle */}
+          <button
+            className="md:hidden"
+            onClick={() => setIsOpen(!isOpen)}
+          >
+            {isOpen ? <X /> : <Menu />}
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile menu */}
+      {isOpen && (
+        <div className="border-t px-4 py-3 md:hidden">
+          <Link href="/features" className="block py-2">
+            Features
+          </Link>
+          <Link href="/pricing" className="block py-2">
+            Pricing
+          </Link>
+          <Link href="/docs" className="block py-2">
+            Docs
+          </Link>
+        </div>
+      )}
+    </nav>
+  );
+}`,
       },
     ],
   },
-  { name: "package.json", type: "file" },
-  { name: "tsconfig.json", type: "file" },
-  { name: "README.md", type: "file" },
-];
+  {
+    id: 3,
+    role: "user",
+    content: "Can you add a dropdown menu for the Products section?",
+  },
+  {
+    id: 4,
+    role: "assistant",
+    content:
+      "Sure! I'll add a dropdown menu to the Products section with hover support and smooth animations:",
+    codeBlocks: [
+      {
+        language: "tsx",
+        code: `const [dropdownOpen, setDropdownOpen] = useState(false);
 
-function FileTreeItem({
-  node,
-  depth = 0,
-}: {
-  node: FileNode;
-  depth?: number;
-}) {
-  const [open, setOpen] = useState(depth < 2);
-
-  if (node.type === "folder") {
-    return (
-      <div>
-        <button
-          onClick={() => setOpen(!open)}
-          className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-          style={{ paddingLeft: `${depth * 12 + 8}px` }}
-        >
-          {open ? (
-            <ChevronDown size={12} />
-          ) : (
-            <ChevronRight size={12} />
-          )}
-          <Folder size={14} className="text-blue-500" />
-          <span>{node.name}</span>
-        </button>
-        {open &&
-          node.children?.map((child) => (
-            <FileTreeItem key={child.name} node={child} depth={depth + 1} />
-          ))}
-      </div>
-    );
-  }
-
-  const ext = node.name.split(".").pop();
-  const iconColor =
-    ext === "tsx" || ext === "ts"
-      ? "text-blue-500"
-      : ext === "css"
-        ? "text-purple-500"
-        : ext === "json"
-          ? "text-yellow-600"
-          : "text-gray-400";
-
-  return (
-    <button
-      className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-      style={{ paddingLeft: `${depth * 12 + 20}px` }}
-    >
-      <File size={14} className={iconColor} />
-      <span>{node.name}</span>
-    </button>
-  );
-}
-
-const codeContent = `"use client";
-
-import React, { useState } from "react";
-import Navigation from "./Navigation";
-import SupportChat from "./SupportChat";
-
-export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState("support");
-  const [messages, setMessages] = useState<Message[]>([]);
-
-  const handleSendMessage = async (content: string) => {
-    const newMessage: Message = {
-      id: Date.now(),
-      role: "user",
-      content,
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, newMessage]);
-
-    // AI response
-    const response = await fetch("/api/chat", {
-      method: "POST",
-      body: JSON.stringify({ messages: [...messages, newMessage] }),
-    });
-    const data = await response.json();
-    setMessages((prev) => [...prev, data.message]);
-  };
-
-  return (
-    <div className="flex h-[600px] border rounded-lg overflow-hidden">
-      <div className="w-64 border-r">
-        <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
-      </div>
-      <div className="flex-1 p-4">
-        <SupportChat messages={messages} onSend={handleSendMessage} />
-      </div>
+<div className="relative">
+  <button
+    onMouseEnter={() => setDropdownOpen(true)}
+    onMouseLeave={() => setDropdownOpen(false)}
+    className="flex items-center gap-1"
+  >
+    Products <ChevronDown size={14} />
+  </button>
+  {dropdownOpen && (
+    <div className="absolute top-full left-0 mt-2
+      w-48 rounded-lg border bg-white p-2 shadow-lg">
+      <Link href="/editor" className="block rounded px-3 py-2
+        hover:bg-gray-50">Editor</Link>
+      <Link href="/terminal" className="block rounded px-3 py-2
+        hover:bg-gray-50">Terminal</Link>
+      <Link href="/agent" className="block rounded px-3 py-2
+        hover:bg-gray-50">AI Agent</Link>
     </div>
-  );
-}`;
-
-const terminalLines = [
-  { prompt: true, text: "npm run dev" },
-  { prompt: false, text: "  ▲ Next.js 16.2.7 (Turbopack)" },
-  { prompt: false, text: "  - Local:   http://localhost:3000" },
-  { prompt: false, text: "  - Network: http://192.168.1.5:3000" },
-  { prompt: false, text: "" },
-  { prompt: false, text: " ✓ Starting..." },
-  { prompt: false, text: " ✓ Ready in 1.2s" },
+  )}
+</div>`,
+      },
+    ],
+  },
 ];
 
 export default function DashboardPage() {
-  const [showExplorer, setShowExplorer] = useState(true);
-  const [showTerminal, setShowTerminal] = useState(true);
-  const [showChat, setShowChat] = useState(true);
-  const [chatInput, setChatInput] = useState("");
-  const [activeTab, setActiveTab] = useState("Dashboard.tsx");
+  const [messages, setMessages] = useState<Message[]>(sampleConversation);
+  const [inputValue, setInputValue] = useState("");
+  const [rightPanel, setRightPanel] = useState<"none" | "browser" | "code" | "terminal">("none");
+  const model = "Auto";
 
-  const tabs = ["Dashboard.tsx", "SupportChat.tsx"];
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputValue.trim()) return;
+
+    const userMsg: Message = {
+      id: messages.length + 1,
+      role: "user",
+      content: inputValue,
+    };
+    setMessages([...messages, userMsg]);
+    setInputValue("");
+
+    setTimeout(() => {
+      const aiMsg: Message = {
+        id: messages.length + 2,
+        role: "assistant",
+        content:
+          "I'll help you with that. Let me think about the best approach...",
+      };
+      setMessages((prev) => [...prev, aiMsg]);
+    }, 1000);
+  };
 
   return (
     <div className="flex h-full flex-col">
-      {/* Top bar */}
-      <div className="flex h-12 items-center justify-between border-b border-gray-200 bg-white px-4">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setShowExplorer(!showExplorer)}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <PanelLeftClose size={16} />
-          </button>
-          <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5">
-            <Search size={14} className="text-gray-400" />
-            <span className="text-xs text-gray-400">
-              Search files...
-            </span>
-            <kbd className="ml-8 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] text-gray-400">
-              Ctrl+P
-            </kbd>
-          </div>
+      {/* Top bar - navigation */}
+      <div className="flex h-11 items-center justify-between border-b border-gray-200 bg-white px-3">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-900">
+            Ideation for SaaS product
+          </span>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50">
-            <GitBranch size={14} />
-            main
+        <div className="flex items-center gap-1">
+          {/* Navigation arrows */}
+          <button className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+            <ArrowLeft size={14} />
           </button>
-          <button className="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-1.5 text-xs text-green-600">
-            <Play size={14} />
-            Running
+          <button className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+            <ArrowRight size={14} />
           </button>
-          <button className="relative text-gray-400 hover:text-gray-600">
-            <Bell size={16} />
-            <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-rose-500" />
+
+          {/* View toggles */}
+          <div className="ml-2 flex items-center rounded-lg border border-gray-200">
+            <button
+              className="rounded-l-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              title="Code view"
+            >
+              <Code size={14} />
+            </button>
+            <button
+              onClick={() =>
+                setRightPanel(rightPanel === "browser" ? "none" : "browser")
+              }
+              className={`p-1.5 ${
+                rightPanel === "browser"
+                  ? "bg-gray-100 text-gray-900"
+                  : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              }`}
+              title="Browser view"
+            >
+              <Globe size={14} />
+            </button>
+            <button
+              onClick={() =>
+                setRightPanel(rightPanel === "terminal" ? "none" : "terminal")
+              }
+              className={`rounded-r-lg p-1.5 ${
+                rightPanel === "terminal"
+                  ? "bg-gray-100 text-gray-900"
+                  : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              }`}
+              title="Terminal view"
+            >
+              <Terminal size={14} />
+            </button>
+          </div>
+
+          {/* Copy / More */}
+          <button className="ml-1 rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+            <Copy size={14} />
           </button>
-          <button className="text-gray-400 hover:text-gray-600">
-            <MoreHorizontal size={16} />
+          <button className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+            <MoreHorizontal size={14} />
           </button>
         </div>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* File explorer */}
-        {showExplorer && (
-          <div className="w-56 shrink-0 overflow-y-auto border-r border-gray-200 bg-white">
-            <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Explorer
-              </span>
-              <button className="text-gray-400 hover:text-gray-600">
-                <Plus size={14} />
-              </button>
-            </div>
-            <div className="py-1">
-              {fileTree.map((node) => (
-                <FileTreeItem key={node.name} node={node} />
+        {/* Main chat area */}
+        <div className="flex flex-1 flex-col">
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="mx-auto max-w-3xl px-6 py-6">
+              {messages.map((msg) => (
+                <div key={msg.id} className="mb-6">
+                  {msg.role === "user" ? (
+                    <div className="flex justify-end">
+                      <div className="max-w-[80%] rounded-2xl bg-gray-100 px-4 py-3">
+                        <p className="text-sm leading-relaxed text-gray-900">
+                          {msg.content}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="mb-2 flex items-center gap-2">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-600">
+                          <Sparkles size={12} className="text-white" />
+                        </div>
+                        <span className="text-xs font-medium text-gray-500">
+                          Teskel Agent
+                        </span>
+                      </div>
+                      <div className="pl-8">
+                        <p className="text-sm leading-relaxed text-gray-700">
+                          {msg.content}
+                        </p>
+                        {msg.codeBlocks?.map((block, idx) => (
+                          <div
+                            key={idx}
+                            className="my-3 overflow-hidden rounded-xl border border-gray-200"
+                          >
+                            <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-2">
+                              <span className="text-xs font-medium text-gray-500">
+                                {block.language}
+                              </span>
+                              <button className="text-gray-400 hover:text-gray-600">
+                                <Copy size={12} />
+                              </button>
+                            </div>
+                            <pre className="overflow-x-auto bg-gray-900 p-4 text-[13px] leading-relaxed text-gray-300">
+                              <code>{block.code}</code>
+                            </pre>
+                          </div>
+                        ))}
+                        {/* Action buttons */}
+                        <div className="mt-2 flex items-center gap-1">
+                          <button className="rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-gray-500">
+                            <Copy size={14} />
+                          </button>
+                          <button className="rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-gray-500">
+                            <RotateCcw size={14} />
+                          </button>
+                          <button className="rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-gray-500">
+                            <ThumbsUp size={14} />
+                          </button>
+                          <button className="rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-gray-500">
+                            <ThumbsDown size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           </div>
-        )}
 
-        {/* Editor + terminal */}
-        <div className="flex flex-1 flex-col overflow-hidden">
-          {/* Tabs */}
-          <div className="flex border-b border-gray-200 bg-gray-50">
-            {tabs.map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`flex items-center gap-2 border-r border-gray-200 px-4 py-2.5 text-xs ${
-                  activeTab === tab
-                    ? "bg-white text-gray-900"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                <File size={12} className="text-blue-500" />
-                {tab}
-                {activeTab === tab && (
-                  <X
-                    size={12}
-                    className="ml-2 text-gray-300 hover:text-gray-500"
-                  />
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Code area */}
-          <div className="flex-1 overflow-auto bg-white p-4 font-mono text-sm">
-            {codeContent.split("\n").map((line, i) => (
-              <div key={i} className="flex hover:bg-gray-50">
-                <span className="mr-4 w-8 select-none text-right text-gray-300">
-                  {i + 1}
-                </span>
-                <span className="text-gray-700">{line}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Terminal */}
-          {showTerminal && (
-            <div className="h-48 shrink-0 border-t border-gray-200 bg-gray-50">
-              <div className="flex items-center justify-between border-b border-gray-200 px-4 py-1.5">
-                <div className="flex items-center gap-4">
-                  <span className="text-xs font-medium text-gray-900">
-                    Terminal
-                  </span>
-                  <span className="text-xs text-gray-400">Problems</span>
-                  <span className="text-xs text-gray-400">Output</span>
-                </div>
+          {/* Input area */}
+          <div className="border-t border-gray-100 bg-white px-6 py-4">
+            <form onSubmit={handleSubmit} className="mx-auto max-w-3xl">
+              <div className="flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm focus-within:border-gray-300 focus-within:shadow-md">
+                <Plus
+                  size={18}
+                  className="shrink-0 text-gray-400"
+                />
+                <input
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  placeholder="Send follow-up"
+                  className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
+                />
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setShowTerminal(false)}
+                    type="button"
+                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-gray-500 hover:bg-gray-100"
+                  >
+                    {model}
+                    <ChevronDown size={12} />
+                  </button>
+                  <button
+                    type="button"
                     className="text-gray-400 hover:text-gray-600"
                   >
-                    <PanelBottomClose size={14} />
+                    <Mic size={16} />
                   </button>
                 </div>
               </div>
-              <div className="overflow-auto p-3 font-mono text-xs">
-                {terminalLines.map((line, i) => (
-                  <div key={i} className="leading-relaxed">
-                    {line.prompt && (
-                      <span className="text-rose-600">~/project $ </span>
-                    )}
-                    <span className={line.prompt ? "text-gray-900" : "text-gray-500"}>
-                      {line.text}
-                    </span>
-                  </div>
-                ))}
-                <div className="mt-1 flex items-center">
-                  <span className="text-rose-600">~/project $ </span>
-                  <span className="ml-1 h-4 w-1.5 animate-pulse bg-gray-400" />
+              <div className="mt-2 flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  >
+                    <Globe size={12} />
+                    Web
+                  </button>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  >
+                    <Code size={12} />
+                    Code
+                  </button>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  >
+                    <Terminal size={12} />
+                    Terminal
+                  </button>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  >
+                    <FileText size={12} />
+                    Docs
+                  </button>
                 </div>
+                <span className="text-[11px] text-gray-400">Local</span>
               </div>
-            </div>
-          )}
+            </form>
+          </div>
         </div>
 
-        {/* AI Chat panel */}
-        {showChat && (
-          <div className="flex w-80 shrink-0 flex-col border-l border-gray-200 bg-white">
-            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+        {/* Right panel - Browser / Terminal */}
+        {rightPanel !== "none" && (
+          <div className="flex w-[45%] flex-col border-l border-gray-200 bg-white">
+            <div className="flex h-11 items-center justify-between border-b border-gray-200 px-3">
               <div className="flex items-center gap-2">
-                <Sparkles size={16} className="text-rose-500" />
-                <span className="text-sm font-medium text-gray-900">
-                  Teskel AI
-                </span>
-              </div>
-              <button
-                onClick={() => setShowChat(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X size={14} />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4">
-              {/* Welcome message */}
-              <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <div className="mb-2 flex items-center gap-2">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-600">
-                    <Sparkles size={12} className="text-white" />
-                  </div>
+                {rightPanel === "browser" && (
+                  <>
+                    <button className="rounded p-1 text-gray-400 hover:text-gray-600">
+                      <ArrowLeft size={14} />
+                    </button>
+                    <button className="rounded p-1 text-gray-400 hover:text-gray-600">
+                      <ArrowRight size={14} />
+                    </button>
+                    <div className="ml-2 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1">
+                      <Globe size={12} className="text-gray-400" />
+                      <span className="text-xs text-gray-400">
+                        Search or enter URL
+                      </span>
+                    </div>
+                  </>
+                )}
+                {rightPanel === "terminal" && (
                   <span className="text-xs font-medium text-gray-700">
-                    Teskel AI
+                    Terminal
                   </span>
-                </div>
-                <p className="text-sm leading-relaxed text-gray-700">
-                  Hi! I&apos;m Teskel AI. I can help you with:
-                </p>
-                <ul className="mt-2 space-y-1 text-sm text-gray-500">
-                  <li>• Writing and editing code</li>
-                  <li>• Debugging errors</li>
-                  <li>• Explaining code logic</li>
-                  <li>• Generating tests</li>
-                  <li>• Refactoring suggestions</li>
-                </ul>
+                )}
               </div>
-
-              {/* Sample conversation */}
-              <div className="mb-4 rounded-xl border border-rose-100 bg-rose-50/50 p-4">
-                <p className="text-sm text-gray-700">
-                  How do I add authentication to this Next.js app?
-                </p>
-              </div>
-
-              <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <div className="mb-2 flex items-center gap-2">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-600">
-                    <Sparkles size={12} className="text-white" />
-                  </div>
-                  <span className="text-xs font-medium text-gray-700">
-                    Teskel AI
-                  </span>
-                </div>
-                <p className="text-sm leading-relaxed text-gray-700">
-                  I recommend using <code className="rounded bg-gray-200 px-1 text-rose-600">NextAuth.js</code> for authentication. Here&apos;s a quick setup:
-                </p>
-                <div className="mt-3 rounded-lg bg-gray-900 p-3 font-mono text-xs text-gray-300">
-                  <div className="text-green-400">npm install next-auth</div>
-                  <div className="mt-2 text-gray-500">
-                    {`// src/app/api/auth/[...nextauth]/route.ts`}
-                  </div>
-                  <div className="text-purple-400">
-                    import NextAuth from &quot;next-auth&quot;
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Chat input */}
-            <div className="border-t border-gray-200 p-3">
-              <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
-                <input
-                  type="text"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="Ask Teskel AI..."
-                  className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
-                />
-                <button className="text-gray-400 hover:text-rose-500">
-                  <Send size={16} />
+              <div className="flex items-center gap-1">
+                <button className="rounded p-1 text-gray-400 hover:text-gray-600">
+                  <Maximize2 size={14} />
+                </button>
+                <button
+                  onClick={() => setRightPanel("none")}
+                  className="rounded p-1 text-gray-400 hover:text-gray-600"
+                >
+                  <X size={14} />
                 </button>
               </div>
-              <div className="mt-2 flex items-center justify-between">
-                <span className="text-[10px] text-gray-400">
-                  / for commands · @ for files
-                </span>
-                <span className="text-[10px] text-gray-400">
-                  Teskel AI 2.5
-                </span>
-              </div>
             </div>
+
+            {rightPanel === "browser" && (
+              <div className="flex flex-1 items-center justify-center text-gray-300">
+                <div className="text-center">
+                  <Globe size={48} className="mx-auto mb-3 opacity-30" />
+                  <p className="text-sm text-gray-400">
+                    Enter a URL to browse
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {rightPanel === "terminal" && (
+              <div className="flex-1 bg-gray-950 p-4 font-mono text-sm text-gray-300">
+                <div>
+                  <span className="text-rose-500">~/project $</span>{" "}
+                  <span className="text-gray-400">npm run dev</span>
+                </div>
+                <div className="mt-1 text-gray-500">
+                  ▲ Next.js 16.2.7 (Turbopack)
+                </div>
+                <div className="text-gray-500">
+                  - Local: http://localhost:3000
+                </div>
+                <div className="text-gray-500">
+                  - Network: http://192.168.1.5:3000
+                </div>
+                <div className="mt-1 text-green-400">✓ Ready in 1.2s</div>
+                <div className="mt-2 flex items-center">
+                  <span className="text-rose-500">~/project $</span>
+                  <span className="ml-1 h-4 w-1.5 animate-pulse bg-gray-500" />
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
