@@ -35,12 +35,12 @@ export default function Sidebar() {
 
   return (
     <aside
-      className={`flex h-screen flex-col border-r border-gray-800 bg-gray-900 transition-all ${
+      className={`flex h-screen flex-col border-r border-gray-200 bg-white transition-all ${
         collapsed ? "w-16" : "w-64"
       }`}
     >
       {/* Header */}
-      <div className="flex h-14 items-center justify-between border-b border-gray-800 px-4">
+      <div className="flex h-14 items-center justify-between border-b border-gray-200 px-4">
         {!collapsed && (
           <Link href="/dashboard" className="flex items-center gap-2">
             <svg
@@ -48,12 +48,12 @@ export default function Sidebar() {
               height="24"
               viewBox="0 0 28 28"
               fill="none"
-              className="text-rose-500"
+              className="text-rose-600"
             >
               <rect width="28" height="28" rx="6" fill="currentColor" />
               <path d="M8 8h4v12H8V8zm8 0h4v12h-4V8z" fill="white" />
             </svg>
-            <span className="text-lg font-bold text-white">Teskel</span>
+            <span className="text-lg font-bold text-gray-900">Teskel</span>
           </Link>
         )}
         {collapsed && (
@@ -62,7 +62,7 @@ export default function Sidebar() {
             height="24"
             viewBox="0 0 28 28"
             fill="none"
-            className="mx-auto text-rose-500"
+            className="mx-auto text-rose-600"
           >
             <rect width="28" height="28" rx="6" fill="currentColor" />
             <path d="M8 8h4v12H8V8zm8 0h4v12h-4V8z" fill="white" />
@@ -70,7 +70,7 @@ export default function Sidebar() {
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="rounded p-1 text-gray-500 hover:bg-gray-800 hover:text-gray-300"
+          className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
           aria-label="Toggle sidebar"
         >
           <ChevronDown
@@ -91,10 +91,10 @@ export default function Sidebar() {
       {/* Search */}
       {!collapsed && (
         <div className="px-3 pb-2">
-          <div className="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2">
-            <Search size={14} className="text-gray-500" />
-            <span className="text-xs text-gray-500">Search...</span>
-            <kbd className="ml-auto rounded border border-gray-700 bg-gray-900 px-1.5 py-0.5 text-[10px] text-gray-500">
+          <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+            <Search size={14} className="text-gray-400" />
+            <span className="text-xs text-gray-400">Search...</span>
+            <kbd className="ml-auto rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] text-gray-400">
               /
             </kbd>
           </div>
@@ -112,8 +112,8 @@ export default function Sidebar() {
                 href={item.href}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
                   isActive
-                    ? "bg-gray-800 text-white"
-                    : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-200"
+                    ? "bg-rose-50 text-rose-700"
+                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 }`}
               >
                 <item.icon size={18} />
@@ -135,7 +135,7 @@ export default function Sidebar() {
         {/* Recent chats */}
         {!collapsed && (
           <div className="mt-6">
-            <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-gray-600">
+            <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
               Recent
             </p>
             <div className="space-y-1">
@@ -147,9 +147,9 @@ export default function Sidebar() {
               ].map((chat) => (
                 <button
                   key={chat}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-gray-400 transition-colors hover:bg-gray-800/50 hover:text-gray-200"
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
                 >
-                  <Sparkles size={14} className="shrink-0 text-gray-600" />
+                  <Sparkles size={14} className="shrink-0 text-gray-400" />
                   <span className="truncate">{chat}</span>
                 </button>
               ))}
@@ -160,15 +160,15 @@ export default function Sidebar() {
         {/* Workspace */}
         {!collapsed && (
           <div className="mt-6">
-            <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-gray-600">
+            <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
               Workspace
             </p>
             <div className="space-y-1">
-              <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-gray-400 transition-colors hover:bg-gray-800/50 hover:text-gray-200">
+              <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700">
                 <GitBranch size={14} className="shrink-0" />
                 <span className="truncate">main</span>
               </button>
-              <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-gray-400 transition-colors hover:bg-gray-800/50 hover:text-gray-200">
+              <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700">
                 <Users size={14} className="shrink-0" />
                 <span className="truncate">Team workspace</span>
               </button>
@@ -178,7 +178,7 @@ export default function Sidebar() {
       </nav>
 
       {/* Bottom */}
-      <div className="border-t border-gray-800 p-3">
+      <div className="border-t border-gray-200 p-3">
         {bottomNav.map((item) => {
           const isActive = pathname === item.href;
           return (
@@ -187,8 +187,8 @@ export default function Sidebar() {
               href={item.href}
               className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
                 isActive
-                  ? "bg-gray-800 text-white"
-                  : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-200"
+                  ? "bg-rose-50 text-rose-700"
+                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
               }`}
             >
               <item.icon size={18} />
@@ -205,10 +205,10 @@ export default function Sidebar() {
           {!collapsed && (
             <div className="flex flex-1 items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-200">Teskel Dev</p>
+                <p className="text-sm font-medium text-gray-900">Teskel Dev</p>
                 <p className="text-xs text-gray-500">Pro Plan</p>
               </div>
-              <button className="text-gray-500 hover:text-gray-300">
+              <button className="text-gray-400 hover:text-gray-600">
                 <LogOut size={14} />
               </button>
             </div>

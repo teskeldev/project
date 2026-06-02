@@ -97,8 +97,8 @@ export default function ProjectsPage() {
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-white">Projects</h1>
-            <p className="mt-1 text-sm text-gray-400">
+            <h1 className="text-2xl font-semibold text-gray-900">Projects</h1>
+            <p className="mt-1 text-sm text-gray-500">
               Manage and access your coding projects
             </p>
           </div>
@@ -110,25 +110,25 @@ export default function ProjectsPage() {
 
         {/* Search and filters */}
         <div className="mb-6 flex items-center gap-4">
-          <div className="flex flex-1 items-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2.5">
-            <Search size={16} className="text-gray-500" />
+          <div className="flex flex-1 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5">
+            <Search size={16} className="text-gray-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Find a project..."
-              className="flex-1 bg-transparent text-sm text-white placeholder:text-gray-500 focus:outline-none"
+              className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
             />
           </div>
-          <div className="flex rounded-lg border border-gray-700">
+          <div className="flex rounded-lg border border-gray-200">
             {(["all", "public", "private"] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
                 className={`px-4 py-2.5 text-xs font-medium capitalize ${
                   filter === f
-                    ? "bg-gray-700 text-white"
-                    : "text-gray-400 hover:text-gray-200"
+                    ? "bg-gray-100 text-gray-900"
+                    : "text-gray-500 hover:text-gray-700"
                 } ${f === "all" ? "rounded-l-lg" : ""} ${f === "private" ? "rounded-r-lg" : ""}`}
               >
                 {f}
@@ -142,24 +142,24 @@ export default function ProjectsPage() {
           {filtered.map((project) => (
             <div
               key={project.name}
-              className="group rounded-xl border border-gray-800 bg-gray-900 p-5 transition-colors hover:border-gray-700"
+              className="group rounded-xl border border-gray-200 bg-white p-5 transition-colors hover:border-gray-300 hover:shadow-sm"
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   <FolderOpen
                     size={20}
-                    className="mt-0.5 text-gray-500"
+                    className="mt-0.5 text-gray-400"
                   />
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-semibold text-blue-400 hover:underline">
+                      <h3 className="text-sm font-semibold text-rose-600 hover:underline">
                         {project.name}
                       </h3>
                       <span
                         className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${
                           project.isPrivate
-                            ? "border-gray-700 text-gray-500"
-                            : "border-gray-700 text-gray-500"
+                            ? "border-gray-200 text-gray-500"
+                            : "border-gray-200 text-gray-500"
                         }`}
                       >
                         {project.isPrivate ? (
@@ -170,17 +170,17 @@ export default function ProjectsPage() {
                         {project.isPrivate ? "Private" : "Public"}
                       </span>
                     </div>
-                    <p className="mt-1 text-sm text-gray-400">
+                    <p className="mt-1 text-sm text-gray-500">
                       {project.description}
                     </p>
                   </div>
                 </div>
-                <button className="text-gray-600 opacity-0 transition-opacity group-hover:opacity-100 hover:text-gray-300">
+                <button className="text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 hover:text-gray-500">
                   <MoreHorizontal size={16} />
                 </button>
               </div>
 
-              <div className="mt-4 flex items-center gap-6 text-xs text-gray-500">
+              <div className="mt-4 flex items-center gap-6 text-xs text-gray-400">
                 <span className="flex items-center gap-1.5">
                   <span
                     className="h-2.5 w-2.5 rounded-full"
