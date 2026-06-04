@@ -94,7 +94,7 @@ export default function SettingsPage() {
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
                     activeTab === tab.id
-                      ? "bg-rose-50 text-rose-700"
+                      ? "bg-blue-50 text-blue-700"
                       : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
                   }`}
                 >
@@ -115,11 +115,11 @@ export default function SettingsPage() {
                   </h2>
                   <div className="rounded-xl border border-gray-200 bg-white p-6">
                     <div className="mb-6 flex items-center gap-4">
-                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-600 text-2xl font-bold text-white">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-900 text-2xl font-bold text-white">
                         T
                       </div>
                       <div>
-                        <button className="text-sm font-medium text-rose-600 hover:text-rose-700">
+                        <button className="text-sm font-medium text-blue-600 hover:text-blue-700">
                           Change avatar
                         </button>
                         <p className="text-xs text-gray-400">
@@ -136,7 +136,7 @@ export default function SettingsPage() {
                         <input
                           type="text"
                           defaultValue="Teskel Dev"
-                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500"
+                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                       </div>
                       <div>
@@ -146,7 +146,7 @@ export default function SettingsPage() {
                         <input
                           type="email"
                           defaultValue="teskel@example.com"
-                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500"
+                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                       </div>
                       <div className="sm:col-span-2">
@@ -156,13 +156,13 @@ export default function SettingsPage() {
                         <textarea
                           defaultValue="Building the future of coding with AI."
                           rows={3}
-                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500"
+                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                       </div>
                     </div>
 
                     <div className="mt-6 flex justify-end">
-                      <button className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700">
+                      <button className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800">
                         Save changes
                       </button>
                     </div>
@@ -225,12 +225,12 @@ export default function SettingsPage() {
                       key={plan.name}
                       className={`rounded-xl border p-6 ${
                         plan.current
-                          ? "border-rose-300 bg-rose-50/50"
+                          ? "border-blue-300 bg-blue-50/50"
                           : "border-gray-200 bg-white"
                       }`}
                     >
                       {plan.current && (
-                        <span className="mb-3 inline-block rounded-full bg-rose-600 px-2.5 py-0.5 text-xs font-medium text-white">
+                        <span className="mb-3 inline-block rounded-full bg-gray-900 px-2.5 py-0.5 text-xs font-medium text-white">
                           Current plan
                         </span>
                       )}
@@ -261,7 +261,7 @@ export default function SettingsPage() {
                         className={`mt-6 w-full rounded-lg px-4 py-2 text-sm font-medium ${
                           plan.current
                             ? "border border-gray-200 text-gray-400"
-                            : "bg-rose-600 text-white hover:bg-rose-700"
+                            : "bg-gray-900 text-white hover:bg-gray-800"
                         }`}
                         disabled={plan.current}
                       >
@@ -282,7 +282,7 @@ export default function SettingsPage() {
                         <span className="text-gray-700">12,847 / unlimited</span>
                       </div>
                       <div className="h-2 rounded-full bg-gray-100">
-                        <div className="h-2 w-1/3 rounded-full bg-rose-500" />
+                        <div className="h-2 w-1/3 rounded-full bg-blue-500" />
                       </div>
                     </div>
                     <div>
@@ -321,7 +321,7 @@ export default function SettingsPage() {
                         onClick={() => setTheme(t.id)}
                         className={`flex flex-1 flex-col items-center gap-2 rounded-xl border p-4 transition-colors ${
                           theme === t.id
-                            ? "border-rose-300 bg-rose-50"
+                            ? "border-blue-300 bg-blue-50"
                             : "border-gray-200 hover:border-gray-300"
                         }`}
                       >
@@ -329,7 +329,7 @@ export default function SettingsPage() {
                           size={20}
                           className={
                             theme === t.id
-                              ? "text-rose-500"
+                              ? "text-blue-500"
                               : "text-gray-400"
                           }
                         />
@@ -358,7 +358,7 @@ export default function SettingsPage() {
                         onChange={(e) =>
                           setFontSize(parseInt(e.target.value))
                         }
-                        className="w-full accent-rose-500"
+                        className="w-full accent-blue-500"
                       />
                     </div>
                     <div className="flex items-center justify-between">
@@ -368,7 +368,7 @@ export default function SettingsPage() {
                           Wrap long lines in the editor
                         </p>
                       </div>
-                      <button className="relative h-6 w-11 rounded-full bg-rose-600">
+                      <button className="relative h-6 w-11 rounded-full bg-gray-900">
                         <span className="absolute right-1 top-1 h-4 w-4 rounded-full bg-white" />
                       </button>
                     </div>
@@ -409,7 +409,7 @@ export default function SettingsPage() {
                   <h2 className="text-lg font-medium text-gray-900">
                     Team Members
                   </h2>
-                  <button className="flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700">
+                  <button className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800">
                     <Plus size={14} />
                     Invite member
                   </button>
@@ -441,7 +441,7 @@ export default function SettingsPage() {
                         <span
                           className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                             member.role === "Owner"
-                              ? "bg-rose-100 text-rose-600"
+                              ? "bg-blue-50 text-blue-600"
                               : member.role === "Admin"
                                 ? "bg-blue-100 text-blue-600"
                                 : "bg-gray-100 text-gray-500"
@@ -469,7 +469,7 @@ export default function SettingsPage() {
                     Use API keys to integrate Teskel with your own tools and
                     workflows.
                   </p>
-                  <button className="flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700">
+                  <button className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800">
                     <Plus size={14} />
                     Generate new key
                   </button>
@@ -551,7 +551,7 @@ export default function SettingsPage() {
                         </div>
                         <button
                           className={`relative h-6 w-11 rounded-full ${
-                            notif.on ? "bg-rose-600" : "bg-gray-200"
+                            notif.on ? "bg-gray-900" : "bg-gray-200"
                           }`}
                         >
                           <span

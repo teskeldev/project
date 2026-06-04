@@ -130,7 +130,7 @@ export default function ComposerPage() {
       {/* Top bar */}
       <div className="flex h-11 items-center justify-between border-b border-gray-200 px-4">
         <div className="flex items-center gap-3">
-          <Sparkles size={16} className="text-rose-500" />
+          <Sparkles size={16} className="text-blue-500" />
           <span className="text-sm font-medium text-gray-900">Composer</span>
           <span className="rounded bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500">
             {fileChanges.length} files
@@ -147,7 +147,7 @@ export default function ComposerPage() {
             <RotateCcw size={12} className="mr-1.5 inline" />
             Revert all
           </button>
-          <button className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-rose-700">
+          <button className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800">
             <Check size={12} className="mr-1.5 inline" />
             Accept all ({fileChanges.length})
           </button>
@@ -238,7 +238,7 @@ export default function ComposerPage() {
                     onClick={() =>
                       toggleAccept(fileChanges[selectedFile].file)
                     }
-                    className="rounded-lg bg-rose-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-rose-700"
+                    className="rounded-lg bg-gray-900 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-gray-800"
                   >
                     Accept
                   </button>
@@ -311,7 +311,7 @@ export default function ComposerPage() {
                 <Mic size={14} />
               </button>
               {inputValue.trim() && (
-                <button className="flex h-6 w-6 items-center justify-center rounded-lg bg-rose-600 text-white hover:bg-rose-700">
+                <button className="flex h-6 w-6 items-center justify-center rounded-lg bg-gray-900 text-white hover:bg-gray-800">
                   <ArrowRight size={12} />
                 </button>
               )}

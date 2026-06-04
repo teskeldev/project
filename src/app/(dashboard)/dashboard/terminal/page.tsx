@@ -206,7 +206,7 @@ export default function TerminalPage() {
           <div key={i} className="leading-6">
             {line.type === "prompt" ? (
               <div>
-                <span className="text-rose-400">{currentTab.cwd} $</span>{" "}
+                <span className="text-blue-400">{currentTab.cwd} $</span>{" "}
                 <span className="text-gray-300">{line.content}</span>
               </div>
             ) : line.type === "error" ? (
@@ -221,7 +221,7 @@ export default function TerminalPage() {
 
         {/* Active input */}
         <form onSubmit={handleCommand} className="flex items-center leading-6">
-          <span className="text-rose-400">
+          <span className="text-blue-400">
             {currentTab?.cwd || "~"} $
           </span>
           <input

@@ -101,10 +101,10 @@ export default function ChangelogPage() {
               className="relative border-l-2 border-gray-200 pl-8"
             >
               {/* Dot */}
-              <div className="absolute -left-2 top-0 h-4 w-4 rounded-full border-2 border-rose-500 bg-white" />
+              <div className="absolute -left-2 top-0 h-4 w-4 rounded-full border-2 border-blue-500 bg-white" />
 
               <div className="mb-2 flex items-center gap-3">
-                <span className="flex items-center gap-1.5 rounded-full bg-rose-100 px-3 py-0.5 text-sm font-medium text-rose-700">
+                <span className="flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-0.5 text-sm font-medium text-blue-700">
                   <Tag size={12} />
                   v{release.version}
                 </span>

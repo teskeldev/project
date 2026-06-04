@@ -84,7 +84,7 @@ export default function EnterprisePage() {
           transition={{ duration: 0.6 }}
           className="mb-20 text-center"
         >
-          <span className="mb-4 inline-block rounded-full bg-rose-100 px-4 py-1.5 text-sm font-medium text-rose-600">
+          <span className="mb-4 inline-block rounded-full bg-blue-50 px-4 py-1.5 text-sm font-medium text-blue-600">
             Enterprise
           </span>
           <h1 className="text-4xl font-semibold tracking-tight text-gray-900 md:text-5xl">
@@ -142,8 +142,8 @@ export default function EnterprisePage() {
               viewport={{ once: true }}
               className="rounded-2xl border border-gray-200 bg-white p-6"
             >
-              <div className="mb-3 inline-flex rounded-lg bg-rose-50 p-2.5">
-                <feature.icon size={20} className="text-rose-600" />
+              <div className="mb-3 inline-flex rounded-lg bg-blue-50 p-2.5">
+                <feature.icon size={20} className="text-blue-600" />
               </div>
               <h3 className="mb-2 text-sm font-semibold text-gray-900">
                 {feature.title}

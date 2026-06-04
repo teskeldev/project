@@ -156,7 +156,7 @@ export default function GitPage() {
       {/* Top bar */}
       <div className="flex h-11 items-center justify-between border-b border-gray-200 px-4">
         <div className="flex items-center gap-3">
-          <GitBranch size={16} className="text-rose-500" />
+          <GitBranch size={16} className="text-blue-500" />
           <span className="text-sm font-medium text-gray-900">
             Source Control
           </span>
@@ -186,7 +186,7 @@ export default function GitPage() {
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-xs font-medium transition-colors ${
               activeTab === tab.id
-                ? "border-rose-500 text-gray-900"
+                ? "border-blue-500 text-gray-900"
                 : "border-transparent text-gray-500 hover:text-gray-700"
             }`}
           >
@@ -210,7 +210,7 @@ export default function GitPage() {
                 rows={2}
               />
               <div className="mt-2 flex items-center gap-2">
-                <button className="flex-1 rounded-lg bg-rose-600 py-2 text-xs font-medium text-white hover:bg-rose-700">
+                <button className="flex-1 rounded-lg bg-gray-900 py-2 text-xs font-medium text-white hover:bg-gray-800">
                   <Check size={12} className="mr-1.5 inline" />
                   Commit ({stagedFiles.size} staged)
                 </button>
@@ -327,12 +327,12 @@ export default function GitPage() {
                 <div
                   key={b.name}
                   className={`flex items-center gap-3 rounded-lg px-3 py-2.5 ${
-                    b.current ? "bg-rose-50" : "hover:bg-gray-50"
+                    b.current ? "bg-blue-50" : "hover:bg-gray-50"
                   }`}
                 >
                   <GitBranch
                     size={14}
-                    className={b.current ? "text-rose-500" : "text-gray-400"}
+                    className={b.current ? "text-blue-500" : "text-gray-400"}
                   />
                   <span
                     className={`flex-1 text-sm ${b.current ? "font-medium text-gray-900" : "text-gray-700"}`}
@@ -340,7 +340,7 @@ export default function GitPage() {
                     {b.name}
                   </span>
                   {b.current && (
-                    <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-medium text-rose-600">
+                    <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">
                       current
                     </span>
                   )}
@@ -445,7 +445,7 @@ export default function GitPage() {
                 </div>
               ))}
             </div>
-            <button className="mt-4 flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-xs font-medium text-white hover:bg-rose-700">
+            <button className="mt-4 flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-xs font-medium text-white hover:bg-gray-800">
               <Plus size={14} />
               New Pull Request
             </button>

@@ -18,7 +18,7 @@ export default function ForgotPasswordPage() {
               height="32"
               viewBox="0 0 28 28"
               fill="none"
-              className="text-rose-600"
+              className="text-gray-900"
             >
               <rect width="28" height="28" rx="6" fill="currentColor" />
               <path d="M8 8h4v12H8V8zm8 0h4v12h-4V8z" fill="white" />
@@ -30,8 +30,8 @@ export default function ForgotPasswordPage() {
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-rose-50">
-            <Mail className="text-rose-600" size={24} />
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50">
+            <Mail className="text-blue-600" size={24} />
           </div>
           <h1 className="mb-2 text-2xl font-semibold text-gray-900">
             Check your email
@@ -42,7 +42,7 @@ export default function ForgotPasswordPage() {
           </p>
           <Link
             href="/login"
-            className="inline-flex items-center gap-2 text-sm font-medium text-rose-600 hover:text-rose-700"
+            className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
           >
             <ArrowLeft size={16} />
             Back to sign in
@@ -61,7 +61,7 @@ export default function ForgotPasswordPage() {
             height="32"
             viewBox="0 0 28 28"
             fill="none"
-            className="text-rose-600"
+            className="text-gray-900"
           >
             <rect width="28" height="28" rx="6" fill="currentColor" />
             <path d="M8 8h4v12H8V8zm8 0h4v12h-4V8z" fill="white" />
@@ -101,7 +101,7 @@ export default function ForgotPasswordPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+              className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               required
             />
           </div>
@@ -117,7 +117,7 @@ export default function ForgotPasswordPage() {
       <p className="mt-6 text-center text-sm text-gray-500">
         <Link
           href="/login"
-          className="inline-flex items-center gap-1 font-medium text-rose-600 hover:text-rose-700"
+          className="inline-flex items-center gap-1 font-medium text-blue-600 hover:text-blue-700"
         >
           <ArrowLeft size={14} />
           Back to sign in

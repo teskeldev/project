@@ -168,7 +168,7 @@ export default function ExtensionsPage() {
       <div className="border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Puzzle size={20} className="text-rose-500" />
+            <Puzzle size={20} className="text-blue-500" />
             <h1 className="text-lg font-semibold text-gray-900">Extensions</h1>
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -204,7 +204,7 @@ export default function ExtensionsPage() {
             onClick={() => setTab("marketplace")}
             className={`pb-2 text-sm font-medium ${
               tab === "marketplace"
-                ? "border-b-2 border-rose-500 text-gray-900"
+                ? "border-b-2 border-blue-500 text-gray-900"
                 : "text-gray-500 hover:text-gray-700"
             }`}
           >
@@ -214,7 +214,7 @@ export default function ExtensionsPage() {
             onClick={() => setTab("installed")}
             className={`pb-2 text-sm font-medium ${
               tab === "installed"
-                ? "border-b-2 border-rose-500 text-gray-900"
+                ? "border-b-2 border-blue-500 text-gray-900"
                 : "text-gray-500 hover:text-gray-700"
             }`}
           >
@@ -268,7 +268,7 @@ export default function ExtensionsPage() {
                 ) : (
                   <button
                     onClick={() => toggleInstall(ext.id)}
-                    className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-rose-700"
+                    className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800"
                   >
                     Install
                   </button>

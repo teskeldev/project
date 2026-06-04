@@ -315,7 +315,7 @@ function ActionItem({ action }: { action: ToolAction }) {
         </div>
         {action.type === "file_create" || action.type === "file_edit" ? (
           <div>
-            <code className="text-xs font-medium text-rose-600">
+            <code className="text-xs font-medium text-blue-600">
               {action.file}
             </code>
             <p className="text-[11px] text-gray-400">{action.description}</p>
@@ -325,7 +325,7 @@ function ActionItem({ action }: { action: ToolAction }) {
         ) : action.type === "terminal" ? (
           <div className="mt-1 rounded-lg bg-gray-900 px-3 py-2">
             <div className="text-xs text-gray-400">
-              <span className="text-rose-400">$</span> {action.command}
+              <span className="text-blue-400">$</span> {action.command}
             </div>
             <pre className="mt-1 whitespace-pre-wrap text-[11px] text-gray-500">
               {action.output}
@@ -437,7 +437,7 @@ export default function ChatPage() {
                   ) : (
                     <div>
                       <div className="mb-2 flex items-center gap-2">
-                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-600">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-900">
                           <Sparkles size={12} className="text-white" />
                         </div>
                         <span className="text-xs font-medium text-gray-500">
@@ -465,7 +465,7 @@ export default function ChatPage() {
                             {msg.actions && msg.actions.length > 0 && (
                               <div className="mt-3 space-y-1 rounded-xl border border-gray-200 bg-white p-3">
                                 <div className="mb-2 flex items-center gap-2">
-                                  <Play size={12} className="text-rose-500" />
+                                  <Play size={12} className="text-blue-500" />
                                   <span className="text-[11px] font-semibold text-gray-700">
                                     Agent Actions
                                   </span>
@@ -491,7 +491,7 @@ export default function ChatPage() {
                                       {block.language}
                                     </span>
                                     {block.file && (
-                                      <code className="text-[11px] text-rose-500">
+                                      <code className="text-[11px] text-blue-500">
                                         {block.file}
                                       </code>
                                     )}
@@ -629,14 +629,14 @@ export default function ChatPage() {
             {rightPanel === "terminal" && (
               <div className="flex-1 bg-gray-950 p-4 font-mono text-sm text-gray-300">
                 <div>
-                  <span className="text-rose-400">~/teskel $</span>{" "}
+                  <span className="text-blue-400">~/teskel $</span>{" "}
                   <span className="text-gray-400">npm install jose bcryptjs</span>
                 </div>
                 <div className="mt-1 text-gray-500">
                   added 2 packages in 1.2s
                 </div>
                 <div className="mt-2">
-                  <span className="text-rose-400">~/teskel $</span>{" "}
+                  <span className="text-blue-400">~/teskel $</span>{" "}
                   <span className="text-gray-400">npm run build</span>
                 </div>
                 <div className="mt-1 text-gray-500">
@@ -646,7 +646,7 @@ export default function ChatPage() {
                 <div className="text-green-400">✓ Linting passed</div>
                 <div className="text-green-400">✓ Type checking passed</div>
                 <div className="mt-2 flex items-center">
-                  <span className="text-rose-400">~/teskel $</span>
+                  <span className="text-blue-400">~/teskel $</span>
                   <span className="ml-1 inline-block h-4 w-1.5 animate-pulse bg-gray-500" />
                 </div>
               </div>

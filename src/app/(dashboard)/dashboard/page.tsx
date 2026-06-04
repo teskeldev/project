@@ -55,7 +55,7 @@ const suggestions = [
     icon: Rocket,
     label: "Deploy project",
     prompt: "Help me deploy my project to production",
-    color: "text-rose-500",
+    color: "text-blue-500",
   },
 ];
 
@@ -84,7 +84,7 @@ export default function DashboardPage() {
     <div className="flex h-full flex-col items-center justify-center bg-white">
       <div className="w-full max-w-2xl px-6">
         <div className="mb-8 text-center">
-          <div className="mb-4 inline-flex items-center justify-center rounded-2xl bg-gradient-to-br from-rose-500 to-rose-600 p-3 shadow-lg shadow-rose-200">
+          <div className="mb-4 inline-flex items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-3 shadow-lg shadow-blue-200">
             <Sparkles size={28} className="text-white" />
           </div>
           <h1 className="text-2xl font-semibold text-gray-900">
@@ -123,7 +123,7 @@ export default function DashboardPage() {
               {inputValue.trim() && (
                 <button
                   type="submit"
-                  className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-600 text-white hover:bg-rose-700"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-900 text-white hover:bg-gray-800"
                 >
                   <ArrowRight size={14} />
                 </button>

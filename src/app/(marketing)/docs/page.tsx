@@ -147,7 +147,7 @@ export default function DocsPage() {
             {popularArticles.map((article) => (
               <button
                 key={article}
-                className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 transition-colors hover:border-rose-200 hover:text-rose-600"
+                className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 transition-colors hover:border-blue-200 hover:text-blue-600"
               >
                 {article}
               </button>
@@ -164,10 +164,10 @@ export default function DocsPage() {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: i * 0.05 }}
               viewport={{ once: true }}
-              className="group rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:border-rose-200 hover:shadow-md"
+              className="group rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:border-blue-200 hover:shadow-md"
             >
-              <div className="mb-3 inline-flex rounded-lg bg-rose-50 p-2.5">
-                <cat.icon size={20} className="text-rose-600" />
+              <div className="mb-3 inline-flex rounded-lg bg-blue-50 p-2.5">
+                <cat.icon size={20} className="text-blue-600" />
               </div>
               <h3 className="mb-1 text-base font-semibold text-gray-900">
                 {cat.title}
@@ -176,7 +176,7 @@ export default function DocsPage() {
               <ul className="space-y-2">
                 {cat.articles.map((article) => (
                   <li key={article}>
-                    <button className="flex w-full items-center justify-between text-left text-sm text-gray-600 transition-colors hover:text-rose-600">
+                    <button className="flex w-full items-center justify-between text-left text-sm text-gray-600 transition-colors hover:text-blue-600">
                       <span>{article}</span>
                       <ArrowRight
                         size={14}

@@ -89,15 +89,15 @@ function FeatureCard({
       whileInView={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: index * 0.1 }}
       viewport={{ once: true }}
-      className="group rounded-2xl border border-gray-200 bg-white/70 p-8 backdrop-blur-sm transition-all hover:border-rose-200 hover:shadow-lg"
+      className="group rounded-2xl border border-[#E5E7EB] bg-white/70 p-8 backdrop-blur-sm transition-all hover:border-blue-200 hover:shadow-lg"
     >
-      <div className="mb-4 inline-flex rounded-xl bg-rose-50 p-3">
-        <Icon size={24} className="text-rose-600" />
+      <div className="mb-4 inline-flex rounded-xl bg-blue-50 p-3">
+        <Icon size={24} className="text-blue-600" />
       </div>
       <h3 className="mb-2 text-lg font-semibold text-gray-900">{title}</h3>
       <p className="text-sm leading-relaxed text-gray-600">{description}</p>
       {link && (
-        <p className="mt-4 text-sm font-medium text-rose-600 transition-colors group-hover:text-rose-700">
+        <p className="mt-4 text-sm font-medium text-blue-600 transition-colors group-hover:text-blue-700">
           {link} &rarr;
         </p>
       )}
@@ -160,7 +160,7 @@ function AgentDemo() {
               key={i}
               className="mb-3 flex items-start gap-3 rounded-lg p-2 hover:bg-gray-800"
             >
-              <div className="mt-1 h-4 w-4 animate-spin rounded-full border-2 border-rose-400 border-t-transparent" />
+              <div className="mt-1 h-4 w-4 animate-spin rounded-full border-2 border-blue-400 border-t-transparent" />
               <div>
                 <p className="text-sm font-medium text-gray-200">
                   {task.label}
@@ -318,7 +318,7 @@ function AutocompleteDemo() {
           Our specialized Tab model predicts your next action with striking
           speed and precision.
         </p>
-        <p className="mt-6 font-medium text-rose-600">Learn about Tab &rarr;</p>
+        <p className="mt-6 font-medium text-blue-600">Learn about Tab &rarr;</p>
       </div>
     </motion.div>
   );
