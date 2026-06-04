@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 
 const navLinks = [
   { label: "Product", href: "/#product" },
@@ -16,42 +15,24 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <motion.header
-      initial={{ y: -20, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      className="sticky top-0 z-50 w-full border-b border-[#E5E7EB]/60 bg-white/70 backdrop-blur-xl"
-    >
-      <nav className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
+    <header className="sticky top-0 z-50 w-full border-b border-[#E5E7EB]/60 bg-white/80 backdrop-blur-xl">
+      <nav className="mx-auto flex h-14 max-w-[1100px] items-center justify-between px-6">
         {/* Logo */}
-        <Link href="/" className="group flex items-center gap-2">
-          <div className="relative">
-            <svg
-              width="28"
-              height="28"
-              viewBox="0 0 28 28"
-              fill="none"
-              className="text-gray-900 transition-transform duration-300 group-hover:scale-110"
-            >
-              <rect width="28" height="28" rx="6" fill="currentColor" />
-              <path
-                d="M8 8h4v12H8V8zm8 0h4v12h-4V8z"
-                fill="white"
-              />
-            </svg>
-          </div>
-          <span className="text-xl font-bold tracking-tight text-gray-900">
-            TESKEL
-          </span>
+        <Link href="/" className="flex items-center gap-2">
+          <svg width="24" height="24" viewBox="0 0 28 28" fill="none" className="text-[#0F172A]">
+            <rect width="28" height="28" rx="6" fill="currentColor" />
+            <path d="M8 8h4v12H8V8zm8 0h4v12h-4V8z" fill="white" />
+          </svg>
+          <span className="text-[16px] font-bold tracking-tight text-[#0F172A]">Teskel</span>
         </Link>
 
         {/* Desktop links */}
-        <div className="hidden items-center gap-8 md:flex">
+        <div className="hidden items-center gap-7 md:flex">
           {navLinks.map((link) => (
             <Link
               key={link.label}
               href={link.href}
-              className="relative text-sm font-medium text-gray-500 transition-colors duration-200 hover:text-gray-900 after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:bg-blue-500 after:transition-all after:duration-300 hover:after:w-full"
+              className="text-[14px] text-[#64748B] transition-colors hover:text-[#0F172A]"
             >
               {link.label}
             </Link>
@@ -59,39 +40,35 @@ export default function Navbar() {
         </div>
 
         {/* Desktop CTA */}
-        <div className="hidden items-center gap-3 md:flex">
-          <Link
-            href="/login"
-            className="text-sm font-medium text-gray-500 transition-colors duration-200 hover:text-gray-900"
-          >
+        <div className="hidden items-center gap-4 md:flex">
+          <Link href="/login" className="text-[14px] text-[#64748B] transition-colors hover:text-[#0F172A]">
             Sign in
           </Link>
           <Link
             href="/enterprise"
-            className="btn-press rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 hover:shadow-sm"
+            className="rounded-full border border-[#E5E7EB] px-4 py-1.5 text-[13px] font-medium text-[#0F172A] transition-all hover:border-[#D1D5DB] hover:shadow-sm"
           >
             Contact sales
           </Link>
           <Link
             href="/download"
-            className="btn-press relative overflow-hidden rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-gray-800 hover:shadow-md"
+            className="rounded-full bg-[#0F172A] px-4 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-[#1E293B]"
           >
             Download
           </Link>
         </div>
 
         {/* Mobile toggle */}
-        <button
-          className="md:hidden"
-          onClick={() => setMobileOpen(!mobileOpen)}
-          aria-label="Toggle menu"
-        >
-          <motion.div
-            animate={{ rotate: mobileOpen ? 90 : 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            {mobileOpen ? <X size={24} /> : <Menu size={24} />}
-          </motion.div>
+        <button className="md:hidden" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Toggle menu">
+          {mobileOpen ? (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          ) : (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 12h18M3 6h18M3 18h18" />
+            </svg>
+          )}
         </button>
       </nav>
 
@@ -102,46 +79,32 @@ export default function Navbar() {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="overflow-hidden border-t border-[#E5E7EB]/60 bg-white/90 backdrop-blur-xl md:hidden"
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden border-t border-[#E5E7EB]/60 bg-white md:hidden"
           >
             <div className="flex flex-col gap-3 px-6 py-4">
-              {navLinks.map((link, i) => (
-                <motion.div
+              {navLinks.map((link) => (
+                <Link
                   key={link.label}
-                  initial={{ x: -10, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  transition={{ delay: i * 0.05 }}
+                  href={link.href}
+                  className="text-[14px] text-[#64748B] hover:text-[#0F172A]"
+                  onClick={() => setMobileOpen(false)}
                 >
-                  <Link
-                    href={link.href}
-                    className="block text-sm font-medium text-gray-600 transition-colors hover:text-gray-900"
-                    onClick={() => setMobileOpen(false)}
-                  >
-                    {link.label}
-                  </Link>
-                </motion.div>
+                  {link.label}
+                </Link>
               ))}
               <hr className="border-[#E5E7EB]" />
-              <Link href="/login" className="text-sm font-medium text-gray-600">
-                Sign in
-              </Link>
-              <Link
-                href="/enterprise"
-                className="rounded-lg border border-gray-200 px-4 py-2 text-center text-sm font-medium text-gray-700"
-              >
+              <Link href="/login" className="text-[14px] text-[#64748B]">Sign in</Link>
+              <Link href="/enterprise" className="rounded-full border border-[#E5E7EB] px-4 py-2 text-center text-[13px] font-medium text-[#0F172A]">
                 Contact sales
               </Link>
-              <Link
-                href="/download"
-                className="rounded-lg bg-gray-900 px-4 py-2 text-center text-sm font-medium text-white"
-              >
+              <Link href="/download" className="rounded-full bg-[#0F172A] px-4 py-2 text-center text-[13px] font-medium text-white">
                 Download
               </Link>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.header>
+    </header>
   );
 }
