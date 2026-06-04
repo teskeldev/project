@@ -8,16 +8,16 @@ import Footer from "@/components/Footer";
 
 export default function Home() {
   return (
-    <>
+    <div className="min-h-screen bg-[#F7F7F5]">
       <Navbar />
       <main className="flex-1">
         <Hero />
-        <EditorDemo />
         <SocialProof />
+        <EditorDemo />
         <Features />
         <CTA />
       </main>
       <Footer />
-    </>
+    </div>
   );
 }
