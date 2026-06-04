@@ -62,7 +62,7 @@ const footerColumns = [
 
 export default function Footer() {
   return (
-    <footer className="border-t border-gray-200 bg-white/50 px-6 py-16">
+    <footer className="border-t border-[#E5E7EB]/60 bg-white/50 px-6 py-16 backdrop-blur-sm">
       <div className="mx-auto max-w-7xl">
         <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 md:grid-cols-5">
           {footerColumns.map((col) => (
@@ -75,7 +75,7 @@ export default function Footer() {
                   <li key={link.label}>
                     <Link
                       href={link.href}
-                      className="text-sm text-gray-500 transition-colors hover:text-gray-900"
+                      className="text-sm text-gray-500 transition-all duration-200 hover:text-gray-900 hover:translate-x-0.5"
                     >
                       {link.label}
                     </Link>

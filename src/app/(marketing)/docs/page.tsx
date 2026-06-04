@@ -164,7 +164,7 @@ export default function DocsPage() {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: i * 0.05 }}
               viewport={{ once: true }}
-              className="group rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:border-blue-200 hover:shadow-md"
+              className="group rounded-2xl border border-gray-200/80 bg-white/80 p-6 transition-all duration-300 hover:border-blue-200 hover:shadow-lg"
             >
               <div className="mb-3 inline-flex rounded-lg bg-blue-50 p-2.5">
                 <cat.icon size={20} className="text-blue-600" />

@@ -96,7 +96,7 @@ export default function BlogPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="group mb-12 cursor-pointer rounded-2xl border border-gray-200 bg-white p-8 transition-all hover:border-blue-200 hover:shadow-lg"
+            className="group mb-12 cursor-pointer rounded-2xl border border-gray-200/80 bg-white/80 p-8 transition-all duration-300 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-50/50"
           >
             <span className="mb-4 inline-block rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
               Featured
@@ -134,7 +134,7 @@ export default function BlogPage() {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: i * 0.05 }}
               viewport={{ once: true }}
-              className="group cursor-pointer rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:border-blue-200 hover:shadow-md"
+              className="group cursor-pointer rounded-2xl border border-gray-200/80 bg-white/80 p-6 transition-all duration-300 hover:border-blue-200 hover:shadow-lg"
             >
               <span
                 className={`mb-3 inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${categoryColors[post.category]}`}

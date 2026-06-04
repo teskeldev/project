@@ -81,10 +81,10 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="flex h-full flex-col items-center justify-center bg-white">
+    <div className="flex h-full flex-col items-center justify-center bg-white/50 backdrop-blur-sm">
       <div className="w-full max-w-2xl px-6">
-        <div className="mb-8 text-center">
-          <div className="mb-4 inline-flex items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-3 shadow-lg shadow-blue-200">
+        <div className="animate-fade-in-up mb-8 text-center">
+          <div className="mb-4 inline-flex animate-float items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 p-3 shadow-lg shadow-blue-200/50">
             <Sparkles size={28} className="text-white" />
           </div>
           <h1 className="text-2xl font-semibold text-gray-900">
@@ -96,7 +96,7 @@ export default function DashboardPage() {
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3.5 shadow-sm transition-shadow focus-within:border-gray-300 focus-within:shadow-md">
+          <div className="flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3.5 shadow-sm transition-all duration-300 focus-within:border-blue-200 focus-within:shadow-lg focus-within:shadow-blue-50">
             <Plus size={18} className="shrink-0 text-gray-400" />
             <input
               type="text"
@@ -163,13 +163,14 @@ export default function DashboardPage() {
         </form>
 
         <div className="mt-8 grid grid-cols-3 gap-3">
-          {suggestions.map((s) => (
+          {suggestions.map((s, i) => (
             <button
               key={s.label}
               onClick={() => handleSuggestion(s.prompt)}
-              className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-left transition-all hover:border-gray-300 hover:shadow-sm"
+              className="animate-fade-in-up group flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md"
+              style={{ animationDelay: `${i * 0.06}s` }}
             >
-              <s.icon size={18} className={s.color} />
+              <s.icon size={18} className={`${s.color} transition-transform duration-200 group-hover:scale-110`} />
               <span className="text-xs font-medium text-gray-700">
                 {s.label}
               </span>
@@ -186,7 +187,7 @@ export default function DashboardPage() {
               <button
                 key={p.name}
                 onClick={() => router.push("/dashboard/projects")}
-                className="flex flex-1 items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 transition-all hover:border-gray-300 hover:shadow-sm"
+                className="flex flex-1 items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md"
               >
                 <Code size={16} className="text-gray-400" />
                 <div className="text-left">

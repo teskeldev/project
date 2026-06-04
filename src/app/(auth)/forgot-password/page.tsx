@@ -72,7 +72,7 @@ export default function ForgotPasswordPage() {
         </Link>
       </div>
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+      <div className="rounded-2xl border border-gray-200/80 bg-white/80 p-8 shadow-lg shadow-gray-200/50 backdrop-blur-sm transition-all duration-500">
         <h1 className="mb-2 text-2xl font-semibold text-gray-900">
           Reset your password
         </h1>

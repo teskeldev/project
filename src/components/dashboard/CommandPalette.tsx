@@ -105,9 +105,9 @@ export default function CommandPalette() {
   const categories = [...new Set(filtered.map((c) => c.category))];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]">
-      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={() => setOpen(false)} />
-      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh] animate-fade-in">
+      <div className="absolute inset-0 bg-black/20 backdrop-blur-md" onClick={() => setOpen(false)} />
+      <div className="animate-scale-in relative w-full max-w-lg overflow-hidden rounded-2xl border border-gray-200/80 bg-white/95 shadow-2xl backdrop-blur-xl">
         <div className="flex items-center gap-3 border-b border-gray-200 px-4 py-3">
           <Search size={16} className="text-gray-400" />
           <input
@@ -133,8 +133,8 @@ export default function CommandPalette() {
                     <button
                       key={cmd.id}
                       onClick={() => handleSelect(cmd)}
-                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                        globalIndex === selectedIndex ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:bg-gray-50"
+                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-all duration-150 ${
+                        globalIndex === selectedIndex ? "bg-blue-50/70 text-gray-900" : "text-gray-600 hover:bg-gray-50"
                       }`}
                     >
                       <cmd.icon size={16} className="shrink-0 text-gray-400" />

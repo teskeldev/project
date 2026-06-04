@@ -87,20 +87,24 @@ function FeatureCard({
     <motion.div
       initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: index * 0.1 }}
+      transition={{ duration: 0.6, delay: index * 0.12, ease: [0.16, 1, 0.3, 1] }}
       viewport={{ once: true }}
-      className="group rounded-2xl border border-[#E5E7EB] bg-white/70 p-8 backdrop-blur-sm transition-all hover:border-blue-200 hover:shadow-lg"
+      whileHover={{ y: -4, transition: { duration: 0.2 } }}
+      className="group relative rounded-2xl border border-[#E5E7EB] bg-white/80 p-8 backdrop-blur-sm transition-all duration-300 hover:border-blue-200/80 hover:shadow-xl hover:shadow-blue-100/50"
     >
-      <div className="mb-4 inline-flex rounded-xl bg-blue-50 p-3">
-        <Icon size={24} className="text-blue-600" />
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-50/0 to-blue-50/0 transition-all duration-500 group-hover:from-blue-50/30 group-hover:to-indigo-50/20" />
+      <div className="relative">
+        <div className="mb-4 inline-flex rounded-xl bg-blue-50 p-3 transition-transform duration-300 group-hover:scale-110">
+          <Icon size={24} className="text-blue-600" />
+        </div>
+        <h3 className="mb-2 text-lg font-semibold text-gray-900">{title}</h3>
+        <p className="text-sm leading-relaxed text-gray-500">{description}</p>
+        {link && (
+          <p className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-blue-600 transition-all duration-200 group-hover:gap-2 group-hover:text-blue-700">
+            {link} <span className="transition-transform duration-200 group-hover:translate-x-0.5">&rarr;</span>
+          </p>
+        )}
       </div>
-      <h3 className="mb-2 text-lg font-semibold text-gray-900">{title}</h3>
-      <p className="text-sm leading-relaxed text-gray-600">{description}</p>
-      {link && (
-        <p className="mt-4 text-sm font-medium text-blue-600 transition-colors group-hover:text-blue-700">
-          {link} &rarr;
-        </p>
-      )}
     </motion.div>
   );
 }
@@ -318,7 +322,7 @@ function AutocompleteDemo() {
           Our specialized Tab model predicts your next action with striking
           speed and precision.
         </p>
-        <p className="mt-6 font-medium text-blue-600">Learn about Tab &rarr;</p>
+        <p className="mt-6 inline-flex items-center gap-1 font-medium text-blue-600 transition-all duration-200 hover:gap-2">Learn about Tab <span>&rarr;</span></p>
       </div>
     </motion.div>
   );
