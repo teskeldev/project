@@ -53,7 +53,7 @@ export default function DownloadPage() {
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: i * 0.1 }}
-              className="rounded-2xl border border-gray-200 bg-white p-8 text-center"
+              className="rounded-2xl border border-gray-200/80 bg-white/80 p-8 text-center"
             >
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50">
                 <platform.icon size={32} className="text-blue-600" />
@@ -84,7 +84,7 @@ export default function DownloadPage() {
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="mt-12 rounded-2xl border border-gray-200 bg-white p-8"
+          className="mt-12 rounded-2xl border border-gray-200/80 bg-white/80 p-8"
         >
           <h3 className="mb-4 text-lg font-semibold text-gray-900">
             Install via CLI
@@ -118,7 +118,7 @@ export default function DownloadPage() {
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="mt-12 rounded-2xl border border-gray-200 bg-white p-8"
+          className="mt-12 rounded-2xl border border-gray-200/80 bg-white/80 p-8"
         >
           <h3 className="mb-4 text-lg font-semibold text-gray-900">
             System requirements

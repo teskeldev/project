@@ -30,14 +30,14 @@ export default function SocialProof() {
 
       {/* Marquee */}
       <div className="relative">
-        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-24 bg-gradient-to-r from-[#F7F7F5] to-transparent" />
-        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-24 bg-gradient-to-l from-[#F7F7F5] to-transparent" />
+        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-32 bg-gradient-to-r from-[#F7F7F5] to-transparent" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-32 bg-gradient-to-l from-[#F7F7F5] to-transparent" />
 
         <div className="flex animate-marquee items-center gap-16">
           {[...companies, ...companies].map((company, i) => (
             <div
               key={`${company}-${i}`}
-              className="flex shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white/60 px-8 py-5 backdrop-blur-sm"
+              className="flex shrink-0 items-center justify-center rounded-xl border border-gray-200/60 bg-white/70 px-8 py-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-gray-300 hover:shadow-md"
             >
               <span className="text-xl font-bold tracking-tight text-gray-800">
                 {company}

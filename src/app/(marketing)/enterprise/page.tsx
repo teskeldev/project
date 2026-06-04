@@ -140,7 +140,7 @@ export default function EnterprisePage() {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: i * 0.05 }}
               viewport={{ once: true }}
-              className="rounded-2xl border border-gray-200 bg-white p-6"
+              className="rounded-2xl border border-gray-200/80 bg-white/80 p-6"
             >
               <div className="mb-3 inline-flex rounded-lg bg-blue-50 p-2.5">
                 <feature.icon size={20} className="text-blue-600" />

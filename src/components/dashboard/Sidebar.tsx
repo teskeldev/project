@@ -53,10 +53,10 @@ export default function Sidebar() {
 
   if (collapsed) {
     return (
-      <aside className="flex h-screen w-12 flex-col items-center border-r border-gray-200 bg-white py-3">
+      <aside className="animate-slide-in-left flex h-screen w-12 flex-col items-center border-r border-[#E5E7EB]/60 bg-white/80 py-3 backdrop-blur-xl">
         <button
           onClick={() => setCollapsed(false)}
-          className="mb-3 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          className="mb-3 rounded-lg p-2 text-gray-400 transition-all duration-200 hover:bg-gray-100 hover:text-gray-600"
           title="Expand sidebar"
         >
           <ChevronRight size={16} />
@@ -81,7 +81,7 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="flex h-screen w-60 flex-col border-r border-gray-200 bg-white">
+    <aside className="animate-slide-in-left flex h-screen w-60 flex-col border-r border-[#E5E7EB]/60 bg-white/80 backdrop-blur-xl">
       {/* Top actions */}
       <div className="space-y-0.5 p-3">
         <button
