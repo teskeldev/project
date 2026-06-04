@@ -19,6 +19,14 @@ import {
   GitBranch,
   Puzzle,
   Layers,
+  Bot,
+  Plug,
+  BookOpen,
+  FileText,
+  PenTool,
+  SearchCode,
+  GitPullRequest,
+  Sparkles,
 } from "lucide-react";
 
 const chatHistory = [
@@ -46,6 +54,20 @@ const workspaceLinks = [
   { href: "/dashboard/extensions", icon: Puzzle, label: "Extensions" },
 ];
 
+const aiLinks = [
+  { href: "/dashboard/agents", icon: Bot, label: "Background Agents" },
+  { href: "/dashboard/artifacts", icon: Sparkles, label: "Artifacts" },
+  { href: "/dashboard/canvas", icon: PenTool, label: "Canvas" },
+  { href: "/dashboard/review", icon: GitPullRequest, label: "Diff Review" },
+  { href: "/dashboard/search", icon: SearchCode, label: "Search" },
+];
+
+const configLinks = [
+  { href: "/dashboard/knowledge", icon: BookOpen, label: "Knowledge" },
+  { href: "/dashboard/rules", icon: FileText, label: "Rules" },
+  { href: "/dashboard/integrations", icon: Plug, label: "Integrations" },
+];
+
 export default function Sidebar() {
   const pathname = usePathname();
   const [reposOpen, setReposOpen] = useState(true);
@@ -68,6 +90,18 @@ export default function Sidebar() {
           <Search size={16} />
         </button>
         {workspaceLinks.map((link) => (
+          <Link key={link.href} href={link.href} className={`mb-1 rounded-lg p-2 ${pathname === link.href ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"}`} title={link.label}>
+            <link.icon size={16} />
+          </Link>
+        ))}
+        <div className="my-1 h-px w-6 bg-gray-200" />
+        {aiLinks.map((link) => (
+          <Link key={link.href} href={link.href} className={`mb-1 rounded-lg p-2 ${pathname === link.href ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"}`} title={link.label}>
+            <link.icon size={16} />
+          </Link>
+        ))}
+        <div className="my-1 h-px w-6 bg-gray-200" />
+        {configLinks.map((link) => (
           <Link key={link.href} href={link.href} className={`mb-1 rounded-lg p-2 ${pathname === link.href ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"}`} title={link.label}>
             <link.icon size={16} />
           </Link>
@@ -132,6 +166,48 @@ export default function Sidebar() {
           Workspace
         </p>
         {workspaceLinks.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            className={`flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
+              pathname === link.href
+                ? "bg-gray-100 text-gray-900"
+                : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+            }`}
+          >
+            <link.icon size={14} />
+            <span>{link.label}</span>
+          </Link>
+        ))}
+      </div>
+
+      {/* AI Tools */}
+      <div className="border-t border-gray-100 px-3 py-2">
+        <p className="mb-1 px-3 text-[10px] font-medium uppercase tracking-wider text-gray-400">
+          AI Tools
+        </p>
+        {aiLinks.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            className={`flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
+              pathname === link.href
+                ? "bg-gray-100 text-gray-900"
+                : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+            }`}
+          >
+            <link.icon size={14} />
+            <span>{link.label}</span>
+          </Link>
+        ))}
+      </div>
+
+      {/* Configuration */}
+      <div className="border-t border-gray-100 px-3 py-2">
+        <p className="mb-1 px-3 text-[10px] font-medium uppercase tracking-wider text-gray-400">
+          Configuration
+        </p>
+        {configLinks.map((link) => (
           <Link
             key={link.href}
             href={link.href}
