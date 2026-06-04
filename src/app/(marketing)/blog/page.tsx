@@ -65,7 +65,7 @@ const categoryColors: Record<string, string> = {
   Engineering: "bg-purple-100 text-purple-700",
   Security: "bg-green-100 text-green-700",
   "Case Study": "bg-amber-100 text-amber-700",
-  Vision: "bg-rose-100 text-rose-700",
+  Vision: "bg-blue-50 text-blue-700",
   Comparison: "bg-cyan-100 text-cyan-700",
 };
 
@@ -96,12 +96,12 @@ export default function BlogPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="group mb-12 cursor-pointer rounded-2xl border border-gray-200 bg-white p-8 transition-all hover:border-rose-200 hover:shadow-lg"
+            className="group mb-12 cursor-pointer rounded-2xl border border-gray-200 bg-white p-8 transition-all hover:border-blue-200 hover:shadow-lg"
           >
-            <span className="mb-4 inline-block rounded-full bg-rose-100 px-3 py-1 text-xs font-medium text-rose-700">
+            <span className="mb-4 inline-block rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
               Featured
             </span>
-            <h2 className="mb-3 text-2xl font-semibold text-gray-900 group-hover:text-rose-600 md:text-3xl">
+            <h2 className="mb-3 text-2xl font-semibold text-gray-900 group-hover:text-blue-600 md:text-3xl">
               {featured.title}
             </h2>
             <p className="mb-4 max-w-2xl text-base text-gray-600">
@@ -134,14 +134,14 @@ export default function BlogPage() {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: i * 0.05 }}
               viewport={{ once: true }}
-              className="group cursor-pointer rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:border-rose-200 hover:shadow-md"
+              className="group cursor-pointer rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:border-blue-200 hover:shadow-md"
             >
               <span
                 className={`mb-3 inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${categoryColors[post.category]}`}
               >
                 {post.category}
               </span>
-              <h3 className="mb-2 text-lg font-semibold text-gray-900 group-hover:text-rose-600">
+              <h3 className="mb-2 text-lg font-semibold text-gray-900 group-hover:text-blue-600">
                 {post.title}
               </h3>
               <p className="mb-4 text-sm text-gray-600">{post.excerpt}</p>
@@ -158,7 +158,7 @@ export default function BlogPage() {
                 </div>
                 <ArrowRight
                   size={14}
-                  className="text-rose-500 opacity-0 transition-opacity group-hover:opacity-100"
+                  className="text-blue-500 opacity-0 transition-opacity group-hover:opacity-100"
                 />
               </div>
             </motion.article>

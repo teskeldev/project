@@ -223,7 +223,7 @@ export default function Sidebar() {
               : "hover:bg-gray-100"
           }`}
         >
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-100 text-xs font-bold text-rose-600">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-600">
             T
           </div>
           <div className="min-w-0 flex-1">

@@ -72,7 +72,7 @@ const codeLines = [
   {
     indent: 4,
     content: "<Navigation />",
-    color: "text-rose-400",
+    color: "text-blue-400",
   },
   { indent: 3, content: "</div>", color: "text-gray-300" },
   {
@@ -83,7 +83,7 @@ const codeLines = [
   {
     indent: 4,
     content: "<SupportChat />",
-    color: "text-rose-400",
+    color: "text-blue-400",
   },
   { indent: 3, content: "</div>", color: "text-gray-300" },
   { indent: 2, content: "</div>", color: "text-gray-300" },

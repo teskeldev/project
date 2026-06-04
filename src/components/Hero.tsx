@@ -9,8 +9,8 @@ export default function Hero() {
     <section className="relative overflow-hidden px-6 pb-20 pt-24 md:pb-32 md:pt-36">
       {/* Subtle gradient blobs */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full bg-rose-200/40 blur-3xl" />
-        <div className="absolute -right-40 top-20 h-[400px] w-[400px] rounded-full bg-pink-200/30 blur-3xl" />
+        <div className="absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full bg-blue-100/40 blur-3xl" />
+        <div className="absolute -right-40 top-20 h-[400px] w-[400px] rounded-full bg-slate-100/50 blur-3xl" />
       </div>
 
       <div className="relative mx-auto max-w-5xl">
@@ -22,7 +22,7 @@ export default function Hero() {
         >
           <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-tight text-gray-900 md:text-6xl md:leading-[1.15]">
             Built to make you extraordinarily productive,{" "}
-            <span className="text-rose-600">Teskel</span> is the best coding
+            <span className="text-blue-600">Teskel</span> is the best coding
             agent.
           </h1>
         </motion.div>

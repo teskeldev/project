@@ -101,7 +101,7 @@ export default function PricingPage() {
               }`}
             >
               Yearly
-              <span className="ml-1.5 rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-600">
+              <span className="ml-1.5 rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-600">
                 Save 20%
               </span>
             </button>
@@ -117,12 +117,12 @@ export default function PricingPage() {
               transition={{ duration: 0.5, delay: i * 0.1 }}
               className={`relative rounded-2xl border p-8 ${
                 plan.popular
-                  ? "border-rose-300 bg-white shadow-lg"
+                  ? "border-blue-300 bg-white shadow-lg"
                   : "border-gray-200 bg-white"
               }`}
             >
               {plan.popular && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-rose-600 px-3 py-1 text-xs font-medium text-white">
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gray-900 px-3 py-1 text-xs font-medium text-white">
                   Most popular
                 </span>
               )}

@@ -124,7 +124,7 @@ export default function Navbar() {
           </Link>
           <Link
             href="/signup"
-            className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700"
+            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
           >
             Get Started
           </Link>
@@ -236,7 +236,7 @@ function FileTreeItem({
       onClick={() => onSelect(node.name)}
       className={`flex w-full items-center gap-1 py-1 pr-2 text-left text-[13px] transition-colors ${
         selectedFile === node.name
-          ? "bg-rose-50 text-gray-900"
+          ? "bg-blue-50 text-gray-900"
           : "text-gray-600 hover:bg-gray-100"
       }`}
       style={{ paddingLeft: `${depth * 12 + 22}px` }}
@@ -358,7 +358,7 @@ export default function EditorPage() {
                 }}
                 className={`group flex h-full cursor-pointer items-center gap-2 border-r border-gray-200 px-3 text-[13px] ${
                   activeTab === tab.name
-                    ? "border-b-2 border-b-rose-500 bg-white text-gray-900"
+                    ? "border-b-2 border-b-blue-500 bg-white text-gray-900"
                     : "text-gray-500 hover:bg-gray-100"
                 }`}
               >
@@ -476,7 +476,7 @@ export default function EditorPage() {
                 </div>
                 <div className="h-36 overflow-auto bg-gray-950 p-3 font-mono text-[13px] text-gray-300">
                   <div>
-                    <span className="text-rose-400">~/teskel-web $</span>{" "}
+                    <span className="text-blue-400">~/teskel-web $</span>{" "}
                     <span className="text-gray-400">npm run dev</span>
                   </div>
                   <div className="mt-1 text-gray-500">
@@ -496,7 +496,7 @@ export default function EditorPage() {
                     ✓ Compiled /dashboard in 312ms
                   </div>
                   <div className="mt-2 flex items-center">
-                    <span className="text-rose-400">~/teskel-web $</span>
+                    <span className="text-blue-400">~/teskel-web $</span>
                     <span className="ml-1 inline-block h-4 w-1.5 animate-pulse bg-gray-500" />
                   </div>
                 </div>
@@ -570,7 +570,7 @@ function colorize(line: string): React.ReactNode {
     tokens.push({
       start: match.index,
       end: match.index + match[0].length,
-      className: "text-rose-600",
+      className: "text-blue-600",
     });
   }
 

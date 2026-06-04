@@ -163,7 +163,7 @@ export default function ProjectsPage() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold text-gray-900 group-hover:text-rose-600">
+                    <h3 className="text-sm font-semibold text-gray-900 group-hover:text-blue-600">
                       {project.name}
                     </h3>
                     <span className="flex items-center gap-1 rounded-full border border-gray-200 px-2 py-0.5 text-[10px] text-gray-500">

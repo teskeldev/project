@@ -15,7 +15,7 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-rose-100 bg-[#fff5f5]/80 backdrop-blur-lg">
+    <header className="sticky top-0 z-50 w-full border-b border-[#E5E7EB] bg-white/80 backdrop-blur-lg">
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
@@ -24,7 +24,7 @@ export default function Navbar() {
             height="28"
             viewBox="0 0 28 28"
             fill="none"
-            className="text-rose-600"
+            className="text-gray-900"
           >
             <rect width="28" height="28" rx="6" fill="currentColor" />
             <path
@@ -84,7 +84,7 @@ export default function Navbar() {
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="border-t border-rose-100 bg-[#fff5f5] px-6 py-4 md:hidden">
+        <div className="border-t border-[#E5E7EB] bg-white px-6 py-4 md:hidden">
           <div className="flex flex-col gap-4">
             {navLinks.map((link) => (
               <Link
@@ -96,7 +96,7 @@ export default function Navbar() {
                 {link.label}
               </Link>
             ))}
-            <hr className="border-rose-100" />
+            <hr className="border-[#E5E7EB]" />
             <Link
               href="/login"
               className="text-sm font-medium text-gray-600"

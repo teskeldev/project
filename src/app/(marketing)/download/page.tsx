@@ -55,8 +55,8 @@ export default function DownloadPage() {
               transition={{ duration: 0.5, delay: i * 0.1 }}
               className="rounded-2xl border border-gray-200 bg-white p-8 text-center"
             >
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-50">
-                <platform.icon size={32} className="text-rose-600" />
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50">
+                <platform.icon size={32} className="text-blue-600" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900">
                 {platform.name}
