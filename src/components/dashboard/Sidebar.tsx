@@ -27,6 +27,7 @@ import {
   SearchCode,
   GitPullRequest,
   Sparkles,
+  Palette,
 } from "lucide-react";
 
 const chatHistory = [
@@ -57,6 +58,7 @@ const workspaceLinks = [
 const aiLinks = [
   { href: "/dashboard/agents", icon: Bot, label: "Background Agents" },
   { href: "/dashboard/artifacts", icon: Sparkles, label: "Artifacts" },
+  { href: "/dashboard/design", icon: Palette, label: "Design" },
   { href: "/dashboard/canvas", icon: PenTool, label: "Canvas" },
   { href: "/dashboard/review", icon: GitPullRequest, label: "Diff Review" },
   { href: "/dashboard/search", icon: SearchCode, label: "Search" },
