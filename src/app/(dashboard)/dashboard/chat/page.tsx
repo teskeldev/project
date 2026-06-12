@@ -1,6 +1,14 @@
-"use client";
+﻿"use client";
 
-import { useState } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Sparkles,
   ArrowLeft,
@@ -14,351 +22,461 @@ import {
   ThumbsUp,
   ThumbsDown,
   ChevronDown,
-  ChevronUp,
   Mic,
   Plus,
   Maximize2,
   MoreHorizontal,
   X,
   Loader2,
-  Search,
-  FolderOpen,
-  Pencil,
-  Eye,
-  CheckCircle2,
-  Clock,
-  Play,
+  Send,
+  Square,
+  Wand2,
+  AlertTriangle,
 } from "lucide-react";
+import { useProject } from "@/lib/store/project";
+import {
+  ApiClientError,
+  createThread,
+  generateChangeSet,
+  listMessages,
+  listThreads,
+  type ChatMessage,
+} from "@/lib/client/api";
+import { streamChatCompletion } from "@/lib/client/chatStream";
 
-type ToolAction =
-  | { type: "thinking"; content: string }
-  | { type: "file_edit"; file: string; description: string }
-  | { type: "file_create"; file: string; description: string }
-  | { type: "terminal"; command: string; output: string }
-  | { type: "web_search"; query: string; results: string[] }
-  | { type: "file_read"; file: string }
-  | { type: "browser"; url: string };
+/* -------------------------------------------------------------------------- */
+/* Local view model                                                           */
+/*                                                                            */
+/* We render real persisted messages plus transient (optimistic / streaming)  */
+/* ones. Streaming assistant messages get a synthetic id until persisted.     */
+/* -------------------------------------------------------------------------- */
 
-interface Message {
-  id: number;
-  role: "user" | "assistant";
+type ViewRole = "user" | "assistant";
+
+interface ViewMessage {
+  id: string;
+  role: ViewRole;
   content: string;
-  codeBlocks?: { language: string; code: string; file?: string }[];
-  actions?: ToolAction[];
-  isLoading?: boolean;
+  // streaming state for the live assistant bubble
+  streaming?: boolean;
+  // inline error bubble (e.g. AI not configured)
+  error?: boolean;
+  errorCode?: string;
   timestamp?: string;
 }
 
-const agentConversation: Message[] = [
-  {
-    id: 1,
-    role: "user",
-    content:
-      "Build a user authentication system with login, signup, and password reset. Use Next.js API routes with JWT tokens.",
-    timestamp: "2:34 PM",
-  },
-  {
-    id: 2,
-    role: "assistant",
-    content:
-      "I'll build a complete authentication system for you. Let me start by planning the architecture and then implement each part.",
-    timestamp: "2:34 PM",
-    actions: [
-      {
-        type: "thinking",
-        content:
-          "The user wants a full auth system. I need to:\n1. Create a JWT utility for token generation/verification\n2. Set up API routes for /api/auth/login, /api/auth/signup, /api/auth/reset-password\n3. Create middleware for protected routes\n4. Add password hashing with bcrypt\n5. Set up a user model/schema\n\nI'll use jose for JWT (Edge-compatible), bcryptjs for password hashing, and create a simple in-memory store that can be swapped for a real DB later.",
-      },
-      {
-        type: "file_create",
-        file: "src/lib/auth/jwt.ts",
-        description: "JWT utility with sign/verify functions using jose",
-      },
-      {
-        type: "file_create",
-        file: "src/lib/auth/password.ts",
-        description: "Password hashing with bcryptjs",
-      },
-      {
-        type: "file_create",
-        file: "src/app/api/auth/signup/route.ts",
-        description: "Signup endpoint — validates input, hashes password, creates user, returns JWT",
-      },
-      {
-        type: "file_create",
-        file: "src/app/api/auth/login/route.ts",
-        description: "Login endpoint — verifies credentials, returns JWT",
-      },
-      {
-        type: "file_create",
-        file: "src/app/api/auth/reset-password/route.ts",
-        description: "Password reset endpoint — generates reset token, sends email",
-      },
-      {
-        type: "file_create",
-        file: "src/middleware.ts",
-        description: "Auth middleware for protecting /dashboard routes",
-      },
-      {
-        type: "terminal",
-        command: "npm install jose bcryptjs",
-        output:
-          "added 2 packages in 1.2s\n\n2 packages are looking for funding\n  run `npm fund` for details",
-      },
-      {
-        type: "terminal",
-        command: "npm run build",
-        output: "✓ Compiled successfully\n✓ Linting passed\n✓ Type checking passed\nRoute (app)\n├ ○ /api/auth/login\n├ ○ /api/auth/signup\n├ ○ /api/auth/reset-password\n└ ƒ /dashboard (protected)",
-      },
-    ],
-    codeBlocks: [
-      {
-        language: "typescript",
-        file: "src/lib/auth/jwt.ts",
-        code: `import { SignJWT, jwtVerify } from "jose";
-
-const secret = new TextEncoder().encode(
-  process.env.JWT_SECRET || "default-secret-change-me"
-);
-
-export async function signToken(payload: Record<string, unknown>) {
-  return new SignJWT(payload)
-    .setProtectedHeader({ alg: "HS256" })
-    .setExpirationTime("7d")
-    .setIssuedAt()
-    .sign(secret);
+function toViewMessage(m: ChatMessage): ViewMessage | null {
+  // We only render USER + ASSISTANT in the conversation surface. SYSTEM/TOOL
+  // messages are internal and not shown here.
+  // TODO(Phase 6): render structured agent actions from TOOL message metadata.
+  if (m.role !== "USER" && m.role !== "ASSISTANT") return null;
+  return {
+    id: m.id,
+    role: m.role === "USER" ? "user" : "assistant",
+    content: m.content,
+    timestamp: formatTime(m.createdAt),
+  };
 }
 
-export async function verifyToken(token: string) {
-  const { payload } = await jwtVerify(token, secret);
-  return payload;
-}`,
-      },
-      {
-        language: "typescript",
-        file: "src/app/api/auth/login/route.ts",
-        code: `import { NextResponse } from "next/server";
-import { comparePassword } from "@/lib/auth/password";
-import { signToken } from "@/lib/auth/jwt";
-import { findUserByEmail } from "@/lib/db/users";
-
-export async function POST(request: Request) {
-  const { email, password } = await request.json();
-
-  const user = await findUserByEmail(email);
-  if (!user) {
-    return NextResponse.json(
-      { error: "Invalid credentials" },
-      { status: 401 }
-    );
+function formatTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "";
   }
-
-  const valid = await comparePassword(password, user.passwordHash);
-  if (!valid) {
-    return NextResponse.json(
-      { error: "Invalid credentials" },
-      { status: 401 }
-    );
-  }
-
-  const token = await signToken({ userId: user.id, email });
-  return NextResponse.json({ token, user: { id: user.id, email } });
-}`,
-      },
-    ],
-  },
-  {
-    id: 3,
-    role: "user",
-    content: "Great! Now add rate limiting to the auth endpoints.",
-    timestamp: "2:36 PM",
-  },
-  {
-    id: 4,
-    role: "assistant",
-    content:
-      "I'll add rate limiting to protect the auth endpoints from brute force attacks.",
-    timestamp: "2:36 PM",
-    actions: [
-      {
-        type: "thinking",
-        content:
-          "For rate limiting, I'll create a simple in-memory rate limiter using a Map with IP-based tracking. In production this would use Redis, but for now a Map works.\n\nRate limits:\n- Login: 5 attempts per 15 minutes per IP\n- Signup: 3 attempts per hour per IP\n- Reset password: 3 attempts per hour per IP",
-      },
-      {
-        type: "file_create",
-        file: "src/lib/rate-limit.ts",
-        description: "In-memory rate limiter with sliding window",
-      },
-      {
-        type: "file_edit",
-        file: "src/app/api/auth/login/route.ts",
-        description: "Added rate limiting — 5 attempts per 15 min per IP",
-      },
-      {
-        type: "file_edit",
-        file: "src/app/api/auth/signup/route.ts",
-        description: "Added rate limiting — 3 attempts per hour per IP",
-      },
-      {
-        type: "web_search",
-        query: "Next.js rate limiting best practices edge runtime",
-        results: [
-          "Vercel Rate Limiting Guide — vercel.com/guides/rate-limiting",
-          "next-rate-limit npm package documentation",
-          "Upstash Redis rate limiting for Next.js",
-        ],
-      },
-      {
-        type: "terminal",
-        command: "npm run lint && npm run build",
-        output: "✓ No lint errors\n✓ Compiled successfully in 2.1s",
-      },
-    ],
-    codeBlocks: [
-      {
-        language: "typescript",
-        file: "src/lib/rate-limit.ts",
-        code: `interface RateLimitEntry {
-  count: number;
-  resetAt: number;
 }
 
-const store = new Map<string, RateLimitEntry>();
+/* -------------------------------------------------------------------------- */
+/* Tiny fenced-code splitter                                                  */
+/*                                                                            */
+/* Avoids a heavy markdown dependency. Splits assistant content into plain    */
+/* text segments and ```lang\n...``` fenced code blocks, preserving the       */
+/* existing dark code-block UI.                                               */
+/* -------------------------------------------------------------------------- */
 
-export function rateLimit(
-  key: string,
-  limit: number,
-  windowMs: number
-): { success: boolean; remaining: number } {
-  const now = Date.now();
-  const entry = store.get(key);
+type Segment =
+  | { kind: "text"; text: string }
+  | { kind: "code"; language: string; code: string };
 
-  if (!entry || now > entry.resetAt) {
-    store.set(key, { count: 1, resetAt: now + windowMs });
-    return { success: true, remaining: limit - 1 };
+function splitFencedContent(content: string): Segment[] {
+  const segments: Segment[] = [];
+  const fence = /```([^\n`]*)\n([\s\S]*?)```/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = fence.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({
+        kind: "text",
+        text: content.slice(lastIndex, match.index),
+      });
+    }
+    segments.push({
+      kind: "code",
+      language: match[1].trim() || "text",
+      code: match[2].replace(/\n$/, ""),
+    });
+    lastIndex = fence.lastIndex;
   }
 
-  if (entry.count >= limit) {
-    return { success: false, remaining: 0 };
+  if (lastIndex < content.length) {
+    segments.push({ kind: "text", text: content.slice(lastIndex) });
   }
 
-  entry.count++;
-  return { success: true, remaining: limit - entry.count };
-}`,
-      },
-    ],
-  },
-];
+  return segments;
+}
 
-function ThinkingBlock({ content }: { content: string }) {
-  const [expanded, setExpanded] = useState(false);
+function CodeBlock({ language, code }: { language: string; code: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {
+      // clipboard unavailable
+    }
+  };
 
   return (
-    <div className="my-2 rounded-xl border border-gray-200 bg-gray-50">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center gap-2 px-4 py-2.5 text-left"
-      >
-        <Sparkles size={14} className="text-amber-500" />
-        <span className="text-xs font-medium text-gray-600">
-          Thinking process
+    <div className="my-3 overflow-hidden rounded-xl border border-gray-200">
+      <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-2">
+        <span className="text-xs font-medium text-gray-500">{language}</span>
+        <button
+          onClick={copy}
+          className="text-gray-400 hover:text-gray-600"
+          title="Copy code"
+        >
+          <Copy size={12} />
+        </button>
+      </div>
+      <pre className="overflow-x-auto bg-gray-900 p-4 text-[13px] leading-relaxed text-gray-300">
+        <code>{code}</code>
+      </pre>
+      {copied && (
+        <span className="block bg-gray-900 px-4 pb-2 text-[10px] text-green-400">
+          Copied
         </span>
-        <Clock size={12} className="ml-1 text-gray-400" />
-        <span className="text-[11px] text-gray-400">2.3s</span>
-        {expanded ? (
-          <ChevronUp size={14} className="ml-auto text-gray-400" />
-        ) : (
-          <ChevronDown size={14} className="ml-auto text-gray-400" />
-        )}
-      </button>
-      {expanded && (
-        <div className="border-t border-gray-200 px-4 py-3">
-          <pre className="whitespace-pre-wrap text-xs leading-relaxed text-gray-600">
-            {content}
-          </pre>
-        </div>
       )}
     </div>
   );
 }
 
-function ActionItem({ action }: { action: ToolAction }) {
-  const iconMap = {
-    file_create: { icon: Plus, color: "text-green-500", bg: "bg-green-50", label: "Created" },
-    file_edit: { icon: Pencil, color: "text-blue-500", bg: "bg-blue-50", label: "Edited" },
-    file_read: { icon: Eye, color: "text-gray-500", bg: "bg-gray-50", label: "Read" },
-    terminal: { icon: Terminal, color: "text-amber-500", bg: "bg-amber-50", label: "Ran command" },
-    web_search: { icon: Search, color: "text-purple-500", bg: "bg-purple-50", label: "Searched" },
-    browser: { icon: Globe, color: "text-cyan-500", bg: "bg-cyan-50", label: "Browsed" },
-    thinking: { icon: Sparkles, color: "text-amber-500", bg: "bg-amber-50", label: "Thinking" },
-  };
-
-  if (action.type === "thinking") {
-    return <ThinkingBlock content={action.content} />;
-  }
-
-  const config = iconMap[action.type];
-  const Icon = config.icon;
-
+function AssistantContent({ content }: { content: string }) {
+  const segments = splitFencedContent(content);
   return (
-    <div className="flex items-start gap-2.5 py-1.5">
-      <div className={`mt-0.5 rounded-md p-1 ${config.bg}`}>
-        <Icon size={12} className={config.color} />
+    <>
+      {segments.map((seg, i) =>
+        seg.kind === "code" ? (
+          <CodeBlock key={i} language={seg.language} code={seg.code} />
+        ) : seg.text.trim() ? (
+          <p
+            key={i}
+            className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700"
+          >
+            {seg.text.trim()}
+          </p>
+        ) : null
+      )}
+    </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Empty / loading states                                                     */
+/* -------------------------------------------------------------------------- */
+
+function NoProjectState() {
+  return (
+    <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50">
+        <Sparkles size={22} className="text-blue-500" />
       </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-medium text-gray-500">
-            {config.label}
-          </span>
-          <CheckCircle2 size={11} className="text-green-500" />
-        </div>
-        {action.type === "file_create" || action.type === "file_edit" ? (
-          <div>
-            <code className="text-xs font-medium text-blue-600">
-              {action.file}
-            </code>
-            <p className="text-[11px] text-gray-400">{action.description}</p>
-          </div>
-        ) : action.type === "file_read" ? (
-          <code className="text-xs text-gray-600">{action.file}</code>
-        ) : action.type === "terminal" ? (
-          <div className="mt-1 rounded-lg bg-gray-900 px-3 py-2">
-            <div className="text-xs text-gray-400">
-              <span className="text-blue-400">$</span> {action.command}
-            </div>
-            <pre className="mt-1 whitespace-pre-wrap text-[11px] text-gray-500">
-              {action.output}
-            </pre>
-          </div>
-        ) : action.type === "web_search" ? (
-          <div>
-            <p className="text-xs text-gray-600">
-              &quot;{action.query}&quot;
-            </p>
-            <div className="mt-1 space-y-0.5">
-              {action.results.map((r, i) => (
-                <p key={i} className="text-[11px] text-blue-500">
-                  {r}
-                </p>
-              ))}
-            </div>
-          </div>
-        ) : action.type === "browser" ? (
-          <code className="text-xs text-blue-500">{action.url}</code>
-        ) : null}
+      <h2 className="text-base font-semibold text-gray-900">
+        Select or create a project to chat
+      </h2>
+      <p className="mt-1 max-w-sm text-sm text-gray-500">
+        Teskel chat works in the context of a project. Pick one from the
+        sidebar, or create a new project to get started.
+      </p>
+    </div>
+  );
+}
+
+function MessageSkeleton() {
+  return (
+    <div className="mx-auto max-w-3xl animate-pulse px-6 py-6">
+      <div className="mb-6 flex justify-end">
+        <div className="h-12 w-2/3 rounded-2xl bg-gray-100" />
+      </div>
+      <div className="mb-2 flex items-center gap-2">
+        <div className="h-6 w-6 rounded-full bg-gray-200" />
+        <div className="h-3 w-24 rounded bg-gray-100" />
+      </div>
+      <div className="space-y-2 pl-8">
+        <div className="h-3 w-full rounded bg-gray-100" />
+        <div className="h-3 w-5/6 rounded bg-gray-100" />
+        <div className="h-3 w-2/3 rounded bg-gray-100" />
       </div>
     </div>
   );
 }
 
-export default function ChatPage() {
-  const [messages] = useState<Message[]>(agentConversation);
+/* -------------------------------------------------------------------------- */
+/* Chat surface (depends on search params -> wrapped in <Suspense>)           */
+/* -------------------------------------------------------------------------- */
+
+function ChatSurface() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const threadParam = searchParams.get("thread");
+
+  const { activeProject } = useProject();
+  const projectId = activeProject?.id ?? null;
+
+  const [threadId, setThreadId] = useState<string | null>(threadParam);
+  const [messages, setMessages] = useState<ViewMessage[]>([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const [inputValue, setInputValue] = useState("");
-  const [rightPanel, setRightPanel] = useState<
-    "none" | "browser" | "terminal"
-  >("none");
+  const [streaming, setStreaming] = useState(false);
+  const [creatingThread, setCreatingThread] = useState(false);
+
+  const [changesetState, setChangesetState] = useState<
+    | { status: "idle" }
+    | { status: "loading" }
+    | { status: "ready"; id: string }
+    | { status: "error"; message: string }
+  >({ status: "idle" });
+
+  const [rightPanel, setRightPanel] = useState<"none" | "browser" | "terminal">(
+    "none"
+  );
   const model = "Auto";
+
+  const abortRef = useRef<AbortController | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  // Keep thread state in sync with the URL search param.
+  useEffect(() => {
+    setThreadId(threadParam);
+  }, [threadParam]);
+
+  // When no thread is specified, default to the project's most-recent thread.
+  useEffect(() => {
+    if (!projectId || threadParam) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { threads } = await listThreads(projectId);
+        if (cancelled) return;
+        if (threads.length > 0) {
+          router.replace(`/dashboard/chat?thread=${threads[0].id}`);
+        } else {
+          setThreadId(null);
+          setMessages([]);
+        }
+      } catch {
+        // Non-fatal: user can still start a new chat.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, threadParam, router]);
+
+  // Load messages for the active thread.
+  useEffect(() => {
+    if (!threadId) {
+      setMessages([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingMessages(true);
+    setLoadError(null);
+    (async () => {
+      try {
+        const { messages: raw } = await listMessages(threadId);
+        if (cancelled) return;
+        setMessages(
+          raw
+            .map(toViewMessage)
+            .filter((m): m is ViewMessage => m !== null)
+        );
+      } catch (err) {
+        if (cancelled) return;
+        setLoadError(
+          err instanceof ApiClientError
+            ? err.message
+            : "Failed to load messages"
+        );
+      } finally {
+        if (!cancelled) setLoadingMessages(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [threadId]);
+
+  // Auto-scroll to the newest content.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages]);
+
+  // Abort any in-flight stream on unmount.
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
+  const ensureThread = useCallback(async (): Promise<string> => {
+    if (threadId) return threadId;
+    if (!projectId) throw new ApiClientError("No active project", 400);
+    setCreatingThread(true);
+    try {
+      const { thread } = await createThread(projectId);
+      setThreadId(thread.id);
+      // Reflect the new thread in the URL without a full navigation.
+      router.replace(`/dashboard/chat?thread=${thread.id}`);
+      return thread.id;
+    } finally {
+      setCreatingThread(false);
+    }
+  }, [threadId, projectId, router]);
+
+  const send = useCallback(async () => {
+    const content = inputValue.trim();
+    if (!content || streaming || !projectId) return;
+
+    setChangesetState({ status: "idle" });
+
+    let activeThreadId: string;
+    try {
+      activeThreadId = await ensureThread();
+    } catch (err) {
+      setLoadError(
+        err instanceof ApiClientError ? err.message : "Failed to start chat"
+      );
+      return;
+    }
+
+    setInputValue("");
+
+    const userMsg: ViewMessage = {
+      id: `local-user-${Date.now()}`,
+      role: "user",
+      content,
+      timestamp: formatTime(new Date().toISOString()),
+    };
+    const assistantId = `local-assistant-${Date.now()}`;
+    const assistantMsg: ViewMessage = {
+      id: assistantId,
+      role: "assistant",
+      content: "",
+      streaming: true,
+    };
+    setMessages((prev) => [...prev, userMsg, assistantMsg]);
+    setStreaming(true);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const patchAssistant = (patch: Partial<ViewMessage>) =>
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, ...patch } : m))
+      );
+
+    await streamChatCompletion(
+      { threadId: activeThreadId, content, signal: controller.signal },
+      {
+        onDelta: (delta) =>
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? { ...m, content: m.content + delta }
+                : m
+            )
+          ),
+        onDone: () => {
+          patchAssistant({ streaming: false });
+        },
+        onError: (message, code) => {
+          patchAssistant({
+            streaming: false,
+            error: true,
+            errorCode: code,
+            content: message,
+          });
+        },
+      }
+    );
+
+    setStreaming(false);
+    abortRef.current = null;
+  }, [inputValue, streaming, projectId, ensureThread]);
+
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setStreaming(false);
+    setMessages((prev) =>
+      prev.map((m) => (m.streaming ? { ...m, streaming: false } : m))
+    );
+  }, []);
+
+  const startNewThread = useCallback(async () => {
+    if (!projectId || creatingThread) return;
+    try {
+      const { thread } = await createThread(projectId);
+      setMessages([]);
+      router.replace(`/dashboard/chat?thread=${thread.id}`);
+    } catch (err) {
+      setLoadError(
+        err instanceof ApiClientError ? err.message : "Failed to create chat"
+      );
+    }
+  }, [projectId, creatingThread, router]);
+
+  const proposeChanges = useCallback(async () => {
+    const instruction = inputValue.trim();
+    if (!instruction || !projectId) return;
+    setChangesetState({ status: "loading" });
+    try {
+      const { changeSet } = await generateChangeSet({
+        projectId,
+        instruction,
+      });
+      setChangesetState({ status: "ready", id: changeSet.id });
+    } catch (err) {
+      setChangesetState({
+        status: "error",
+        message:
+          err instanceof ApiClientError
+            ? err.message
+            : "Failed to generate changes",
+      });
+    }
+  }, [inputValue, projectId]);
+
+  if (!activeProject) {
+    return <NoProjectState />;
+  }
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      void send();
+    }
+  };
+
+  const hasMessages = messages.length > 0;
 
   return (
     <div className="flex h-full flex-col">
@@ -366,21 +484,23 @@ export default function ChatPage() {
       <div className="flex h-11 items-center justify-between border-b border-gray-200 bg-white px-3">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-gray-900">
-            Build auth system with JWT
+            {activeProject.name}
           </span>
-          <span className="rounded bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-600">
-            Agent active
-          </span>
-          <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">
-            7 files changed
-          </span>
+          {streaming && (
+            <span className="flex items-center gap-1 rounded bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-600">
+              <Loader2 size={10} className="animate-spin" />
+              Streaming
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1">
-          <button className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
-            <ArrowLeft size={14} />
-          </button>
-          <button className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
-            <ArrowRight size={14} />
+          <button
+            onClick={startNewThread}
+            disabled={creatingThread}
+            className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+            title="New chat"
+          >
+            <Plus size={12} /> New chat
           </button>
           <div className="ml-2 flex items-center rounded-lg border border-gray-200">
             <button className="rounded-l-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
@@ -390,7 +510,11 @@ export default function ChatPage() {
               onClick={() =>
                 setRightPanel(rightPanel === "browser" ? "none" : "browser")
               }
-              className={`p-1.5 ${rightPanel === "browser" ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"}`}
+              className={`p-1.5 ${
+                rightPanel === "browser"
+                  ? "bg-gray-100 text-gray-900"
+                  : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              }`}
             >
               <Globe size={14} />
             </button>
@@ -398,15 +522,16 @@ export default function ChatPage() {
               onClick={() =>
                 setRightPanel(rightPanel === "terminal" ? "none" : "terminal")
               }
-              className={`rounded-r-lg p-1.5 ${rightPanel === "terminal" ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"}`}
+              className={`rounded-r-lg p-1.5 ${
+                rightPanel === "terminal"
+                  ? "bg-gray-100 text-gray-900"
+                  : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              }`}
             >
               <Terminal size={14} />
             </button>
           </div>
           <button className="ml-1 rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
-            <FolderOpen size={14} />
-          </button>
-          <button className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
             <MoreHorizontal size={14} />
           </button>
         </div>
@@ -415,135 +540,168 @@ export default function ChatPage() {
       <div className="flex flex-1 overflow-hidden">
         {/* Main chat */}
         <div className="flex flex-1 flex-col">
-          <div className="flex-1 overflow-y-auto">
-            <div className="mx-auto max-w-3xl px-6 py-6">
-              {messages.map((msg) => (
-                <div key={msg.id} className="mb-6">
-                  {msg.role === "user" ? (
-                    <div className="flex justify-end">
-                      <div className="max-w-[80%]">
-                        <div className="rounded-2xl bg-gray-100 px-4 py-3">
-                          <p className="text-sm leading-relaxed text-gray-900">
-                            {msg.content}
-                          </p>
-                        </div>
-                        {msg.timestamp && (
-                          <p className="mt-1 text-right text-[10px] text-gray-400">
-                            {msg.timestamp}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <div className="mb-2 flex items-center gap-2">
-                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-900">
-                          <Sparkles size={12} className="text-white" />
-                        </div>
-                        <span className="text-xs font-medium text-gray-500">
-                          Teskel Agent
-                        </span>
-                        {msg.timestamp && (
-                          <span className="text-[10px] text-gray-400">
-                            {msg.timestamp}
-                          </span>
-                        )}
-                      </div>
-                      <div className="pl-8">
-                        {msg.isLoading ? (
-                          <div className="flex items-center gap-2 text-sm text-gray-400">
-                            <Loader2 size={14} className="animate-spin" />
-                            Thinking...
-                          </div>
-                        ) : (
-                          <>
-                            <p className="text-sm leading-relaxed text-gray-700">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto">
+            {loadingMessages && !hasMessages ? (
+              <MessageSkeleton />
+            ) : loadError ? (
+              <div className="mx-auto max-w-3xl px-6 py-6">
+                <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                  <AlertTriangle size={16} className="mt-0.5 text-red-500" />
+                  <div>
+                    <p className="text-sm font-medium text-red-700">
+                      Couldn&apos;t load this conversation
+                    </p>
+                    <p className="text-xs text-red-600">{loadError}</p>
+                  </div>
+                </div>
+              </div>
+            ) : !hasMessages ? (
+              <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-900">
+                  <Sparkles size={20} className="text-white" />
+                </div>
+                <h2 className="text-base font-semibold text-gray-900">
+                  Start a new chat
+                </h2>
+                <p className="mt-1 max-w-sm text-sm text-gray-500">
+                  Ask Teskel to build a feature, fix a bug, or explain code in{" "}
+                  <span className="font-medium">{activeProject.name}</span>.
+                </p>
+              </div>
+            ) : (
+              <div className="mx-auto max-w-3xl px-6 py-6">
+                {messages.map((msg) => (
+                  <div key={msg.id} className="mb-6">
+                    {msg.role === "user" ? (
+                      <div className="flex justify-end">
+                        <div className="max-w-[80%]">
+                          <div className="rounded-2xl bg-gray-100 px-4 py-3">
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-900">
                               {msg.content}
                             </p>
-
-                            {/* Agent actions */}
-                            {msg.actions && msg.actions.length > 0 && (
-                              <div className="mt-3 space-y-1 rounded-xl border border-gray-200 bg-white p-3">
-                                <div className="mb-2 flex items-center gap-2">
-                                  <Play size={12} className="text-blue-500" />
-                                  <span className="text-[11px] font-semibold text-gray-700">
-                                    Agent Actions
-                                  </span>
-                                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500">
-                                    {msg.actions.length} steps
-                                  </span>
-                                </div>
-                                {msg.actions.map((action, idx) => (
-                                  <ActionItem key={idx} action={action} />
-                                ))}
-                              </div>
-                            )}
-
-                            {/* Code blocks */}
-                            {msg.codeBlocks?.map((block, idx) => (
-                              <div
-                                key={idx}
-                                className="my-3 overflow-hidden rounded-xl border border-gray-200"
-                              >
-                                <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-2">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs font-medium text-gray-500">
-                                      {block.language}
-                                    </span>
-                                    {block.file && (
-                                      <code className="text-[11px] text-blue-500">
-                                        {block.file}
-                                      </code>
-                                    )}
-                                  </div>
-                                  <button className="text-gray-400 hover:text-gray-600">
-                                    <Copy size={12} />
+                          </div>
+                          {msg.timestamp && (
+                            <p className="mt-1 text-right text-[10px] text-gray-400">
+                              {msg.timestamp}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="mb-2 flex items-center gap-2">
+                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-900">
+                            <Sparkles size={12} className="text-white" />
+                          </div>
+                          <span className="text-xs font-medium text-gray-500">
+                            Teskel Agent
+                          </span>
+                          {msg.timestamp && (
+                            <span className="text-[10px] text-gray-400">
+                              {msg.timestamp}
+                            </span>
+                          )}
+                        </div>
+                        <div className="pl-8">
+                          {msg.error ? (
+                            <AssistantError
+                              message={msg.content}
+                              code={msg.errorCode}
+                            />
+                          ) : msg.streaming && msg.content.length === 0 ? (
+                            <div className="flex items-center gap-2 text-sm text-gray-400">
+                              <Loader2 size={14} className="animate-spin" />
+                              Thinking...
+                            </div>
+                          ) : (
+                            <>
+                              <AssistantContent content={msg.content} />
+                              {msg.streaming && (
+                                <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-gray-400 align-middle" />
+                              )}
+                              {!msg.streaming && (
+                                <div className="mt-2 flex items-center gap-1">
+                                  <button className="rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-gray-500">
+                                    <Copy size={14} />
+                                  </button>
+                                  <button className="rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-gray-500">
+                                    <RotateCcw size={14} />
+                                  </button>
+                                  <button className="rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-gray-500">
+                                    <ThumbsUp size={14} />
+                                  </button>
+                                  <button className="rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-gray-500">
+                                    <ThumbsDown size={14} />
                                   </button>
                                 </div>
-                                <pre className="overflow-x-auto bg-gray-900 p-4 text-[13px] leading-relaxed text-gray-300">
-                                  <code>{block.code}</code>
-                                </pre>
-                              </div>
-                            ))}
-
-                            {/* Message actions */}
-                            <div className="mt-2 flex items-center gap-1">
-                              <button className="rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-gray-500">
-                                <Copy size={14} />
-                              </button>
-                              <button className="rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-gray-500">
-                                <RotateCcw size={14} />
-                              </button>
-                              <button className="rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-gray-500">
-                                <ThumbsUp size={14} />
-                              </button>
-                              <button className="rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-gray-500">
-                                <ThumbsDown size={14} />
-                              </button>
-                            </div>
-                          </>
-                        )}
+                              )}
+                            </>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Input */}
           <div className="border-t border-gray-100 bg-white px-6 py-4">
             <div className="mx-auto max-w-3xl">
+              {/* Changeset confirmation / error */}
+              {changesetState.status === "ready" && (
+                <div className="mb-2 flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+                  <span className="text-xs text-blue-700">
+                    Proposed changes ready
+                  </span>
+                  <Link
+                    href="/dashboard/composer"
+                    className="text-xs font-medium text-blue-600 underline hover:text-blue-800"
+                  >
+                    Review in Composer
+                  </Link>
+                </div>
+              )}
+              {changesetState.status === "error" && (
+                <div className="mb-2 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                  <AlertTriangle size={12} className="text-red-500" />
+                  <span className="text-xs text-red-600">
+                    {changesetState.message}
+                  </span>
+                </div>
+              )}
+
               <div className="flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm focus-within:border-gray-300 focus-within:shadow-md">
                 <Plus size={18} className="shrink-0 text-gray-400" />
                 <input
                   type="text"
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
-                  placeholder="Send follow-up..."
+                  onKeyDown={onKeyDown}
+                  placeholder={
+                    hasMessages ? "Send a follow-up..." : "Ask Teskel anything..."
+                  }
                   className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
                 />
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={proposeChanges}
+                    disabled={
+                      !inputValue.trim() ||
+                      changesetState.status === "loading" ||
+                      streaming
+                    }
+                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-40"
+                    title="Generate proposed code changes from this instruction"
+                  >
+                    {changesetState.status === "loading" ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <Wand2 size={12} />
+                    )}
+                    Generate changes
+                  </button>
                   <button className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-gray-500 hover:bg-gray-100">
                     {model}
                     <ChevronDown size={12} />
@@ -551,9 +709,33 @@ export default function ChatPage() {
                   <button className="text-gray-400 hover:text-gray-600">
                     <Mic size={16} />
                   </button>
+                  {streaming ? (
+                    <button
+                      onClick={stop}
+                      className="flex items-center gap-1 rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-gray-700"
+                      title="Stop generating"
+                    >
+                      <Square size={12} /> Stop
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => void send()}
+                      disabled={!inputValue.trim() || creatingThread}
+                      className="flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-40"
+                      title="Send"
+                    >
+                      {creatingThread ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <Send size={12} />
+                      )}
+                      Send
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="mt-2 flex items-center justify-between px-1">
+                {/* TODO: Web/Code/Terminal/Docs context chips are visual no-ops for now. */}
                 <div className="flex items-center gap-2">
                   <button className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-gray-400 hover:bg-gray-100 hover:text-gray-600">
                     <Globe size={12} /> Web
@@ -574,7 +756,7 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Right panel */}
+        {/* Right panel (visual placeholder). TODO(Phase 4+): live preview/terminal. */}
         {rightPanel !== "none" && (
           <div className="flex w-[45%] flex-col border-l border-gray-200 bg-white">
             <div className="flex h-11 items-center justify-between border-b border-gray-200 px-3">
@@ -613,47 +795,64 @@ export default function ChatPage() {
                 </button>
               </div>
             </div>
-            {rightPanel === "browser" && (
-              <div className="flex flex-1 items-center justify-center bg-white">
-                <div className="text-center">
+            <div className="flex flex-1 items-center justify-center bg-white">
+              <div className="text-center">
+                {rightPanel === "browser" ? (
                   <Globe size={48} className="mx-auto mb-3 text-gray-200" />
-                  <p className="text-sm font-medium text-gray-400">
-                    Preview
-                  </p>
-                  <p className="mt-1 text-xs text-gray-300">
-                    localhost:3000
-                  </p>
-                </div>
+                ) : (
+                  <Terminal size={48} className="mx-auto mb-3 text-gray-200" />
+                )}
+                <p className="text-sm font-medium text-gray-400">
+                  {rightPanel === "browser" ? "Preview" : "Terminal"}
+                </p>
+                <p className="mt-1 text-xs text-gray-300">Coming soon</p>
               </div>
-            )}
-            {rightPanel === "terminal" && (
-              <div className="flex-1 bg-gray-950 p-4 font-mono text-sm text-gray-300">
-                <div>
-                  <span className="text-blue-400">~/teskel $</span>{" "}
-                  <span className="text-gray-400">npm install jose bcryptjs</span>
-                </div>
-                <div className="mt-1 text-gray-500">
-                  added 2 packages in 1.2s
-                </div>
-                <div className="mt-2">
-                  <span className="text-blue-400">~/teskel $</span>{" "}
-                  <span className="text-gray-400">npm run build</span>
-                </div>
-                <div className="mt-1 text-gray-500">
-                  ▲ Next.js 16.2.7 (Turbopack)
-                </div>
-                <div className="text-green-400">✓ Compiled successfully</div>
-                <div className="text-green-400">✓ Linting passed</div>
-                <div className="text-green-400">✓ Type checking passed</div>
-                <div className="mt-2 flex items-center">
-                  <span className="text-blue-400">~/teskel $</span>
-                  <span className="ml-1 inline-block h-4 w-1.5 animate-pulse bg-gray-500" />
-                </div>
-              </div>
-            )}
+            </div>
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+function AssistantError({
+  message,
+  code,
+}: {
+  message: string;
+  code?: string;
+}) {
+  const notConfigured = code === "AI_NOT_CONFIGURED";
+  return (
+    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+      <div className="flex items-start gap-2">
+        <AlertTriangle size={16} className="mt-0.5 text-red-500" />
+        <div>
+          <p className="text-sm font-medium text-red-700">{message}</p>
+          {notConfigured && (
+            <Link
+              href="/dashboard/integrations"
+              className="mt-1 inline-block text-xs font-medium text-blue-600 underline hover:text-blue-800"
+            >
+              Add an OpenAI API key in Integrations
+            </Link>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-full items-center justify-center">
+          <Loader2 size={20} className="animate-spin text-gray-400" />
+        </div>
+      }
+    >
+      <ChatSurface />
+    </Suspense>
   );
 }

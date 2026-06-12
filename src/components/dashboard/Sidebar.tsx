@@ -1,8 +1,17 @@
-"use client";
+﻿"use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { signOut } from "next-auth/react";
+import { useProject } from "@/lib/store/project";
+import {
+  ApiClientError,
+  listThreads,
+  createThread,
+  type ProjectTemplate,
+  type ChatThread,
+} from "@/lib/client/api";
 import {
   Search,
   PenLine,
@@ -28,24 +37,29 @@ import {
   GitPullRequest,
   Sparkles,
   Palette,
+  LogOut,
+  Plus,
+  Check,
+  Loader2,
+  X,
 } from "lucide-react";
 
-const chatHistory = [
-  { id: 1, title: "Build auth system with JWT", time: "Today" },
-  { id: 2, title: "Ideation for SaaS product", time: "Today" },
-  { id: 3, title: "Fix auth middleware", time: "Today" },
-  { id: 4, title: "Database migration help", time: "Yesterday" },
-  { id: 5, title: "API endpoint review", time: "Yesterday" },
-  { id: 6, title: "React component refactor", time: "3 days ago" },
-  { id: 7, title: "Deploy to Vercel", time: "3 days ago" },
-  { id: 8, title: "Setup CI/CD pipeline", time: "1 week ago" },
-];
-
-const repositories = [
-  { name: "teskel-web", active: true },
-  { name: "teskel-api", active: false },
-  { name: "teskel-editor", active: false },
-];
+/** Compact relative time label for thread list items. */
+function relativeTime(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const diffMs = Date.now() - then;
+  const min = Math.floor(diffMs / 60000);
+  if (min < 1) return "now";
+  if (min < 60) return `${min}m`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h`;
+  const day = Math.floor(hr / 24);
+  if (day < 7) return `${day}d`;
+  const wk = Math.floor(day / 7);
+  if (wk < 5) return `${wk}w`;
+  return new Date(iso).toLocaleDateString();
+}
 
 const workspaceLinks = [
   { href: "/dashboard/editor", icon: Code, label: "Editor" },
@@ -70,10 +84,175 @@ const configLinks = [
   { href: "/dashboard/integrations", icon: Plug, label: "Integrations" },
 ];
 
+function NewProjectModal({
+  onClose,
+  onCreate,
+}: {
+  onClose: () => void;
+  onCreate: (name: string, template: ProjectTemplate) => Promise<void>;
+}) {
+  const [name, setName] = useState("");
+  const [template, setTemplate] = useState<ProjectTemplate>("blank");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || submitting) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onCreate(name.trim(), template);
+      onClose();
+    } catch (err) {
+      setError(
+        err instanceof ApiClientError ? err.message : "Failed to create project"
+      );
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in">
+      <div
+        className="absolute inset-0 bg-black/20 backdrop-blur-md"
+        onClick={onClose}
+      />
+      <form
+        onSubmit={submit}
+        className="animate-scale-in relative w-full max-w-sm overflow-hidden rounded-2xl border border-gray-200/80 bg-white/95 shadow-2xl backdrop-blur-xl"
+      >
+        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+          <h2 className="text-sm font-semibold text-gray-900">New project</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          >
+            <X size={14} />
+          </button>
+        </div>
+        <div className="space-y-4 p-4">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">
+              Project name
+            </label>
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="my-app"
+              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">
+              Template
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {(["blank", "node"] as ProjectTemplate[]).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTemplate(t)}
+                  className={`rounded-lg border px-3 py-2 text-sm capitalize transition-colors ${
+                    template === t
+                      ? "border-blue-400 bg-blue-50 text-blue-700"
+                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+          {error && <p className="text-xs text-red-600">{error}</p>}
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-4 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={!name.trim() || submitting}
+            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+          >
+            {submitting && <Loader2 size={14} className="animate-spin" />}
+            Create
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 export default function Sidebar() {
   const pathname = usePathname();
   const [reposOpen, setReposOpen] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
+  const [showNewProject, setShowNewProject] = useState(false);
+
+  const {
+    projects,
+    activeWorkspace,
+    activeProject,
+    loading,
+    setActiveProject,
+    createNewProject,
+  } = useProject();
+
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const currentThreadId = searchParams.get("thread");
+  const activeProjectId = activeProject?.id ?? null;
+
+  const [threads, setThreads] = useState<ChatThread[]>([]);
+  const [threadsLoading, setThreadsLoading] = useState(false);
+  const [creatingChat, setCreatingChat] = useState(false);
+
+  const loadThreads = useCallback(async () => {
+    if (!activeProjectId) {
+      setThreads([]);
+      return;
+    }
+    setThreadsLoading(true);
+    try {
+      const { threads: t } = await listThreads(activeProjectId);
+      setThreads(t);
+    } catch {
+      // Non-fatal: leave the list empty if threads can't be loaded.
+      setThreads([]);
+    } finally {
+      setThreadsLoading(false);
+    }
+  }, [activeProjectId]);
+
+  // Refresh threads whenever the active project changes.
+  useEffect(() => {
+    void loadThreads();
+  }, [loadThreads]);
+
+  const handleNewChat = async () => {
+    if (!activeProjectId || creatingChat) return;
+    setCreatingChat(true);
+    try {
+      const { thread } = await createThread(activeProjectId);
+      setThreads((prev) => [thread, ...prev]);
+      router.push(`/dashboard/chat?thread=${thread.id}`);
+    } catch {
+      // ignore; user can retry
+    } finally {
+      setCreatingChat(false);
+    }
+  };
+
+  const handleCreate = async (name: string, template: ProjectTemplate) => {
+    await createNewProject({ name, template });
+  };
 
   if (collapsed) {
     return (
@@ -112,6 +291,13 @@ export default function Sidebar() {
         <Link href="/dashboard/settings" className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="Settings">
           <Settings size={16} />
         </Link>
+        <button
+          onClick={() => signOut({ callbackUrl: "/" })}
+          className="mt-1 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          title="Sign out"
+        >
+          <LogOut size={16} />
+        </button>
       </aside>
     );
   }
@@ -225,64 +411,133 @@ export default function Sidebar() {
         ))}
       </div>
 
-      {/* Repositories */}
+      {/* Projects (real workspace + project switcher) */}
       <div className="border-t border-gray-100 px-3 py-2">
-        <button
-          onClick={() => setReposOpen(!reposOpen)}
-          className="flex w-full items-center gap-1 px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400 hover:text-gray-600"
-        >
-          {reposOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          Repositories
-        </button>
+        <div className="flex items-center justify-between px-3">
+          <button
+            onClick={() => setReposOpen(!reposOpen)}
+            className="flex items-center gap-1 py-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400 hover:text-gray-600"
+          >
+            {reposOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            {activeWorkspace ? activeWorkspace.name : "Projects"}
+          </button>
+          <button
+            onClick={() => setShowNewProject(true)}
+            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            title="New project"
+          >
+            <Plus size={12} />
+          </button>
+        </div>
         {reposOpen && (
           <div className="mt-1 space-y-0.5">
-            {repositories.map((repo) => (
-              <Link
-                key={repo.name}
-                href="/dashboard/projects"
-                className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-                  repo.active
-                    ? "text-gray-900"
-                    : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                }`}
+            {loading && projects.length === 0 ? (
+              <div className="space-y-1 px-3 py-1">
+                <div className="h-5 w-full animate-pulse rounded bg-gray-100" />
+                <div className="h-5 w-2/3 animate-pulse rounded bg-gray-100" />
+              </div>
+            ) : projects.length === 0 ? (
+              <button
+                onClick={() => setShowNewProject(true)}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-600"
               >
-                <FolderOpen size={14} />
-                <span className="truncate">{repo.name}</span>
-                {repo.active && (
-                  <span className="ml-auto h-1.5 w-1.5 rounded-full bg-green-500" />
-                )}
-              </Link>
-            ))}
+                <Plus size={14} />
+                <span>Create a project</span>
+              </button>
+            ) : (
+              projects.map((project) => {
+                const isActive = activeProject?.id === project.id;
+                return (
+                  <button
+                    key={project.id}
+                    onClick={() => setActiveProject(project.id)}
+                    className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-sm transition-colors ${
+                      isActive
+                        ? "text-gray-900"
+                        : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                    }`}
+                  >
+                    <FolderOpen size={14} className="shrink-0" />
+                    <span className="truncate">{project.name}</span>
+                    {isActive && (
+                      <Check size={12} className="ml-auto shrink-0 text-green-500" />
+                    )}
+                  </button>
+                );
+              })
+            )}
           </div>
         )}
       </div>
 
-      {/* Chat history */}
+      {/* Chat history (real threads for the active project) */}
       <div className="flex-1 overflow-y-auto border-t border-gray-100 px-3 py-2">
-        {chatHistory.map((chat, i) => {
-          const showTimeLabel =
-            i === 0 || chatHistory[i - 1].time !== chat.time;
-          return (
-            <div key={chat.id}>
-              {showTimeLabel && (
-                <p className="mb-1 mt-3 px-3 text-[10px] font-medium uppercase tracking-wider text-gray-400 first:mt-1">
-                  {chat.time}
-                </p>
-              )}
-              <Link
-                href="/dashboard/chat"
-                className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                  i === 0 && pathname === "/dashboard/chat"
-                    ? "bg-gray-100 text-gray-900"
-                    : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
-                }`}
-              >
-                <MessageSquare size={14} className="shrink-0 text-gray-400" />
-                <span className="truncate">{chat.title}</span>
-              </Link>
-            </div>
-          );
-        })}
+        <div className="flex items-center justify-between px-3">
+          <p className="py-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400">
+            Chats
+          </p>
+          <button
+            onClick={handleNewChat}
+            disabled={!activeProjectId || creatingChat}
+            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-40"
+            title="New chat"
+          >
+            {creatingChat ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <Plus size={12} />
+            )}
+          </button>
+        </div>
+
+        {!activeProjectId ? (
+          <p className="px-3 py-2 text-xs text-gray-400">
+            Select a project to see chats.
+          </p>
+        ) : threadsLoading && threads.length === 0 ? (
+          <div className="space-y-1 px-3 py-1">
+            <div className="h-6 w-full animate-pulse rounded bg-gray-100" />
+            <div className="h-6 w-4/5 animate-pulse rounded bg-gray-100" />
+            <div className="h-6 w-2/3 animate-pulse rounded bg-gray-100" />
+          </div>
+        ) : threads.length === 0 ? (
+          <button
+            onClick={handleNewChat}
+            disabled={creatingChat}
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-40"
+          >
+            <Plus size={14} className="shrink-0" />
+            <span>Start a new chat</span>
+          </button>
+        ) : (
+          <div className="space-y-0.5">
+            {threads.map((thread) => {
+              const isActive =
+                pathname === "/dashboard/chat" &&
+                currentThreadId === thread.id;
+              return (
+                <Link
+                  key={thread.id}
+                  href={`/dashboard/chat?thread=${thread.id}`}
+                  className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                    isActive
+                      ? "bg-gray-100 text-gray-900"
+                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                  }`}
+                >
+                  <MessageSquare
+                    size={14}
+                    className="shrink-0 text-gray-400"
+                  />
+                  <span className="flex-1 truncate">{thread.title}</span>
+                  <span className="shrink-0 text-[10px] text-gray-400">
+                    {relativeTime(thread.updatedAt)}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Bottom */}
@@ -312,7 +567,22 @@ export default function Sidebar() {
           </div>
           <Settings size={14} className="text-gray-400" />
         </Link>
+        <button
+          onClick={() => signOut({ callbackUrl: "/" })}
+          className="mt-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+          title="Sign out"
+        >
+          <LogOut size={14} />
+          <span>Sign out</span>
+        </button>
       </div>
+
+      {showNewProject && (
+        <NewProjectModal
+          onClose={() => setShowNewProject(false)}
+          onCreate={handleCreate}
+        />
+      )}
     </aside>
   );
 }

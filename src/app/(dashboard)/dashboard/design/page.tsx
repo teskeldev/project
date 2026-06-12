@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Send,
   Smartphone,
@@ -13,156 +13,325 @@ import {
   Copy,
   History,
   Sparkles,
-  Palette,
   Layout,
   Type,
   Image,
   Square,
   ChevronRight,
+  Palette,
+  Loader2,
+  AlertCircle,
+  Check,
 } from "lucide-react";
+import { useProject } from "@/lib/store/project";
+import {
+  listDesignSessions,
+  createDesignSession,
+  getDesignSession,
+  streamDesignGeneration,
+  type DesignSession,
+  type DesignVersion,
+} from "@/lib/client/design";
 
 type ViewMode = "preview" | "code" | "split";
 type DeviceSize = "mobile" | "tablet" | "desktop";
 
-interface DesignVersion {
-  id: number;
-  label: string;
-  time: string;
-  active: boolean;
-}
-
 interface ChatMessage {
-  id: number;
+  id: string;
   role: "user" | "assistant";
   content: string;
-  hasDesign?: boolean;
+  isStreaming?: boolean;
 }
 
 const templates = [
-  { id: "landing", label: "Landing Page", icon: Layout },
-  { id: "card", label: "Card Component", icon: Square },
-  { id: "form", label: "Form UI", icon: Type },
-  { id: "dashboard", label: "Dashboard", icon: Monitor },
-  { id: "gallery", label: "Image Gallery", icon: Image },
-  { id: "pricing", label: "Pricing Table", icon: Palette },
+  { id: "landing", label: "Landing Page", icon: Layout, prompt: "Create a modern landing page hero section with a headline, subtitle, CTA button, and a decorative gradient background" },
+  { id: "card", label: "Card Component", icon: Square, prompt: "Create a product card component with an image placeholder, title, description, price, and add-to-cart button" },
+  { id: "form", label: "Form UI", icon: Type, prompt: "Create a sign-up form with email, password, confirm password fields, validation styling, and a submit button" },
+  { id: "dashboard", label: "Dashboard", icon: Monitor, prompt: "Create a dashboard stats section with 4 metric cards showing numbers, labels, and trend indicators" },
+  { id: "gallery", label: "Image Gallery", icon: Image, prompt: "Create a responsive image gallery grid with 6 placeholder images, hover effects, and a lightbox-style overlay" },
+  { id: "pricing", label: "Pricing Table", icon: Palette, prompt: "Create a pricing table with 3 tiers (Free, Pro, Enterprise) with features list, prices, and CTA buttons. Highlight the Pro tier." },
 ];
 
-const versions: DesignVersion[] = [
-  { id: 1, label: "Initial design", time: "3m ago", active: false },
-  { id: 2, label: "Added gradient header", time: "2m ago", active: false },
-  { id: 3, label: "Current version", time: "Now", active: true },
-];
-
-const initialMessages: ChatMessage[] = [
-  {
-    id: 1,
-    role: "user",
-    content: "Create a modern pricing card with 3 tiers: Free, Pro, and Enterprise. Use a clean design with a highlighted Pro tier.",
-  },
-  {
-    id: 2,
-    role: "assistant",
-    content: "I've created a modern pricing card component with 3 tiers. The Pro tier is highlighted with a blue accent and \"Popular\" badge. Each tier includes features, pricing, and a CTA button.",
-    hasDesign: true,
-  },
-  {
-    id: 3,
-    role: "user",
-    content: "Make the Pro card slightly elevated with a shadow, and add a gradient background to the header section.",
-  },
-  {
-    id: 4,
-    role: "assistant",
-    content: "Updated! The Pro card now has elevation with a larger shadow, and I've added a subtle gradient (blue to indigo) to the header area. The design feels more premium now.",
-    hasDesign: true,
-  },
-];
-
-const generatedCode = `export default function PricingCards() {
-  return (
-    <div className="flex gap-6 p-8">
-      {/* Free Tier */}
-      <div className="flex-1 rounded-xl border border-gray-200 bg-white p-6">
-        <h3 className="text-lg font-semibold text-gray-900">Free</h3>
-        <p className="mt-1 text-sm text-gray-500">For individuals</p>
-        <p className="mt-4 text-3xl font-bold">$0<span className="text-sm font-normal text-gray-400">/mo</span></p>
-        <ul className="mt-6 space-y-3 text-sm text-gray-600">
-          <li>✓ 5 projects</li>
-          <li>✓ Basic analytics</li>
-          <li>✓ Community support</li>
-        </ul>
-        <button className="mt-6 w-full rounded-lg border border-gray-200 py-2 text-sm font-medium">
-          Get Started
-        </button>
-      </div>
-
-      {/* Pro Tier - Highlighted */}
-      <div className="flex-1 rounded-xl border-2 border-blue-500 bg-white p-6 shadow-xl shadow-blue-100">
-        <div className="rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-4 -mx-2 -mt-2 mb-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white">Pro</h3>
-            <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs text-white">Popular</span>
-          </div>
-          <p className="mt-1 text-sm text-blue-100">For growing teams</p>
-        </div>
-        <p className="text-3xl font-bold">$29<span className="text-sm font-normal text-gray-400">/mo</span></p>
-        <ul className="mt-6 space-y-3 text-sm text-gray-600">
-          <li>✓ Unlimited projects</li>
-          <li>✓ Advanced analytics</li>
-          <li>✓ Priority support</li>
-          <li>✓ Custom domains</li>
-        </ul>
-        <button className="mt-6 w-full rounded-lg bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700">
-          Upgrade to Pro
-        </button>
-      </div>
-
-      {/* Enterprise Tier */}
-      <div className="flex-1 rounded-xl border border-gray-200 bg-white p-6">
-        <h3 className="text-lg font-semibold text-gray-900">Enterprise</h3>
-        <p className="mt-1 text-sm text-gray-500">For large organizations</p>
-        <p className="mt-4 text-3xl font-bold">Custom</p>
-        <ul className="mt-6 space-y-3 text-sm text-gray-600">
-          <li>✓ Everything in Pro</li>
-          <li>✓ SSO & SAML</li>
-          <li>✓ Dedicated support</li>
-          <li>✓ SLA guarantee</li>
-          <li>✓ Custom integrations</li>
-        </ul>
-        <button className="mt-6 w-full rounded-lg border border-gray-200 py-2 text-sm font-medium">
-          Contact Sales
-        </button>
-      </div>
-    </div>
-  );
-}`;
+function buildSrcdoc(code: string): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"><\/script>
+  <style>body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }</style>
+</head>
+<body>
+  <div id="root">${code}</div>
+  <script>
+    // Simple JSX-like rendering: if the code looks like a component, try to render it
+    // For now we just display the HTML/JSX directly
+  <\/script>
+</body>
+</html>`;
+}
 
 export default function DesignPage() {
+  const { activeProject } = useProject();
+
   const [viewMode, setViewMode] = useState<ViewMode>("preview");
   const [device, setDevice] = useState<DeviceSize>("desktop");
-  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [showVersions, setShowVersions] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
-    setMessages([...messages, { id: Date.now(), role: "user", content: input }]);
+  // Session state
+  const [sessions, setSessions] = useState<DesignSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [versions, setVersions] = useState<DesignVersion[]>([]);
+  const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
+
+  // Generation state
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [streamingCode, setStreamingCode] = useState("");
+  const [currentCode, setCurrentCode] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  // Error state
+  const [aiNotConfigured, setAiNotConfigured] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loadingSession, setLoadingSession] = useState(false);
+
+  const abortRef = useRef<AbortController | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to bottom of messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Load sessions when project changes
+  useEffect(() => {
+    if (!activeProject) return;
+
+    let cancelled = false;
+
+    async function loadSessions() {
+      try {
+        const { sessions: list } = await listDesignSessions(activeProject!.id);
+        if (cancelled) return;
+        setSessions(list);
+
+        // Auto-select first session or create one
+        if (list.length > 0) {
+          setActiveSessionId(list[0].id);
+        } else {
+          const { session } = await createDesignSession(activeProject!.id, "Design Session");
+          if (cancelled) return;
+          setSessions([session as DesignSession & { _count: { versions: number } }]);
+          setActiveSessionId(session.id);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load sessions");
+        }
+      }
+    }
+
+    loadSessions();
+    return () => { cancelled = true; };
+  }, [activeProject]);
+
+  // Load session detail when active session changes
+  useEffect(() => {
+    if (!activeSessionId) return;
+
+    let cancelled = false;
+
+    async function loadSessionDetail() {
+      setLoadingSession(true);
+      try {
+        const { session } = await getDesignSession(activeSessionId!);
+        if (cancelled) return;
+
+        setVersions(session.versions);
+
+        // Build messages from versions (versions are newest-first from API)
+        const sortedVersions = [...session.versions].reverse();
+        const msgs: ChatMessage[] = [];
+        for (const v of sortedVersions) {
+          msgs.push({ id: `user-${v.id}`, role: "user", content: v.prompt });
+          msgs.push({ id: `ai-${v.id}`, role: "assistant", content: v.code });
+        }
+        setMessages(msgs);
+
+        // Set current code to latest version
+        if (session.versions.length > 0) {
+          setCurrentCode(session.versions[0].code);
+          setActiveVersionId(session.versions[0].id);
+        } else {
+          setCurrentCode("");
+          setActiveVersionId(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load session");
+        }
+      } finally {
+        if (!cancelled) setLoadingSession(false);
+      }
+    }
+
+    loadSessionDetail();
+    return () => { cancelled = true; };
+  }, [activeSessionId]);
+
+  const handleSend = useCallback(async () => {
+    if (!input.trim() || !activeSessionId || isGenerating) return;
+
+    const prompt = input.trim();
     setInput("");
-    setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now() + 1,
-          role: "assistant",
-          content: "I've updated the design based on your feedback. The changes are now reflected in the preview.",
-          hasDesign: true,
+    setError(null);
+    setIsGenerating(true);
+    setStreamingCode("");
+
+    // Add user message
+    const userMsgId = `user-${Date.now()}`;
+    const aiMsgId = `ai-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      { id: userMsgId, role: "user", content: prompt },
+      { id: aiMsgId, role: "assistant", content: "", isStreaming: true },
+    ]);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    let accumulated = "";
+
+    await streamDesignGeneration(
+      { sessionId: activeSessionId, prompt, signal: controller.signal },
+      {
+        onDelta(content) {
+          accumulated += content;
+          setStreamingCode(accumulated);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === aiMsgId ? { ...m, content: accumulated } : m
+            )
+          );
         },
-      ]);
-    }, 1000);
+        onDone(versionId) {
+          setCurrentCode(accumulated);
+          setStreamingCode("");
+          setIsGenerating(false);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === aiMsgId ? { ...m, isStreaming: false } : m
+            )
+          );
+          // Add to versions list
+          const newVersion: DesignVersion = {
+            id: versionId,
+            sessionId: activeSessionId,
+            code: accumulated,
+            prompt,
+            createdAt: new Date().toISOString(),
+          };
+          setVersions((prev) => [newVersion, ...prev]);
+          setActiveVersionId(versionId);
+        },
+        onError(message, code) {
+          setIsGenerating(false);
+          setStreamingCode("");
+          if (code === "AI_NOT_CONFIGURED") {
+            setAiNotConfigured(true);
+          } else {
+            setError(message);
+          }
+          // Remove the streaming message
+          setMessages((prev) => prev.filter((m) => m.id !== aiMsgId));
+        },
+      }
+    );
+
+    abortRef.current = null;
+  }, [input, activeSessionId, isGenerating]);
+
+  const handleStop = () => {
+    abortRef.current?.abort();
+    setIsGenerating(false);
+    setStreamingCode("");
   };
 
-  const deviceWidth = device === "mobile" ? "w-[375px]" : device === "tablet" ? "w-[768px]" : "w-full";
+  const handleVersionClick = (version: DesignVersion) => {
+    setCurrentCode(version.code);
+    setActiveVersionId(version.id);
+  };
+
+  const handleCopy = async () => {
+    if (!currentCode) return;
+    await navigator.clipboard.writeText(currentCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownload = () => {
+    if (!currentCode) return;
+    const blob = new Blob([currentCode], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "Component.tsx";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleReset = async () => {
+    if (!activeProject) return;
+    const { session } = await createDesignSession(activeProject.id);
+    setSessions((prev) => [session as DesignSession & { _count: { versions: number } }, ...prev]);
+    setActiveSessionId(session.id);
+    setMessages([]);
+    setVersions([]);
+    setCurrentCode("");
+    setActiveVersionId(null);
+  };
+
+  const displayCode = isGenerating ? streamingCode : currentCode;
+  const deviceWidth = device === "mobile" ? "max-w-[375px]" : device === "tablet" ? "max-w-[768px]" : "max-w-full";
+
+  // No project selected
+  if (!activeProject) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="text-center">
+          <Sparkles size={48} className="mx-auto mb-4 text-gray-300" />
+          <h2 className="text-lg font-semibold text-gray-900">No Project Selected</h2>
+          <p className="mt-2 text-sm text-gray-500">
+            Select a project to start designing with AI.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // AI not configured
+  if (aiNotConfigured) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="text-center max-w-md">
+          <AlertCircle size={48} className="mx-auto mb-4 text-amber-400" />
+          <h2 className="text-lg font-semibold text-gray-900">AI Not Configured</h2>
+          <p className="mt-2 text-sm text-gray-500">
+            To use Teskel Design, you need to configure an AI provider with an API key.
+          </p>
+          <a
+            href="/dashboard/integrations"
+            className="mt-4 inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Go to Integrations
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full">
@@ -189,6 +358,20 @@ export default function DesignPage() {
             >
               <History size={14} />
             </button>
+            {/* Session selector */}
+            {sessions.length > 1 && (
+              <select
+                value={activeSessionId ?? ""}
+                onChange={(e) => setActiveSessionId(e.target.value)}
+                className="ml-2 rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-600"
+              >
+                {sessions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.title}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
 
@@ -202,7 +385,7 @@ export default function DesignPage() {
                   key={t.id}
                   className="flex flex-col items-center gap-1 rounded-lg border border-gray-200 bg-white p-2 text-center transition-all hover:border-blue-200 hover:shadow-sm"
                   onClick={() => {
-                    setInput(`Create a ${t.label.toLowerCase()} component`);
+                    setInput(t.prompt);
                     setShowTemplates(false);
                   }}
                 >
@@ -218,48 +401,96 @@ export default function DesignPage() {
         {showVersions && (
           <div className="border-b border-gray-100 bg-gray-50 p-3">
             <p className="mb-2 text-[11px] font-medium text-gray-500">Version History</p>
-            <div className="space-y-1">
-              {versions.map((v) => (
-                <button
-                  key={v.id}
-                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition-colors ${
-                    v.active ? "bg-blue-50 ring-1 ring-blue-200" : "hover:bg-white"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className={`h-2 w-2 rounded-full ${v.active ? "bg-blue-500" : "bg-gray-300"}`} />
-                    <span className="text-[12px] text-gray-700">{v.label}</span>
-                  </div>
-                  <span className="text-[10px] text-gray-400">{v.time}</span>
-                </button>
-              ))}
-            </div>
+            {versions.length === 0 ? (
+              <p className="text-[11px] text-gray-400">No versions yet. Generate a design to get started.</p>
+            ) : (
+              <div className="max-h-[200px] space-y-1 overflow-auto">
+                {versions.map((v, idx) => (
+                  <button
+                    key={v.id}
+                    onClick={() => handleVersionClick(v)}
+                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition-colors ${
+                      activeVersionId === v.id ? "bg-blue-50 ring-1 ring-blue-200" : "hover:bg-white"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className={`h-2 w-2 shrink-0 rounded-full ${activeVersionId === v.id ? "bg-blue-500" : "bg-gray-300"}`} />
+                      <span className="truncate text-[12px] text-gray-700">
+                        {v.prompt.length > 40 ? v.prompt.slice(0, 40) + "..." : v.prompt}
+                      </span>
+                    </div>
+                    <span className="ml-2 shrink-0 text-[10px] text-gray-400">
+                      v{versions.length - idx}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {/* Messages */}
         <div className="flex-1 space-y-4 overflow-auto p-4">
-          {messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div
-                className={`max-w-[85%] rounded-xl px-4 py-2.5 ${
-                  msg.role === "user"
-                    ? "bg-gray-900 text-[13px] text-white"
-                    : "border border-gray-100 bg-white text-[13px] text-gray-700"
-                }`}
-              >
-                <p className="leading-relaxed">{msg.content}</p>
-                {msg.hasDesign && msg.role === "assistant" && (
-                  <div className="mt-2 flex items-center gap-1.5 rounded-md bg-blue-50 px-2 py-1">
-                    <Eye size={12} className="text-blue-600" />
-                    <span className="text-[11px] font-medium text-blue-700">Design updated</span>
-                    <ChevronRight size={12} className="ml-auto text-blue-400" />
-                  </div>
-                )}
-              </div>
+          {loadingSession ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 size={20} className="animate-spin text-gray-400" />
             </div>
-          ))}
+          ) : messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Sparkles size={32} className="mb-3 text-gray-300" />
+              <p className="text-[13px] font-medium text-gray-600">Start designing</p>
+              <p className="mt-1 text-[12px] text-gray-400">
+                Describe a UI component and Teskel will generate it for you.
+              </p>
+            </div>
+          ) : (
+            messages.map((msg) => (
+              <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div
+                  className={`max-w-[85%] rounded-xl px-4 py-2.5 ${
+                    msg.role === "user"
+                      ? "bg-gray-900 text-[13px] text-white"
+                      : "border border-gray-100 bg-white text-[13px] text-gray-700"
+                  }`}
+                >
+                  {msg.role === "user" ? (
+                    <p className="leading-relaxed">{msg.content}</p>
+                  ) : (
+                    <div>
+                      {msg.isStreaming && !msg.content && (
+                        <div className="flex items-center gap-2">
+                          <Loader2 size={12} className="animate-spin" />
+                          <span className="text-[12px] text-gray-400">Generating...</span>
+                        </div>
+                      )}
+                      {msg.content && (
+                        <div className="flex items-center gap-1.5 rounded-md bg-blue-50 px-2 py-1">
+                          {msg.isStreaming ? (
+                            <Loader2 size={12} className="animate-spin text-blue-600" />
+                          ) : (
+                            <Eye size={12} className="text-blue-600" />
+                          )}
+                          <span className="text-[11px] font-medium text-blue-700">
+                            {msg.isStreaming ? "Generating design..." : "Design generated"}
+                          </span>
+                          {!msg.isStreaming && <ChevronRight size={12} className="ml-auto text-blue-400" />}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+          <div ref={messagesEndRef} />
         </div>
+
+        {/* Error display */}
+        {error && (
+          <div className="mx-3 mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+            <p className="text-[12px] text-red-700">{error}</p>
+          </div>
+        )}
 
         {/* Input */}
         <div className="border-t border-gray-100 p-3">
@@ -267,16 +498,33 @@ export default function DesignPage() {
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSend()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
               placeholder="Describe your design..."
               className="flex-1 text-[13px] text-gray-900 outline-none placeholder:text-gray-400"
+              disabled={isGenerating}
             />
-            <button
-              onClick={handleSend}
-              className="rounded-md bg-gray-900 p-1.5 text-white transition-colors hover:bg-gray-800"
-            >
-              <Send size={14} />
-            </button>
+            {isGenerating ? (
+              <button
+                onClick={handleStop}
+                className="rounded-md bg-red-600 p-1.5 text-white transition-colors hover:bg-red-700"
+                title="Stop generation"
+              >
+                <Square size={14} />
+              </button>
+            ) : (
+              <button
+                onClick={handleSend}
+                disabled={!input.trim()}
+                className="rounded-md bg-gray-900 p-1.5 text-white transition-colors hover:bg-gray-800 disabled:opacity-40"
+              >
+                <Send size={14} />
+              </button>
+            )}
           </div>
           <p className="mt-1.5 text-center text-[10px] text-gray-400">
             Tip: Be specific about colors, layout, and interactions
@@ -289,7 +537,6 @@ export default function DesignPage() {
         {/* Preview toolbar */}
         <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2">
           <div className="flex items-center gap-1">
-            {/* View mode */}
             <button
               onClick={() => setViewMode("preview")}
               className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
@@ -346,13 +593,27 @@ export default function DesignPage() {
 
           {/* Actions */}
           <div className="flex items-center gap-1">
-            <button className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="Reset">
+            <button
+              onClick={handleReset}
+              className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              title="New session"
+            >
               <RotateCcw size={14} />
             </button>
-            <button className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="Copy code">
-              <Copy size={14} />
+            <button
+              onClick={handleCopy}
+              className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              title="Copy code"
+              disabled={!displayCode}
+            >
+              {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
             </button>
-            <button className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="Download">
+            <button
+              onClick={handleDownload}
+              className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              title="Download as .tsx"
+              disabled={!currentCode}
+            >
               <Download size={14} />
             </button>
           </div>
@@ -363,86 +624,53 @@ export default function DesignPage() {
           {/* Preview */}
           {(viewMode === "preview" || viewMode === "split") && (
             <div className={`flex flex-1 items-start justify-center overflow-auto bg-[#F7F7F5] p-6 ${viewMode === "split" ? "border-r border-gray-100" : ""}`}>
-              <div className={`${deviceWidth} mx-auto overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-all duration-300`}>
-                {/* Rendered design preview */}
-                <div className="p-6">
-                  <div className={`flex ${device === "mobile" ? "flex-col" : ""} gap-4`}>
-                    {/* Free tier */}
-                    <div className="flex-1 rounded-xl border border-gray-200 p-5">
-                      <h3 className="text-[16px] font-semibold text-gray-900">Free</h3>
-                      <p className="mt-0.5 text-[12px] text-gray-500">For individuals</p>
-                      <p className="mt-3 text-[24px] font-bold text-gray-900">
-                        $0<span className="text-[12px] font-normal text-gray-400">/mo</span>
-                      </p>
-                      <ul className="mt-4 space-y-2 text-[12px] text-gray-600">
-                        <li>✓ 5 projects</li>
-                        <li>✓ Basic analytics</li>
-                        <li>✓ Community support</li>
-                      </ul>
-                      <button className="mt-5 w-full rounded-lg border border-gray-200 py-2 text-[12px] font-medium text-gray-700 hover:bg-gray-50">
-                        Get Started
-                      </button>
-                    </div>
-
-                    {/* Pro tier - highlighted */}
-                    <div className="flex-1 rounded-xl border-2 border-blue-500 p-5 shadow-lg shadow-blue-100">
-                      <div className="-mx-2 -mt-2 mb-4 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-3">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-[16px] font-semibold text-white">Pro</h3>
-                          <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-medium text-white">
-                            Popular
-                          </span>
-                        </div>
-                        <p className="mt-0.5 text-[12px] text-blue-100">For growing teams</p>
-                      </div>
-                      <p className="text-[24px] font-bold text-gray-900">
-                        $29<span className="text-[12px] font-normal text-gray-400">/mo</span>
-                      </p>
-                      <ul className="mt-4 space-y-2 text-[12px] text-gray-600">
-                        <li>✓ Unlimited projects</li>
-                        <li>✓ Advanced analytics</li>
-                        <li>✓ Priority support</li>
-                        <li>✓ Custom domains</li>
-                      </ul>
-                      <button className="mt-5 w-full rounded-lg bg-blue-600 py-2 text-[12px] font-medium text-white hover:bg-blue-700">
-                        Upgrade to Pro
-                      </button>
-                    </div>
-
-                    {/* Enterprise tier */}
-                    <div className="flex-1 rounded-xl border border-gray-200 p-5">
-                      <h3 className="text-[16px] font-semibold text-gray-900">Enterprise</h3>
-                      <p className="mt-0.5 text-[12px] text-gray-500">For large organizations</p>
-                      <p className="mt-3 text-[24px] font-bold text-gray-900">Custom</p>
-                      <ul className="mt-4 space-y-2 text-[12px] text-gray-600">
-                        <li>✓ Everything in Pro</li>
-                        <li>✓ SSO & SAML</li>
-                        <li>✓ Dedicated support</li>
-                        <li>✓ SLA guarantee</li>
-                        <li>✓ Custom integrations</li>
-                      </ul>
-                      <button className="mt-5 w-full rounded-lg border border-gray-200 py-2 text-[12px] font-medium text-gray-700 hover:bg-gray-50">
-                        Contact Sales
-                      </button>
-                    </div>
-                  </div>
+              {displayCode ? (
+                <div className={`${deviceWidth} w-full mx-auto overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-all duration-300`}>
+                  <iframe
+                    srcDoc={buildSrcdoc(displayCode)}
+                    className="h-[600px] w-full border-0"
+                    sandbox="allow-scripts"
+                    title="Design Preview"
+                  />
                 </div>
-              </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                  <Eye size={32} className="mb-3 text-gray-300" />
+                  <p className="text-[13px] text-gray-500">
+                    Your design preview will appear here
+                  </p>
+                  <p className="mt-1 text-[11px] text-gray-400">
+                    Describe a component in the chat to generate it
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
           {/* Code view */}
           {(viewMode === "code" || viewMode === "split") && (
-            <div className="flex-1 overflow-auto bg-[#0B0F19]">
+            <div className="flex flex-1 flex-col overflow-hidden bg-[#0B0F19]">
               <div className="flex items-center justify-between border-b border-gray-800 px-4 py-2">
-                <span className="text-[11px] text-gray-400">PricingCards.tsx</span>
-                <button className="rounded p-1 text-gray-500 hover:bg-gray-800 hover:text-gray-300">
-                  <Copy size={12} />
+                <span className="text-[11px] text-gray-400">Component.tsx</span>
+                <button
+                  onClick={handleCopy}
+                  className="rounded p-1 text-gray-500 hover:bg-gray-800 hover:text-gray-300"
+                  disabled={!displayCode}
+                >
+                  {copied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
                 </button>
               </div>
-              <pre className="overflow-auto p-4 font-mono text-[11px] leading-5 text-gray-300">
-                {generatedCode}
-              </pre>
+              <div className="flex-1 overflow-auto">
+                {displayCode ? (
+                  <pre className="p-4 font-mono text-[11px] leading-5 text-gray-300 whitespace-pre-wrap">
+                    {displayCode}
+                  </pre>
+                ) : (
+                  <div className="flex items-center justify-center py-20">
+                    <p className="text-[12px] text-gray-500">No code generated yet</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

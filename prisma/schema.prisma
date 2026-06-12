@@ -1,0 +1,592 @@
+// Teskel database schema
+// Postgres-targeted Prisma schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------- Enums -----------------------------
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum FileType {
+  FILE
+  FOLDER
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+  TOOL
+}
+
+enum AgentStatus {
+  QUEUED
+  RUNNING
+  WAITING_APPROVAL
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum AgentStepType {
+  THINK
+  READ_FILE
+  WRITE_FILE
+  RUN_COMMAND
+  SEARCH
+  GIT
+  DIFF
+  REVIEW
+}
+
+enum StepStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum ChangeSetStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPLIED
+  REJECTED
+}
+
+enum FileChangeType {
+  CREATE
+  UPDATE
+  DELETE
+  RENAME
+}
+
+enum FileChangeStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum TerminalStatus {
+  ACTIVE
+  CLOSED
+}
+
+enum RuleScope {
+  GLOBAL
+  WORKSPACE
+  PROJECT
+  FILE
+}
+
+enum KnowledgeType {
+  TEXT
+  FILE
+  URL
+  NOTE
+}
+
+enum ArtifactType {
+  CODE
+  DOCUMENT
+  CHART
+  WEBAPP
+  IMAGE
+}
+
+// ----------------------------- Auth.js models -----------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  passwordHash  String?
+  image         String?
+  bio           String?
+  preferences   Json?
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts         Account[]
+  sessions         Session[]
+  ownedWorkspaces  Workspace[]       @relation("WorkspaceOwner")
+  memberships      WorkspaceMember[]
+  chatThreads      ChatThread[]
+  agentRuns        AgentRun[]
+  terminalSessions TerminalSession[]
+  apiKeys          ApiKey[]
+  designSessions   DesignSession[]
+  documents        Document[]
+  artifacts        Artifact[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ----------------------------- Workspace -----------------------------
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner        User              @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members      WorkspaceMember[]
+  projects     Project[]
+  rules        Rule[]
+  knowledge    KnowledgeItem[]
+  integrations Integration[]
+  apiKeys      ApiKey[]
+  extensions   Extension[]
+
+  @@index([ownerId])
+}
+
+model WorkspaceMember {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        Role     @default(MEMBER)
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+// ----------------------------- Project -----------------------------
+
+model Project {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  name          String
+  slug          String
+  description   String?
+  storageKey    String
+  gitRepoUrl    String?
+  defaultBranch String   @default("main")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workspace        Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  files            FileNode[]
+  chatThreads      ChatThread[]
+  agentRuns        AgentRun[]
+  changeSets       ChangeSet[]
+  terminalSessions TerminalSession[]
+  gitState         GitState?
+  rules            Rule[]
+  knowledge        KnowledgeItem[]
+  designSessions   DesignSession[]
+  documents        Document[]
+  artifacts        Artifact[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
+}
+
+model FileNode {
+  id        String   @id @default(cuid())
+  projectId String
+  parentId  String?
+  type      FileType
+  name      String
+  path      String
+  language  String?
+  content   String?  @db.Text
+  size      Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project  Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent   FileNode?  @relation("FileNodeChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children FileNode[] @relation("FileNodeChildren")
+
+  @@unique([projectId, path])
+  @@index([projectId, parentId])
+}
+
+// ----------------------------- Chat -----------------------------
+
+model ChatThread {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  ChatMessage[]
+  agentRuns AgentRun[]
+
+  @@index([projectId])
+  @@index([userId])
+}
+
+model ChatMessage {
+  id        String      @id @default(cuid())
+  threadId  String
+  role      MessageRole
+  content   String      @db.Text
+  metadata  Json?
+  createdAt DateTime    @default(now())
+
+  thread ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId])
+}
+
+// ----------------------------- Agent -----------------------------
+
+model AgentRun {
+  id        String      @id @default(cuid())
+  projectId String
+  threadId  String?
+  userId    String
+  status    AgentStatus @default(QUEUED)
+  goal      String      @db.Text
+  plan      Json?
+  result    Json?
+  error     String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  thread     ChatThread? @relation(fields: [threadId], references: [id], onDelete: SetNull)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  steps      AgentStep[]
+  changeSets ChangeSet[]
+
+  @@index([projectId])
+  @@index([threadId])
+  @@index([userId])
+}
+
+model AgentStep {
+  id         String        @id @default(cuid())
+  agentRunId String
+  type       AgentStepType
+  title      String
+  status     StepStatus    @default(PENDING)
+  input      Json?
+  output     Json?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  agentRun AgentRun @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
+
+  @@index([agentRunId])
+}
+
+// ----------------------------- Changes -----------------------------
+
+model ChangeSet {
+  id          String          @id @default(cuid())
+  projectId   String
+  agentRunId  String?
+  title       String
+  description String?
+  status      ChangeSetStatus @default(DRAFT)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  agentRun       AgentRun?       @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
+  fileChanges    FileChange[]
+  reviewComments ReviewComment[]
+
+  @@index([projectId])
+  @@index([agentRunId])
+}
+
+model FileChange {
+  id          String           @id @default(cuid())
+  changeSetId String
+  filePath    String
+  oldPath     String?
+  changeType  FileChangeType
+  oldContent  String?          @db.Text
+  newContent  String?          @db.Text
+  diff        String?          @db.Text
+  status      FileChangeStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  changeSet ChangeSet @relation(fields: [changeSetId], references: [id], onDelete: Cascade)
+
+  @@index([changeSetId])
+}
+
+// ----------------------------- Terminal -----------------------------
+
+model TerminalSession {
+  id        String         @id @default(cuid())
+  projectId String
+  userId    String
+  title     String
+  cwd       String
+  status    TerminalStatus @default(ACTIVE)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  project  Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commands TerminalCommand[]
+
+  @@index([projectId])
+  @@index([userId])
+}
+
+model TerminalCommand {
+  id        String   @id @default(cuid())
+  sessionId String
+  command   String   @db.Text
+  output    String?  @db.Text
+  exitCode  Int?
+  createdAt DateTime @default(now())
+
+  session TerminalSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+// ----------------------------- Git -----------------------------
+
+model GitState {
+  id             String   @id @default(cuid())
+  projectId      String   @unique
+  branch         String
+  status         Json?
+  lastCommitHash String?
+  updatedAt      DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// ----------------------------- Rules & Knowledge -----------------------------
+
+model Rule {
+  id          String    @id @default(cuid())
+  workspaceId String?
+  projectId   String?
+  scope       RuleScope
+  filePattern String?
+  title       String
+  content     String    @db.Text
+  enabled     Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project   Project?   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([projectId])
+}
+
+model KnowledgeItem {
+  id          String        @id @default(cuid())
+  workspaceId String
+  projectId   String?
+  title       String
+  type        KnowledgeType
+  content     String        @db.Text
+  metadata    Json?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([projectId])
+}
+
+model Integration {
+  id              String   @id @default(cuid())
+  workspaceId     String
+  provider        String
+  name            String
+  encryptedConfig String   @db.Text
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  userId      String
+  workspaceId String?
+  name        String
+  hashedKey   String    @unique
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([workspaceId])
+}
+
+// ----------------------------- Design & Canvas -----------------------------
+
+model DesignSession {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project  Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  versions DesignVersion[]
+
+  @@index([projectId])
+  @@index([userId])
+}
+
+model DesignVersion {
+  id        String   @id @default(cuid())
+  sessionId String
+  code      String   @db.Text
+  prompt    String   @db.Text
+  createdAt DateTime @default(now())
+
+  session DesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+// ----------------------------- Documents & Artifacts -----------------------------
+
+model Document {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  title     String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([userId])
+}
+
+model Artifact {
+  id        String       @id @default(cuid())
+  projectId String
+  userId    String
+  title     String
+  type      ArtifactType
+  content   String       @db.Text
+  language  String?
+  metadata  Json?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([userId])
+}
+
+// ----------------------------- Extensions -----------------------------
+
+model Extension {
+  id          String   @id @default(cuid())
+  workspaceId String
+  registryId  String
+  name        String
+  author      String
+  version     String
+  config      Json?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, registryId])
+  @@index([workspaceId])
+}
+
+// ----------------------------- Review Comments -----------------------------
+
+model ReviewComment {
+  id          String   @id @default(cuid())
+  changeSetId String
+  filePath    String
+  line        Int
+  author      String
+  content     String   @db.Text
+  suggestion  String?  @db.Text
+  resolved    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  changeSet ChangeSet @relation(fields: [changeSetId], references: [id], onDelete: Cascade)
+
+  @@index([changeSetId])
+}

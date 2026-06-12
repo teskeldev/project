@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Mail } from "lucide-react";
+import { ArrowLeft, AlertCircle } from "lucide-react";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -30,15 +30,15 @@ export default function ForgotPasswordPage() {
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50">
-            <Mail className="text-blue-600" size={24} />
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-50">
+            <AlertCircle className="text-amber-600" size={24} />
           </div>
           <h1 className="mb-2 text-2xl font-semibold text-gray-900">
-            Check your email
+            Not available yet
           </h1>
           <p className="mb-6 text-sm text-gray-500">
-            We sent a password reset link to{" "}
-            <span className="font-medium text-gray-700">{email}</span>
+            Password reset is not yet available. Please contact support or create
+            a new account.
           </p>
           <Link
             href="/login"
@@ -73,12 +73,15 @@ export default function ForgotPasswordPage() {
       </div>
 
       <div className="rounded-2xl border border-gray-200/80 bg-white/80 p-8 shadow-lg shadow-gray-200/50 backdrop-blur-sm transition-all duration-500">
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-700">
+          Password reset is not yet available. This feature is coming soon.
+        </div>
+
         <h1 className="mb-2 text-2xl font-semibold text-gray-900">
           Reset your password
         </h1>
         <p className="mb-6 text-sm text-gray-500">
-          Enter the email associated with your account and we&apos;ll send you a
-          reset link.
+          This feature is currently under development.
         </p>
 
         <form
@@ -101,15 +104,17 @@ export default function ForgotPasswordPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60"
               required
+              disabled
             />
           </div>
           <button
             type="submit"
-            className="mt-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gray-800"
+            disabled
+            className="mt-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white opacity-50 cursor-not-allowed"
           >
-            Send reset link
+            Not Available Yet
           </button>
         </form>
       </div>

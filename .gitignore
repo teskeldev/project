@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# teskel storage
+/.teskel-storage
+
+# build/lint output logs
+build_out.txt
+build_success.txt
+lint_out.txt
+lint_out2.txt

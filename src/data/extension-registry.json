@@ -1,0 +1,182 @@
+[
+  {
+    "registryId": "ms-python.python",
+    "name": "Python",
+    "author": "Microsoft",
+    "description": "IntelliSense, linting, debugging, code formatting, refactoring, and more for Python.",
+    "category": "Languages",
+    "icon": "\ud83d\udc0d",
+    "installs": "98M",
+    "rating": 4.8
+  },
+  {
+    "registryId": "dbaeumer.vscode-eslint",
+    "name": "ESLint",
+    "author": "Microsoft",
+    "description": "Integrates ESLint into your editor for JavaScript and TypeScript linting.",
+    "category": "Linters",
+    "icon": "\ud83d\udcdd",
+    "installs": "32M",
+    "rating": 4.7
+  },
+  {
+    "registryId": "esbenp.prettier-vscode",
+    "name": "Prettier",
+    "author": "Prettier",
+    "description": "Code formatter using Prettier. Supports JavaScript, TypeScript, CSS, and more.",
+    "category": "Formatters",
+    "icon": "\ud83c\udfa8",
+    "installs": "42M",
+    "rating": 4.6
+  },
+  {
+    "registryId": "bradlc.vscode-tailwindcss",
+    "name": "Tailwind CSS IntelliSense",
+    "author": "Tailwind Labs",
+    "description": "Intelligent Tailwind CSS tooling: autocomplete, linting, hover previews.",
+    "category": "Styling",
+    "icon": "\ud83c\udf0a",
+    "installs": "12M",
+    "rating": 4.9
+  },
+  {
+    "registryId": "eamodio.gitlens",
+    "name": "GitLens",
+    "author": "GitKraken",
+    "description": "Supercharge Git inside your editor \u2014 blame, history, stash, and more.",
+    "category": "Git",
+    "icon": "\ud83d\udd0d",
+    "installs": "28M",
+    "rating": 4.5
+  },
+  {
+    "registryId": "ms-azuretools.vscode-docker",
+    "name": "Docker",
+    "author": "Microsoft",
+    "description": "Makes it easy to build, manage, and deploy containerized applications.",
+    "category": "DevOps",
+    "icon": "\ud83d\udc33",
+    "installs": "18M",
+    "rating": 4.4
+  },
+  {
+    "registryId": "rangav.vscode-thunder-client",
+    "name": "Thunder Client",
+    "author": "Thunder Client",
+    "description": "Lightweight REST API client for testing APIs directly from your editor.",
+    "category": "Testing",
+    "icon": "\u26a1",
+    "installs": "8M",
+    "rating": 4.7
+  },
+  {
+    "registryId": "prisma.prisma",
+    "name": "Prisma",
+    "author": "Prisma",
+    "description": "Adds syntax highlighting, formatting, and auto-completion for Prisma Schema files.",
+    "category": "Database",
+    "icon": "\ud83d\udc8e",
+    "installs": "5M",
+    "rating": 4.8
+  },
+  {
+    "registryId": "usernamehw.errorlens",
+    "name": "Error Lens",
+    "author": "Alexander",
+    "description": "Improve highlighting of errors, warnings and other language diagnostics.",
+    "category": "Utilities",
+    "icon": "\ud83d\udd26",
+    "installs": "9M",
+    "rating": 4.6
+  },
+  {
+    "registryId": "rust-lang.rust-analyzer",
+    "name": "Rust Analyzer",
+    "author": "rust-lang",
+    "description": "Provides Rust language support: code completion, go to definition, and more.",
+    "category": "Languages",
+    "icon": "\u2699\ufe0f",
+    "installs": "6M",
+    "rating": 4.9
+  },
+  {
+    "registryId": "golang.go",
+    "name": "Go",
+    "author": "Go Team at Google",
+    "description": "Rich Go language support with IntelliSense, debugging, linting, and code navigation.",
+    "category": "Languages",
+    "icon": "\ud83d\udc39",
+    "installs": "14M",
+    "rating": 4.7
+  },
+  {
+    "registryId": "ms-vscode.vscode-typescript-next",
+    "name": "TypeScript Nightly",
+    "author": "Microsoft",
+    "description": "Enables the nightly build of TypeScript for cutting-edge language features.",
+    "category": "Languages",
+    "icon": "\ud83d\udcd8",
+    "installs": "4M",
+    "rating": 4.3
+  },
+  {
+    "registryId": "github.copilot",
+    "name": "GitHub Copilot",
+    "author": "GitHub",
+    "description": "AI pair programmer that suggests code completions as you type.",
+    "category": "AI",
+    "icon": "\ud83e\udd16",
+    "installs": "15M",
+    "rating": 4.6
+  },
+  {
+    "registryId": "formulahendry.auto-rename-tag",
+    "name": "Auto Rename Tag",
+    "author": "Jun Han",
+    "description": "Automatically rename paired HTML/XML tags when one is modified.",
+    "category": "Utilities",
+    "icon": "\ud83c\udff7\ufe0f",
+    "installs": "16M",
+    "rating": 4.4
+  },
+  {
+    "registryId": "christian-kohler.path-intellisense",
+    "name": "Path Intellisense",
+    "author": "Christian Kohler",
+    "description": "Autocompletes filenames in your code for faster imports and references.",
+    "category": "Utilities",
+    "icon": "\ud83d\udcc2",
+    "installs": "11M",
+    "rating": 4.5
+  },
+  {
+    "registryId": "pkief.material-icon-theme",
+    "name": "Material Icon Theme",
+    "author": "Philipp Kief",
+    "description": "Material Design icons for files and folders in the file explorer.",
+    "category": "Themes",
+    "icon": "\ud83c\udf08",
+    "installs": "20M",
+    "rating": 4.8
+  },
+  {
+    "registryId": "streetsidesoftware.code-spell-checker",
+    "name": "Code Spell Checker",
+    "author": "Street Side Software",
+    "description": "Spelling checker for source code, comments, and strings.",
+    "category": "Linters",
+    "icon": "\ud83d\udcda",
+    "installs": "10M",
+    "rating": 4.5
+  },
+  {
+    "registryId": "ms-vscode-remote.remote-ssh",
+    "name": "Remote - SSH",
+    "author": "Microsoft",
+    "description": "Open any folder on a remote machine using SSH and take advantage of full feature set.",
+    "category": "DevOps",
+    "icon": "\ud83d\udd10",
+    "installs": "13M",
+    "rating": 4.3
+  }
+]

@@ -1,129 +1,271 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   File,
-  Plus,
-  ChevronDown,
   Check,
+  X,
   RotateCcw,
   Sparkles,
-  ArrowRight,
   GitBranch,
-  Mic,
-  Globe,
-  Code,
-  Terminal,
-  FileText,
+  ChevronDown,
+  Columns2,
+  AlignLeft,
+  AlertTriangle,
+  Loader2,
+  CheckCircle2,
 } from "lucide-react";
+import { useProject } from "@/lib/store/project";
+import {
+  listChangeSets,
+  getChangeSet,
+  updateFileChange,
+  applyChangeSet,
+  rejectChangeSet,
+  ApiClientError,
+  type ChangeSetSummary,
+  type ChangeSetDetail,
+  type FileChange,
+  type FileChangeType,
+  type ApplyResult,
+} from "@/lib/client/api";
+import {
+  diffStat,
+  parseUnifiedDiff,
+  buildSideBySide,
+} from "@/lib/diff";
 
-interface FileChange {
-  file: string;
-  status: "added" | "modified" | "deleted";
-  additions: number;
-  deletions: number;
-  diff: DiffLine[];
-}
+type ViewMode = "unified" | "split";
 
-interface DiffLine {
-  type: "added" | "removed" | "context";
-  content: string;
-  lineNumber?: number;
-}
-
-const fileChanges: FileChange[] = [
-  {
-    file: "src/lib/auth/jwt.ts",
-    status: "added",
-    additions: 18,
-    deletions: 0,
-    diff: [
-      { type: "added", content: 'import { SignJWT, jwtVerify } from "jose";', lineNumber: 1 },
-      { type: "added", content: "", lineNumber: 2 },
-      { type: "added", content: "const secret = new TextEncoder().encode(", lineNumber: 3 },
-      { type: "added", content: '  process.env.JWT_SECRET || "default-secret"', lineNumber: 4 },
-      { type: "added", content: ");", lineNumber: 5 },
-      { type: "added", content: "", lineNumber: 6 },
-      { type: "added", content: "export async function signToken(payload: Record<string, unknown>) {", lineNumber: 7 },
-      { type: "added", content: "  return new SignJWT(payload)", lineNumber: 8 },
-      { type: "added", content: '    .setProtectedHeader({ alg: "HS256" })', lineNumber: 9 },
-      { type: "added", content: '    .setExpirationTime("7d")', lineNumber: 10 },
-      { type: "added", content: "    .setIssuedAt()", lineNumber: 11 },
-      { type: "added", content: "    .sign(secret);", lineNumber: 12 },
-      { type: "added", content: "}", lineNumber: 13 },
-    ],
-  },
-  {
-    file: "src/app/api/auth/login/route.ts",
-    status: "added",
-    additions: 24,
-    deletions: 0,
-    diff: [
-      { type: "added", content: 'import { NextResponse } from "next/server";', lineNumber: 1 },
-      { type: "added", content: 'import { comparePassword } from "@/lib/auth/password";', lineNumber: 2 },
-      { type: "added", content: 'import { signToken } from "@/lib/auth/jwt";', lineNumber: 3 },
-      { type: "added", content: "", lineNumber: 4 },
-      { type: "added", content: "export async function POST(request: Request) {", lineNumber: 5 },
-      { type: "added", content: "  const { email, password } = await request.json();", lineNumber: 6 },
-      { type: "added", content: "  const user = await findUserByEmail(email);", lineNumber: 7 },
-      { type: "added", content: "", lineNumber: 8 },
-      { type: "added", content: "  if (!user) {", lineNumber: 9 },
-      { type: "added", content: "    return NextResponse.json(", lineNumber: 10 },
-      { type: "added", content: '      { error: "Invalid credentials" },', lineNumber: 11 },
-      { type: "added", content: "      { status: 401 }", lineNumber: 12 },
-      { type: "added", content: "    );", lineNumber: 13 },
-      { type: "added", content: "  }", lineNumber: 14 },
-    ],
-  },
-  {
-    file: "src/middleware.ts",
-    status: "added",
-    additions: 15,
-    deletions: 0,
-    diff: [
-      { type: "added", content: 'import { NextResponse } from "next/server";', lineNumber: 1 },
-      { type: "added", content: 'import type { NextRequest } from "next/server";', lineNumber: 2 },
-      { type: "added", content: 'import { verifyToken } from "@/lib/auth/jwt";', lineNumber: 3 },
-      { type: "added", content: "", lineNumber: 4 },
-      { type: "added", content: "export async function middleware(request: NextRequest) {", lineNumber: 5 },
-      { type: "added", content: '  const token = request.cookies.get("auth-token")?.value;', lineNumber: 6 },
-      { type: "added", content: "", lineNumber: 7 },
-      { type: "added", content: "  if (!token) {", lineNumber: 8 },
-      { type: "added", content: '    return NextResponse.redirect(new URL("/login", request.url));', lineNumber: 9 },
-      { type: "added", content: "  }", lineNumber: 10 },
-    ],
-  },
-  {
-    file: "package.json",
-    status: "modified",
-    additions: 2,
-    deletions: 0,
-    diff: [
-      { type: "context", content: '  "dependencies": {', lineNumber: 11 },
-      { type: "context", content: '    "next": "16.2.7",', lineNumber: 12 },
-      { type: "added", content: '    "jose": "^5.2.0",', lineNumber: 13 },
-      { type: "added", content: '    "bcryptjs": "^2.4.3",', lineNumber: 14 },
-      { type: "context", content: '    "react": "19.2.4",', lineNumber: 15 },
-      { type: "context", content: '    "react-dom": "19.2.4"', lineNumber: 16 },
-    ],
-  },
-];
+const CHANGE_TYPE_STYLES: Record<
+  FileChangeType,
+  { label: string; badge: string; icon: string }
+> = {
+  CREATE: { label: "created", badge: "bg-green-100 text-green-700", icon: "text-green-500" },
+  UPDATE: { label: "modified", badge: "bg-amber-100 text-amber-700", icon: "text-amber-500" },
+  DELETE: { label: "deleted", badge: "bg-red-100 text-red-700", icon: "text-red-500" },
+  RENAME: { label: "renamed", badge: "bg-blue-100 text-blue-700", icon: "text-blue-500" },
+};
 
 export default function ComposerPage() {
+  const { activeProject } = useProject();
+
+  const [changesets, setChangesets] = useState<ChangeSetSummary[]>([]);
+  const [selectedChangeSetId, setSelectedChangeSetId] = useState<string | null>(
+    null
+  );
+  const [detail, setDetail] = useState<ChangeSetDetail | null>(null);
   const [selectedFile, setSelectedFile] = useState(0);
-  const [inputValue, setInputValue] = useState("");
-  const [acceptedFiles, setAcceptedFiles] = useState<Set<string>>(new Set());
-  const model = "Auto";
+  const [viewMode, setViewMode] = useState<ViewMode>("unified");
 
-  const totalAdditions = fileChanges.reduce((s, f) => s + f.additions, 0);
-  const totalDeletions = fileChanges.reduce((s, f) => s + f.deletions, 0);
+  const [loadingList, setLoadingList] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const toggleAccept = (file: string) => {
-    const next = new Set(acceptedFiles);
-    if (next.has(file)) next.delete(file);
-    else next.add(file);
-    setAcceptedFiles(next);
+  const [applyResult, setApplyResult] = useState<ApplyResult | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // --- Data loading -------------------------------------------------------
+
+  const loadList = useCallback(async () => {
+    if (!activeProject) return;
+    setLoadingList(true);
+    setError(null);
+    try {
+      const { changesets: rows } = await listChangeSets(
+        activeProject.id,
+        "PENDING_REVIEW"
+      );
+      setChangesets(rows);
+      setSelectedChangeSetId((prev) => {
+        if (prev && rows.some((r) => r.id === prev)) return prev;
+        return rows[0]?.id ?? null;
+      });
+    } catch (err) {
+      setError(
+        err instanceof ApiClientError ? err.message : "Failed to load changesets"
+      );
+    } finally {
+      setLoadingList(false);
+    }
+  }, [activeProject]);
+
+  const loadDetail = useCallback(async (id: string) => {
+    setLoadingDetail(true);
+    setError(null);
+    try {
+      const { changeSet } = await getChangeSet(id);
+      setDetail(changeSet);
+      setSelectedFile(0);
+    } catch (err) {
+      setError(
+        err instanceof ApiClientError ? err.message : "Failed to load changeset"
+      );
+    } finally {
+      setLoadingDetail(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadList();
+  }, [loadList]);
+
+  useEffect(() => {
+    if (selectedChangeSetId) {
+      void loadDetail(selectedChangeSetId);
+      setApplyResult(null);
+      setSuccessMessage(null);
+    } else {
+      setDetail(null);
+    }
+  }, [selectedChangeSetId, loadDetail]);
+
+  // --- Derived ------------------------------------------------------------
+
+  const files = useMemo(() => detail?.fileChanges ?? [], [detail?.fileChanges]);
+  const current: FileChange | undefined = files[selectedFile];
+
+  const fileStats = useMemo(
+    () => files.map((f) => diffStat(f.diff)),
+    [files]
+  );
+  const totals = useMemo(
+    () =>
+      fileStats.reduce(
+        (acc, s) => ({
+          additions: acc.additions + s.additions,
+          deletions: acc.deletions + s.deletions,
+        }),
+        { additions: 0, deletions: 0 }
+      ),
+    [fileStats]
+  );
+
+  const acceptedCount = files.filter((f) => f.status === "ACCEPTED").length;
+
+  const conflictByFileChangeId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of applyResult?.conflicts ?? []) {
+      map.set(c.fileChangeId, c.reason);
+    }
+    return map;
+  }, [applyResult]);
+
+  // --- Actions ------------------------------------------------------------
+
+  const handleFileStatus = async (
+    fc: FileChange,
+    status: "ACCEPTED" | "REJECTED"
+  ) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const { fileChange } = await updateFileChange(fc.id, status);
+      setDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              fileChanges: prev.fileChanges.map((f) =>
+                f.id === fileChange.id ? { ...f, status: fileChange.status } : f
+              ),
+            }
+          : prev
+      );
+    } catch (err) {
+      setError(
+        err instanceof ApiClientError ? err.message : "Failed to update file"
+      );
+    } finally {
+      setBusy(false);
+    }
   };
+
+  const handleApply = async (applyAll: boolean) => {
+    if (!detail) return;
+    setBusy(true);
+    setError(null);
+    setApplyResult(null);
+    setSuccessMessage(null);
+    try {
+      const result = await applyChangeSet(detail.id, applyAll);
+      setApplyResult(result);
+      if (result.applied.length > 0) {
+        setSuccessMessage(
+          `${result.applied.length} file${
+            result.applied.length === 1 ? "" : "s"
+          } applied.`
+        );
+      }
+      await loadDetail(detail.id);
+      if (result.changeSetStatus === "APPLIED") {
+        await loadList();
+      }
+    } catch (err) {
+      setError(
+        err instanceof ApiClientError ? err.message : "Failed to apply changes"
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRejectAll = async () => {
+    if (!detail) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await rejectChangeSet(detail.id);
+      await loadList();
+      setDetail(null);
+      setSelectedChangeSetId(null);
+    } catch (err) {
+      setError(
+        err instanceof ApiClientError ? err.message : "Failed to reject changes"
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // --- Empty states -------------------------------------------------------
+
+  if (!activeProject) {
+    return (
+      <EmptyState
+        title="No project selected"
+        body="Select or create a project to review proposed changes."
+      />
+    );
+  }
+
+  if (loadingList && changesets.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center bg-white text-sm text-gray-500">
+        <Loader2 size={16} className="mr-2 animate-spin" /> Loading changes...
+      </div>
+    );
+  }
+
+  if (!loadingList && changesets.length === 0) {
+    return (
+      <EmptyState
+        title="No pending changes"
+        body="Ask the AI to generate changes from Chat."
+        action={
+          <Link
+            href="/dashboard/chat"
+            className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800"
+          >
+            Go to Chat
+          </Link>
+        }
+      />
+    );
+  }
+
+  const selectedSummary = changesets.find((c) => c.id === selectedChangeSetId);
 
   return (
     <div className="flex h-full flex-col bg-white">
@@ -132,207 +274,442 @@ export default function ComposerPage() {
         <div className="flex items-center gap-3">
           <Sparkles size={16} className="text-blue-500" />
           <span className="text-sm font-medium text-gray-900">Composer</span>
+          {changesets.length > 1 ? (
+            <div className="relative">
+              <select
+                value={selectedChangeSetId ?? ""}
+                onChange={(e) => setSelectedChangeSetId(e.target.value)}
+                className="appearance-none rounded-lg border border-gray-200 bg-white py-1 pl-2 pr-7 text-xs text-gray-700 hover:bg-gray-50 focus:outline-none"
+              >
+                {changesets.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={12}
+                className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400"
+              />
+            </div>
+          ) : (
+            selectedSummary && (
+              <span className="text-sm text-gray-700">
+                {selectedSummary.title}
+              </span>
+            )
+          )}
           <span className="rounded bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500">
-            {fileChanges.length} files
+            {files.length} files
           </span>
-          <span className="text-[10px] text-green-600">
-            +{totalAdditions}
-          </span>
-          <span className="text-[10px] text-red-500">
-            -{totalDeletions}
-          </span>
+          <span className="text-[10px] text-green-600">+{totals.additions}</span>
+          <span className="text-[10px] text-red-500">-{totals.deletions}</span>
         </div>
         <div className="flex items-center gap-2">
-          <button className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50">
+          {/* View toggle */}
+          <div className="flex items-center rounded-lg border border-gray-200 p-0.5">
+            <button
+              onClick={() => setViewMode("unified")}
+              className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${
+                viewMode === "unified"
+                  ? "bg-gray-900 text-white"
+                  : "text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              <AlignLeft size={11} /> Unified
+            </button>
+            <button
+              onClick={() => setViewMode("split")}
+              className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${
+                viewMode === "split"
+                  ? "bg-gray-900 text-white"
+                  : "text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              <Columns2 size={11} /> Split
+            </button>
+          </div>
+
+          <button
+            onClick={handleRejectAll}
+            disabled={busy}
+            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          >
             <RotateCcw size={12} className="mr-1.5 inline" />
-            Revert all
+            Reject all
           </button>
-          <button className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800">
-            <Check size={12} className="mr-1.5 inline" />
-            Accept all ({fileChanges.length})
+          {acceptedCount > 0 && (
+            <button
+              onClick={() => handleApply(false)}
+              disabled={busy}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Apply accepted ({acceptedCount})
+            </button>
+          )}
+          <button
+            onClick={() => handleApply(true)}
+            disabled={busy}
+            className="flex items-center rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+          >
+            {busy ? (
+              <Loader2 size={12} className="mr-1.5 animate-spin" />
+            ) : (
+              <Check size={12} className="mr-1.5" />
+            )}
+            Accept all ({files.length})
           </button>
         </div>
       </div>
 
+      {/* Banners */}
+      {error && (
+        <div className="flex items-center gap-2 border-b border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">
+          <AlertTriangle size={13} /> {error}
+        </div>
+      )}
+      {successMessage && (
+        <div className="flex items-center gap-2 border-b border-green-200 bg-green-50 px-4 py-2 text-xs text-green-700">
+          <CheckCircle2 size={13} /> {successMessage}
+        </div>
+      )}
+      {applyResult && applyResult.conflicts.length > 0 && (
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800">
+          <div className="flex items-center gap-2 font-medium">
+            <AlertTriangle size={13} />
+            {applyResult.conflicts.length} file
+            {applyResult.conflicts.length === 1 ? "" : "s"} skipped due to
+            conflicts
+          </div>
+        </div>
+      )}
+      {applyResult && applyResult.failures.length > 0 && (
+        <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">
+          <div className="flex items-center gap-2 font-medium">
+            <AlertTriangle size={13} />
+            {applyResult.failures.length} file
+            {applyResult.failures.length === 1 ? "" : "s"} failed to apply
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-1 overflow-hidden">
         {/* File list */}
-        <div className="w-64 border-r border-gray-200 bg-gray-50">
+        <div className="w-64 shrink-0 overflow-y-auto border-r border-gray-200 bg-gray-50">
           <div className="p-3">
             <div className="flex items-center gap-2 text-xs text-gray-500">
               <GitBranch size={12} />
-              <span className="font-medium">feature/auth-system</span>
+              <span className="truncate font-medium">
+                {activeProject.name}
+              </span>
             </div>
           </div>
-          <div className="space-y-0.5 px-2">
-            {fileChanges.map((f, i) => (
-              <button
-                key={f.file}
-                onClick={() => setSelectedFile(i)}
-                className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] transition-colors ${
-                  selectedFile === i
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                <File
-                  size={14}
-                  className={
-                    f.status === "added"
-                      ? "text-green-500"
-                      : f.status === "modified"
-                        ? "text-amber-500"
-                        : "text-red-500"
-                  }
-                />
-                <span className="flex-1 truncate">
-                  {f.file.split("/").pop()}
-                </span>
-                <div className="flex items-center gap-1">
-                  {f.additions > 0 && (
-                    <span className="text-[10px] text-green-600">
-                      +{f.additions}
-                    </span>
+          <div className="space-y-0.5 px-2 pb-4">
+            {files.map((f, i) => {
+              const stat = fileStats[i];
+              const ct = CHANGE_TYPE_STYLES[f.changeType];
+              const conflict = conflictByFileChangeId.get(f.id);
+              return (
+                <button
+                  key={f.id}
+                  onClick={() => setSelectedFile(i)}
+                  className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] transition-colors ${
+                    selectedFile === i
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  <File size={14} className={ct.icon} />
+                  <span className="flex-1 truncate">
+                    {f.filePath.split("/").pop()}
+                  </span>
+                  {conflict && (
+                    <AlertTriangle size={12} className="text-amber-500" />
                   )}
-                  {f.deletions > 0 && (
-                    <span className="text-[10px] text-red-500">
-                      -{f.deletions}
-                    </span>
+                  {f.status === "ACCEPTED" && (
+                    <Check size={12} className="text-green-600" />
                   )}
-                </div>
-              </button>
-            ))}
+                  {f.status === "REJECTED" && (
+                    <X size={12} className="text-red-500" />
+                  )}
+                  <div className="flex items-center gap-1">
+                    {stat.additions > 0 && (
+                      <span className="text-[10px] text-green-600">
+                        +{stat.additions}
+                      </span>
+                    )}
+                    {stat.deletions > 0 && (
+                      <span className="text-[10px] text-red-500">
+                        -{stat.deletions}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {/* Diff view */}
-        <div className="flex flex-1 flex-col">
-          {/* File header */}
-          <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-2">
-            <div className="flex items-center gap-2">
-              <code className="text-sm text-gray-700">
-                {fileChanges[selectedFile].file}
-              </code>
-              <span
-                className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                  fileChanges[selectedFile].status === "added"
-                    ? "bg-green-100 text-green-700"
-                    : fileChanges[selectedFile].status === "modified"
-                      ? "bg-amber-100 text-amber-700"
-                      : "bg-red-100 text-red-700"
-                }`}
-              >
-                {fileChanges[selectedFile].status}
-              </span>
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {loadingDetail ? (
+            <div className="flex flex-1 items-center justify-center text-sm text-gray-500">
+              <Loader2 size={16} className="mr-2 animate-spin" /> Loading diff...
             </div>
-            <div className="flex items-center gap-2">
-              {acceptedFiles.has(fileChanges[selectedFile].file) ? (
-                <span className="flex items-center gap-1 text-xs text-green-600">
-                  <Check size={12} /> Accepted
-                </span>
-              ) : (
-                <>
-                  <button className="rounded-lg border border-gray-200 px-2.5 py-1 text-[11px] text-gray-500 hover:bg-gray-100">
-                    Reject
-                  </button>
-                  <button
-                    onClick={() =>
-                      toggleAccept(fileChanges[selectedFile].file)
-                    }
-                    className="rounded-lg bg-gray-900 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-gray-800"
+          ) : !current ? (
+            <div className="flex flex-1 items-center justify-center text-sm text-gray-400">
+              No file selected
+            </div>
+          ) : (
+            <>
+              {/* File header */}
+              <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <code className="truncate text-sm text-gray-700">
+                    {current.changeType === "RENAME" && current.oldPath
+                      ? `${current.oldPath} ? ${current.filePath}`
+                      : current.filePath}
+                  </code>
+                  <span
+                    className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                      CHANGE_TYPE_STYLES[current.changeType].badge
+                    }`}
                   >
-                    Accept
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Diff content */}
-          <div className="flex-1 overflow-auto font-mono text-[13px]">
-            {fileChanges[selectedFile].diff.map((line, i) => (
-              <div
-                key={i}
-                className={`flex ${
-                  line.type === "added"
-                    ? "bg-green-50"
-                    : line.type === "removed"
-                      ? "bg-red-50"
-                      : "bg-white"
-                }`}
-              >
-                <span className="w-12 shrink-0 px-2 py-0.5 text-right text-xs text-gray-400">
-                  {line.lineNumber}
-                </span>
-                <span
-                  className={`w-6 shrink-0 px-1 py-0.5 text-center text-xs ${
-                    line.type === "added"
-                      ? "text-green-600"
-                      : line.type === "removed"
-                        ? "text-red-600"
-                        : "text-gray-300"
-                  }`}
-                >
-                  {line.type === "added"
-                    ? "+"
-                    : line.type === "removed"
-                      ? "-"
-                      : " "}
-                </span>
-                <span
-                  className={`flex-1 px-2 py-0.5 ${
-                    line.type === "added"
-                      ? "text-green-800"
-                      : line.type === "removed"
-                        ? "text-red-800"
-                        : "text-gray-700"
-                  }`}
-                >
-                  {line.content || "\u00A0"}
-                </span>
+                    {CHANGE_TYPE_STYLES[current.changeType].label}
+                  </span>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {current.status === "ACCEPTED" ? (
+                    <span className="flex items-center gap-1 text-xs text-green-600">
+                      <Check size={12} /> Accepted
+                      <button
+                        onClick={() => handleFileStatus(current, "REJECTED")}
+                        disabled={busy}
+                        className="ml-1 text-gray-400 hover:text-gray-600"
+                      >
+                        Undo
+                      </button>
+                    </span>
+                  ) : current.status === "REJECTED" ? (
+                    <span className="flex items-center gap-1 text-xs text-red-500">
+                      <X size={12} /> Rejected
+                      <button
+                        onClick={() => handleFileStatus(current, "ACCEPTED")}
+                        disabled={busy}
+                        className="ml-1 text-gray-400 hover:text-gray-600"
+                      >
+                        Undo
+                      </button>
+                    </span>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleFileStatus(current, "REJECTED")}
+                        disabled={busy}
+                        className="rounded-lg border border-gray-200 px-2.5 py-1 text-[11px] text-gray-500 hover:bg-gray-100 disabled:opacity-50"
+                      >
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => handleFileStatus(current, "ACCEPTED")}
+                        disabled={busy}
+                        className="rounded-lg bg-gray-900 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+                      >
+                        Accept
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-            ))}
-          </div>
 
-          {/* Composer input */}
-          <div className="border-t border-gray-200 bg-white px-4 py-3">
-            <div className="flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2.5 shadow-sm focus-within:border-gray-300">
-              <Plus size={16} className="shrink-0 text-gray-400" />
-              <input
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Describe changes to make across files..."
-                className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
-              />
-              <button className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-gray-500 hover:bg-gray-100">
-                {model} <ChevronDown size={12} />
-              </button>
-              <button className="text-gray-400 hover:text-gray-600">
-                <Mic size={14} />
-              </button>
-              {inputValue.trim() && (
-                <button className="flex h-6 w-6 items-center justify-center rounded-lg bg-gray-900 text-white hover:bg-gray-800">
-                  <ArrowRight size={12} />
-                </button>
+              {/* Conflict warning for this file */}
+              {conflictByFileChangeId.has(current.id) && (
+                <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800">
+                  <AlertTriangle size={13} />
+                  {conflictByFileChangeId.get(current.id)} Re-generate or resolve
+                  before applying.
+                </div>
               )}
-            </div>
-            <div className="mt-1.5 flex items-center gap-2 px-1">
-              <button className="flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] text-gray-400 hover:bg-gray-100">
-                <Globe size={10} /> Web
-              </button>
-              <button className="flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] text-gray-400 hover:bg-gray-100">
-                <Code size={10} /> Code
-              </button>
-              <button className="flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] text-gray-400 hover:bg-gray-100">
-                <Terminal size={10} /> Terminal
-              </button>
-              <button className="flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] text-gray-400 hover:bg-gray-100">
-                <FileText size={10} /> Docs
-              </button>
-            </div>
-          </div>
+
+              {/* Diff content */}
+              <div className="flex-1 overflow-auto">
+                {viewMode === "unified" ? (
+                  <UnifiedDiff file={current} />
+                ) : (
+                  <SplitDiff file={current} />
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Diff renderers                                                             */
+/* -------------------------------------------------------------------------- */
+
+function UnifiedDiff({ file }: { file: FileChange }) {
+  const lines = useMemo(() => {
+    if (file.diff) return parseUnifiedDiff(file.diff);
+    // Fallback: synthesize from old/new content.
+    const rows = buildSideBySide(file.oldContent, file.newContent);
+    return rows.map((r) => ({
+      type:
+        r.type === "context"
+          ? ("context" as const)
+          : r.type === "added"
+            ? ("added" as const)
+            : ("removed" as const),
+      content: (r.type === "added" ? r.right.content : r.left.content) ?? "",
+      oldLine: r.left.lineNumber,
+      newLine: r.right.lineNumber,
+    }));
+  }, [file]);
+
+  return (
+    <div className="font-mono text-[13px]">
+      {lines.map((line, i) => {
+        if (line.type === "meta") {
+          return (
+            <div key={i} className="bg-gray-100 px-3 py-0.5 text-[11px] text-gray-400">
+              {line.content}
+            </div>
+          );
+        }
+        return (
+          <div
+            key={i}
+            className={`flex ${
+              line.type === "added"
+                ? "bg-green-50"
+                : line.type === "removed"
+                  ? "bg-red-50"
+                  : "bg-white"
+            }`}
+          >
+            <span className="w-10 shrink-0 select-none px-1 py-0.5 text-right text-xs text-gray-400">
+              {line.oldLine ?? ""}
+            </span>
+            <span className="w-10 shrink-0 select-none px-1 py-0.5 text-right text-xs text-gray-400">
+              {line.newLine ?? ""}
+            </span>
+            <span
+              className={`w-5 shrink-0 select-none px-1 py-0.5 text-center text-xs ${
+                line.type === "added"
+                  ? "text-green-600"
+                  : line.type === "removed"
+                    ? "text-red-600"
+                    : "text-gray-300"
+              }`}
+            >
+              {line.type === "added" ? "+" : line.type === "removed" ? "-" : " "}
+            </span>
+            <span
+              className={`flex-1 whitespace-pre-wrap px-2 py-0.5 ${
+                line.type === "added"
+                  ? "text-green-800"
+                  : line.type === "removed"
+                    ? "text-red-800"
+                    : "text-gray-700"
+              }`}
+            >
+              {line.content || "\u00A0"}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function SplitDiff({ file }: { file: FileChange }) {
+  const rows = useMemo(
+    () => buildSideBySide(file.oldContent, file.newContent),
+    [file]
+  );
+
+  return (
+    <div className="font-mono text-[13px]">
+      {rows.map((row, i) => (
+        <div key={i} className="flex">
+          {/* Left (old) */}
+          <div
+            className={`flex w-1/2 border-r border-gray-200 ${
+              row.type === "removed" || row.type === "changed"
+                ? "bg-red-50"
+                : "bg-white"
+            }`}
+          >
+            <span className="w-10 shrink-0 select-none px-1 py-0.5 text-right text-xs text-gray-400">
+              {row.left.lineNumber ?? ""}
+            </span>
+            <span
+              className={`flex-1 whitespace-pre-wrap px-2 py-0.5 ${
+                row.left.content === null
+                  ? "bg-gray-50"
+                  : row.type === "removed"
+                    ? "text-red-800"
+                    : "text-gray-700"
+              }`}
+            >
+              {row.left.content === null
+                ? ""
+                : row.left.content || "\u00A0"}
+            </span>
+          </div>
+          {/* Right (new) */}
+          <div
+            className={`flex w-1/2 ${
+              row.type === "added" || row.type === "changed"
+                ? "bg-green-50"
+                : "bg-white"
+            }`}
+          >
+            <span className="w-10 shrink-0 select-none px-1 py-0.5 text-right text-xs text-gray-400">
+              {row.right.lineNumber ?? ""}
+            </span>
+            <span
+              className={`flex-1 whitespace-pre-wrap px-2 py-0.5 ${
+                row.right.content === null
+                  ? "bg-gray-50"
+                  : row.type === "added"
+                    ? "text-green-800"
+                    : "text-gray-700"
+              }`}
+            >
+              {row.right.content === null
+                ? ""
+                : row.right.content || "\u00A0"}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Empty state                                                                */
+/* -------------------------------------------------------------------------- */
+
+function EmptyState({
+  title,
+  body,
+  action,
+}: {
+  title: string;
+  body: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center bg-white px-6 text-center">
+      <Sparkles size={28} className="mb-3 text-gray-300" />
+      <h2 className="text-sm font-medium text-gray-900">{title}</h2>
+      <p className="mt-1 max-w-sm text-xs text-gray-500">{body}</p>
+      {action && <div className="mt-4">{action}</div>}
     </div>
   );
 }
