@@ -34,17 +34,24 @@ describe("Fusion Panel Integration Tests", () => {
       expect(panel.judge).toEqual({ model: "claude-opus-4-8", provider: "anthropic" });
     });
 
-    it("falls back to single model twice (opus4.8-4.8) when only one provider is configured", async () => {
-      isAIConfiguredAsyncMock.mockImplementation((provider: string) => {
-        return provider === "openai";
-      });
+    it("uses two cold Opus 4.8 runs (opus4.8-4.8) when only Anthropic is configured", async () => {
+      isAIConfiguredAsyncMock.mockImplementation((provider: string) => provider === "anthropic");
 
       const panel = await detectPanel();
       expect(panel.slug).toBe("opus4.8-4.8");
-      expect(panel.panelists).toEqual([
-        { model: "gpt-4o", provider: "openai" },
-        { model: "gpt-4o", provider: "openai" },
-      ]);
+      expect(panel.panelists).toHaveLength(2);
+      expect(panel.panelists.every((p) => p.model === "claude-opus-4-8")).toBe(true);
+      expect(panel.judge).toEqual({ model: "claude-opus-4-8", provider: "anthropic" });
+      expect(panel.downgraded).toBe(false);
+    });
+
+    it("downgrades and never lets Opus drive when Anthropic is absent", async () => {
+      isAIConfiguredAsyncMock.mockImplementation((provider: string) => provider === "openai");
+
+      const panel = await detectPanel();
+      expect(panel.downgraded).toBe(true);
+      expect(panel.dropped.join(" ")).toContain("opus4.8");
+      expect(panel.judge.provider).toBe("openai");
     });
   });
 

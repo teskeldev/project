@@ -183,6 +183,7 @@ const MODEL_REGISTRY: AvailableModel[] = [
 const PROVIDER_ENV_VARS: Record<string, string[]> = {
   openai: ['OPENAI_API_KEY'],
   anthropic: ['ANTHROPIC_API_KEY'],
+  google: ['GOOGLE_API_KEY', 'GEMINI_API_KEY'],
   groq: ['GROQ_API_KEY'],
   ollama: ['OLLAMA_BASE_URL', 'OLLAMA_HOST'],
 };

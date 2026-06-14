@@ -16,6 +16,7 @@ export type ResolvedKey = {
 const ENV_KEY_MAP: Record<string, string> = {
   openai: "OPENAI_API_KEY",
   anthropic: "ANTHROPIC_API_KEY",
+  google: "GOOGLE_API_KEY",
   groq: "GROQ_API_KEY",
 };
 

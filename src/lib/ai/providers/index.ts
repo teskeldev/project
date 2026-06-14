@@ -32,6 +32,18 @@ export const AI_PROVIDERS: AIProviderConfig[] = [
     requiresApiKey: true,
   },
   {
+    id: 'google',
+    name: 'Google (Gemini)',
+    // Gemini exposes an OpenAI-compatible surface, so it routes through the
+    // shared OpenAI-compatible adapter in provider.ts.
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    models: [
+      { id: 'gemini-3.1-pro', name: 'Gemini 3.1 Pro', contextWindow: 1000000 },
+      { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', contextWindow: 1000000 },
+    ],
+    requiresApiKey: true,
+  },
+  {
     id: 'groq',
     name: 'Groq',
     baseUrl: 'https://api.groq.com/openai/v1',

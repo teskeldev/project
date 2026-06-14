@@ -217,7 +217,7 @@ export default function FusionSettingsPage() {
 
               {config.defaultPanelSlug !== "custom" ? (
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  Panelists are determined automatically based on selected mode. Change to "Custom Panel" mode to manage individually.
+                  Panelists are determined automatically based on selected mode. Change to &ldquo;Custom Panel&rdquo; mode to manage individually.
                 </p>
               ) : (
                 <div className="space-y-4">
@@ -252,6 +252,7 @@ export default function FusionSettingsPage() {
                           >
                             <option value="anthropic">Anthropic (Claude)</option>
                             <option value="openai">OpenAI (GPT)</option>
+                            <option value="google">Google (Gemini)</option>
                             <option value="groq">Groq (Llama)</option>
                             <option value="ollama">Ollama (Local)</option>
                           </select>
@@ -310,6 +311,7 @@ export default function FusionSettingsPage() {
                   >
                     <option value="anthropic">Anthropic (Claude)</option>
                     <option value="openai">OpenAI (GPT)</option>
+                    <option value="google">Google (Gemini)</option>
                   </select>
                 </div>
 

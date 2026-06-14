@@ -50,6 +50,9 @@ function getApiKeyForProvider(providerId: string): string | undefined {
     case "anthropic":
       key = process.env.ANTHROPIC_API_KEY;
       break;
+    case "google":
+      key = process.env.GOOGLE_API_KEY ?? process.env.GEMINI_API_KEY;
+      break;
     case "groq":
       key = process.env.GROQ_API_KEY;
       break;
