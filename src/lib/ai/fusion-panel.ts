@@ -26,7 +26,7 @@ import { chat, isAIConfiguredAsync, type AIMessage } from "@/lib/ai/provider";
 import { validateSyntax } from "./validators/ast-validator";
 import { runLint } from "./validators/lint-validator";
 import { runTests } from "./validators/test-runner";
-import { getFusionConfig } from "./fusion-config";
+import { getActiveFusionProfile, resolveSkillsContent } from "./fusion-profile";
 
 // ---------------------------------------------------------------------------
 // Model identifiers (driver-first; Opus 4.8 always judges)
@@ -55,6 +55,8 @@ export type FusionOptions = {
   panelSlug?: PanelSlug;
   workspaceId?: string;
   projectId?: string;
+  /** Extra shared skills to fuse into every panelist (on top of the profile). */
+  skillSlugs?: string[];
 
   // Track A verification / "running the candidates".
   validateSyntax?: boolean;
@@ -117,7 +119,13 @@ export type FusionResult = {
   durationMs: number;
 };
 
-type PanelMember = { model: string; provider: string; temperature?: number };
+type PanelMember = {
+  model: string;
+  provider: string;
+  temperature?: number;
+  /** Skills injected only into this panelist (advanced / opt-in). */
+  skillSlugs?: string[];
+};
 
 // ---------------------------------------------------------------------------
 // Judge prompts
@@ -222,7 +230,12 @@ export type DetectedPanel = {
   judge: { model: string; provider: string };
   dropped: string[];
   downgraded: boolean;
+  /** Skills injected into EVERY panelist (from the active profile). */
+  sharedSkillSlugs: string[];
 };
+
+type Availability = { hasAnthropic: boolean; hasOpenai: boolean; hasGoogle: boolean };
+type PanelBase = Omit<DetectedPanel, "sharedSkillSlugs">;
 
 /**
  * Resolve the richest panel the configured providers can support, driver-first.
@@ -232,33 +245,52 @@ export type DetectedPanel = {
  * result is flagged as downgraded.
  */
 export async function detectPanel(workspaceId?: string): Promise<DetectedPanel> {
-  const config = await getFusionConfig();
+  const profile = workspaceId
+    ? await getActiveFusionProfile(workspaceId).catch(() => null)
+    : null;
+  const sharedSkillSlugs = profile?.skillSlugs ?? [];
 
+  const avail = await readAvailability(workspaceId);
+
+  // Custom profile: honor its panelists verbatim (with any per-panelist skills);
+  // Opus still judges whenever Anthropic is available.
+  if (profile?.panelSlug === "custom") {
+    return {
+      slug: "custom",
+      panelists: profile.panelists,
+      judge: avail.hasAnthropic ? { ...OPUS } : profile.judge,
+      dropped: [],
+      downgraded: !avail.hasAnthropic,
+      sharedSkillSlugs,
+    };
+  }
+
+  // A profile pinning a specific slug resolves that slug; otherwise auto-detect.
+  const base =
+    profile && profile.panelSlug !== "auto"
+      ? composeSlug(profile.panelSlug, avail)
+      : composeAuto(avail);
+
+  return { ...base, sharedSkillSlugs };
+}
+
+async function readAvailability(workspaceId?: string): Promise<Availability> {
   const [hasAnthropic, hasOpenai, hasGoogle] = await Promise.all([
     isAIConfiguredAsync("anthropic", workspaceId),
     isAIConfiguredAsync("openai", workspaceId),
     isAIConfiguredAsync("google", workspaceId),
   ]);
+  return { hasAnthropic, hasOpenai, hasGoogle };
+}
 
-  // Explicit custom panel from config: honor its panelists; Opus still judges
-  // whenever Anthropic is available.
-  if (config.defaultPanelSlug === "custom") {
-    return {
-      slug: "custom",
-      panelists: config.panelists,
-      judge: hasAnthropic ? { ...OPUS } : config.judge,
-      dropped: [],
-      downgraded: !hasAnthropic,
-    };
-  }
-
+/** Richest available panel, driver-first (Opus drives + judges). */
+function composeAuto({ hasAnthropic, hasOpenai, hasGoogle }: Availability): PanelBase {
   const judge = hasAnthropic
     ? { ...OPUS }
     : hasOpenai
       ? { ...GPT }
       : { model: "gpt-4o-mini", provider: "openai" };
 
-  // Driver-first composition. Opus is the driver; richer panels add GPT then Gemini.
   if (hasAnthropic && hasOpenai && hasGoogle) {
     return {
       slug: "opus4.8-gpt5.5-gemini3.1pro",
@@ -269,29 +301,18 @@ export async function detectPanel(workspaceId?: string): Promise<DetectedPanel> 
     };
   }
   if (hasAnthropic && hasOpenai) {
-    return {
-      slug: "opus4.8-gpt5.5",
-      panelists: [{ ...OPUS }, { ...GPT }],
-      judge,
-      dropped: [],
-      downgraded: false,
-    };
+    return { slug: "opus4.8-gpt5.5", panelists: [{ ...OPUS }, { ...GPT }], judge, dropped: [], downgraded: false };
   }
   if (hasAnthropic) {
-    // Default + always-available panel: two cold runs of Opus 4.8.
     return {
       slug: "opus4.8-4.8",
-      panelists: [
-        { ...OPUS, temperature: 0.2 },
-        { ...OPUS, temperature: 0.5 },
-      ],
+      panelists: [{ ...OPUS, temperature: 0.2 }, { ...OPUS, temperature: 0.5 }],
       judge,
       dropped: [],
       downgraded: false,
     };
   }
-
-  // Degraded: no Anthropic configured, so Opus can't drive. Run whatever exists.
+  // No Anthropic — Opus can't drive; run whatever exists, flagged downgraded.
   const fallback: PanelMember[] = hasOpenai
     ? [{ ...GPT, temperature: 0.2 }, { ...GPT, temperature: 0.5 }]
     : [{ model: "gpt-4o-mini", provider: "openai", temperature: 0.2 }];
@@ -305,18 +326,10 @@ export async function detectPanel(workspaceId?: string): Promise<DetectedPanel> 
 }
 
 /**
- * Resolve panelists for an explicitly requested slug, dropping members whose
- * provider isn't configured (graceful downgrade, never a hard failure).
+ * Resolve a specific requested slug, dropping members whose provider isn't
+ * configured (graceful downgrade, never a hard failure).
  */
-async function resolveRequestedSlug(
-  slug: string,
-  workspaceId: string | undefined
-): Promise<DetectedPanel> {
-  const [hasAnthropic, hasOpenai, hasGoogle] = await Promise.all([
-    isAIConfiguredAsync("anthropic", workspaceId),
-    isAIConfiguredAsync("openai", workspaceId),
-    isAIConfiguredAsync("google", workspaceId),
-  ]);
+function composeSlug(slug: string, { hasAnthropic, hasOpenai, hasGoogle }: Availability): PanelBase {
   const judge = hasAnthropic ? { ...OPUS } : { ...GPT };
   const dropped: string[] = [];
 
@@ -343,10 +356,26 @@ async function resolveRequestedSlug(
   const panelists = wanted.filter((w) => w.ok).map((w) => w.member);
   for (const w of wanted) if (!w.ok) dropped.push(w.label);
 
-  // If everything dropped, fall back to auto-detection.
-  if (panelists.length === 0) return detectPanel(workspaceId);
+  // If everything dropped, fall back to the richest auto panel.
+  if (panelists.length === 0) return composeAuto({ hasAnthropic, hasOpenai, hasGoogle });
 
   return { slug, panelists, judge, dropped, downgraded: dropped.length > 0 };
+}
+
+/**
+ * Resolve panelists for an explicitly requested slug, attaching the active
+ * profile's shared skills.
+ */
+async function resolveRequestedSlug(
+  slug: string,
+  workspaceId: string | undefined
+): Promise<DetectedPanel> {
+  const profile = workspaceId
+    ? await getActiveFusionProfile(workspaceId).catch(() => null)
+    : null;
+  const avail = await readAvailability(workspaceId);
+  const base = composeSlug(slug, avail);
+  return { ...base, sharedSkillSlugs: profile?.skillSlugs ?? [] };
 }
 
 // ---------------------------------------------------------------------------
@@ -370,18 +399,33 @@ export async function executeFusion(options: FusionOptions): Promise<FusionResul
 
   // Step 1 — fan out: each panelist gets the task VERBATIM + the independence
   // instruction, in parallel, blind to one another. No lenses, no personas.
+  // Fused skills are domain KNOWLEDGE injected into the system prompt — applied
+  // uniformly (shared) to preserve independence; per-panelist skills are opt-in.
   const labels = labelPanelists(panelists);
   const panelistPrompt = buildPanelistPrompt(context, task);
 
+  const sharedSkillSlugs = [...panel.sharedSkillSlugs, ...(options.skillSlugs ?? [])];
+  const sharedSkills = workspaceId
+    ? await resolveSkillsContent(sharedSkillSlugs, workspaceId, options.projectId)
+    : "";
+
+  const baseSystem =
+    systemPrompt ||
+    "You are an expert AI developer and analyst. Solve the task completely and directly.";
+
   const responses = await Promise.all(
     panelists.map(async (p, index): Promise<PanelistResponse> => {
+      // Per-panelist skills (advanced) layered on top of the shared block.
+      const perPanelistSkills =
+        workspaceId && p.skillSlugs?.length
+          ? await resolveSkillsContent(p.skillSlugs, workspaceId, options.projectId)
+          : "";
+      const systemContent = [baseSystem, sharedSkills, perPanelistSkills]
+        .filter(Boolean)
+        .join("\n\n");
+
       const messages: AIMessage[] = [
-        {
-          role: "system",
-          content:
-            systemPrompt ||
-            "You are an expert AI developer and analyst. Solve the task completely and directly.",
-        },
+        { role: "system", content: systemContent },
         { role: "user", content: panelistPrompt },
       ];
       try {

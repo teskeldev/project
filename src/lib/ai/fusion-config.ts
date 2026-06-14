@@ -1,10 +1,15 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
-
+/**
+ * Fusion config shape + defaults.
+ *
+ * Persistence moved to per-workspace DB Fusion Profiles (see fusion-profile.ts).
+ * This module now only exposes the shared type and the DEFAULT_CONFIG used to
+ * seed a workspace's first profile.
+ */
 export type PanelistConfig = {
   model: string;
   provider: string;
   temperature?: number;
+  skillSlugs?: string[];
 };
 
 export type FusionConfig = {
@@ -21,9 +26,7 @@ export type FusionConfig = {
   };
 };
 
-const CONFIG_PATH = path.resolve(process.cwd(), ".teskel-storage/fusion-config.json");
-
-const DEFAULT_CONFIG: FusionConfig = {
+export const DEFAULT_CONFIG: FusionConfig = {
   defaultPanelSlug: "auto",
   panelists: [
     { model: "claude-opus-4-8", provider: "anthropic", temperature: 0.2 },
@@ -39,17 +42,3 @@ const DEFAULT_CONFIG: FusionConfig = {
     runTests: false,
   },
 };
-
-export async function getFusionConfig(): Promise<FusionConfig> {
-  try {
-    const data = await fs.readFile(CONFIG_PATH, "utf-8");
-    return { ...DEFAULT_CONFIG, ...JSON.parse(data) };
-  } catch {
-    return DEFAULT_CONFIG;
-  }
-}
-
-export async function saveFusionConfig(config: FusionConfig): Promise<void> {
-  await fs.mkdir(path.dirname(CONFIG_PATH), { recursive: true });
-  await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2), "utf-8");
-}

@@ -185,20 +185,21 @@ model Workspace {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  owner         User              @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  members       WorkspaceMember[]
-  projects      Project[]
-  rules         Rule[]
-  knowledge     KnowledgeItem[]
-  integrations  Integration[]
-  apiKeys       ApiKey[]
-  extensions    Extension[]
-  webhooks      Webhook[]
-  subscription  Subscription?
-  skills        Skill[]
-  usageRecords  UsageRecord[]
-  slashCommands SlashCommand[]
-  aiPermissions AIPermission[]
+  owner          User              @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members        WorkspaceMember[]
+  projects       Project[]
+  rules          Rule[]
+  knowledge      KnowledgeItem[]
+  integrations   Integration[]
+  apiKeys        ApiKey[]
+  extensions     Extension[]
+  webhooks       Webhook[]
+  subscription   Subscription?
+  skills         Skill[]
+  usageRecords   UsageRecord[]
+  slashCommands  SlashCommand[]
+  aiPermissions  AIPermission[]
+  fusionProfiles FusionProfile[]
 
   @@index([ownerId])
 }
@@ -619,9 +620,9 @@ model ReviewComment {
 
   // `author` is a soft display reference (username/handle) and may be left null
   // when the author user has been deleted. `user` is the optional FK to User.
-  author String?  // soft reference for display (e.g. username / handle)
+  author String? // soft reference for display (e.g. username / handle)
   userId String?
-  user   User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([changeSetId])
   @@index([userId])
@@ -777,6 +778,35 @@ model Skill {
   @@index([projectId])
   @@index([workspaceId])
   @@index([projectId, enabled])
+}
+
+// ----------------------------- Fusion Profiles -----------------------------
+
+// A reusable, per-workspace Multi-Model Fusion configuration that "fuses"
+// chosen panelist models with chosen skills. The active profile (isDefault)
+// drives the fusion panel; Opus 4.8 always judges regardless of config.
+model FusionProfile {
+  id                 String   @id @default(cuid())
+  workspaceId        String
+  name               String
+  isDefault          Boolean  @default(false)
+  // "auto" | "opus4.8-4.8" | "opus4.8-gpt5.5" | "opus4.8-gpt5.5-gemini3.1pro" | "custom"
+  panelSlug          String   @default("auto")
+  // [{ model, provider, temperature, skillSlugs?: string[] }]
+  panelists          Json
+  // { model, provider }
+  judge              Json
+  // Shared skill slugs injected into every panelist.
+  skillSlugs         Json
+  // { validateSyntax, runLint, runTests }
+  trackAVerification Json
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
 }
 
 // ----------------------------- Commands -----------------------------
