@@ -2,17 +2,21 @@
  * Teskel background-agent orchestration engine (Phase 6).
  *
  * SERVER-ONLY. Drives an AgentRun through a fixed, typed sequence of steps and
- * emits structured events for an SSE stream. Because Next.js has no persistent
- * worker, the run is DRIVEN WITHIN AN HTTP REQUEST LIFECYCLE: the POST create
- * endpoint persists a QUEUED AgentRun; the GET events endpoint calls
- * `driveAgentRun()` which performs the steps while streaming progress. A
- * reconnect to an already-finished (or already-running) run just replays the
- * current DB status without re-executing.
+ * emits structured events for an SSE stream.
  *
- * PRODUCTION TODO: replace the in-process registry + request-driven execution
- * with a real durable queue/worker (e.g. BullMQ + Redis) so runs survive
- * serverless cold starts / instance restarts and can be resumed independently
- * of any single HTTP connection.
+ * EXECUTION MODEL — two paths share `driveAgentRun()`:
+ *   1. DURABLE (default when Redis is configured): the POST create endpoint
+ *      enqueues a BullMQ job (`enqueueAgentRun`); the separate worker process
+ *      (`src/worker/`) drives the run independently of any HTTP connection, so
+ *      it survives cold starts / restarts and scales horizontally.
+ *   2. IN-PROCESS FALLBACK (no queue configured): the GET events endpoint calls
+ *      `driveAgentRun()` directly on first connect, running the steps inside the
+ *      request lifecycle.
+ *
+ * Either way, the QUEUED -> RUNNING transition is claimed atomically (see the
+ * `updateMany` guard in `driveAgentRun`), so only one executor ever drives a
+ * run. A reconnect to an already-finished (or already-running) run just replays
+ * the current DB status without re-executing.
  *
  * SAFETY:
  *  - The agent NEVER applies changes to disk and NEVER runs shell commands. It

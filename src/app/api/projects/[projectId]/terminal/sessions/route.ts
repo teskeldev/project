@@ -3,6 +3,7 @@ import {
   apiSuccess,
   handleApiError,
   requireProjectAccess,
+  requireRole,
   validateBody,
 } from "@/lib/api";
 import { createTerminalSessionSchema } from "@/lib/validators";
@@ -44,7 +45,8 @@ export async function GET(_req: Request, ctx: RouteContext) {
 export async function POST(req: Request, ctx: RouteContext) {
   try {
     const { projectId } = await ctx.params;
-    const { user, project } = await requireProjectAccess(projectId);
+    const { user, project, member } = await requireProjectAccess(projectId);
+    requireRole(member);
     const { title, cwd } = await validateBody(req, createTerminalSessionSchema);
 
     // Validate any client-supplied cwd against the project root; store the

@@ -3,6 +3,7 @@ import {
   apiSuccess,
   handleApiError,
   requireProjectAccess,
+  requireRole,
   ApiError,
 } from "@/lib/api";
 import {
@@ -146,7 +147,8 @@ export async function POST(req: Request, ctx: RouteContext) {
       throw new ApiError("Changeset not found", 404, "NOT_FOUND");
     }
 
-    const { user, project } = await requireProjectAccess(changeSet.projectId);
+    const { user, project, member } = await requireProjectAccess(changeSet.projectId);
+    requireRole(member);
     const storageKey = project!.storageKey;
 
     await enforceRateLimit(`changesets:revert:${user.id}`, 10, 60_000);

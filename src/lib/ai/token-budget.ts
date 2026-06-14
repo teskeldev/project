@@ -75,21 +75,29 @@ const MODEL_REGISTRY: Record<string, ModelCapacity> = {
     costPer1kInput: 0.01,
     costPer1kOutput: 0.03,
   },
-  'claude-3-5-sonnet': {
-    modelId: 'claude-3-5-sonnet',
+  'claude-opus-4-8': {
+    modelId: 'claude-opus-4-8',
+    maxContext: 200_000,
+    effectiveContext: 40_000,
+    maxOutput: 8_000,
+    costPer1kInput: 0.015,
+    costPer1kOutput: 0.075,
+  },
+  'claude-sonnet-4-6': {
+    modelId: 'claude-sonnet-4-6',
     maxContext: 200_000,
     effectiveContext: 40_000,
     maxOutput: 8_000,
     costPer1kInput: 0.003,
     costPer1kOutput: 0.015,
   },
-  'claude-3-opus': {
-    modelId: 'claude-3-opus',
+  'claude-haiku-4-5-20251001': {
+    modelId: 'claude-haiku-4-5-20251001',
     maxContext: 200_000,
     effectiveContext: 40_000,
-    maxOutput: 4_000,
-    costPer1kInput: 0.015,
-    costPer1kOutput: 0.075,
+    maxOutput: 8_000,
+    costPer1kInput: 0.001,
+    costPer1kOutput: 0.005,
   },
   'llama-3.1-8b': {
     modelId: 'llama-3.1-8b',

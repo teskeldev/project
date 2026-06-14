@@ -3,6 +3,7 @@ import {
   apiSuccess,
   handleApiError,
   requireProjectAccess,
+  requireRole,
   validateBody,
   apiError,
 } from "@/lib/api";
@@ -22,6 +23,7 @@ export async function POST(req: Request) {
       await validateBody(req, generateChangeSetSchema);
 
     const { user, project, member } = await requireProjectAccess(projectId);
+    requireRole(member);
     const workspaceId = project!.workspaceId;
 
     // Rate limit AI usage per user (20/min). Production should use Redis.

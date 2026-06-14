@@ -45,6 +45,8 @@ import { adaptPrompt } from './prompt-adapter';
 import type { AdaptOptions } from './prompt-adapter';
 import { selectAdaptedExamples, detectProjectStyle, type ProjectStyle } from './dynamic-examples';
 import { getRelevantWarnings, formatWarningsForPrompt, logFailure } from './learning/failure-log';
+import { executeFusion as runFusion } from './fusion-panel';
+import { readFile } from '@/lib/storage';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public Types
@@ -69,7 +71,7 @@ export type QualityEngineOptions = {
   conversationHistory?: string;
 
   // Pipeline override
-  forcePipeline?: 'agentless' | 'agent_loop' | 'multi_pass';
+  forcePipeline?: 'agentless' | 'agent_loop' | 'multi_pass' | 'fusion';
   forcePattern?: 'skeleton_flesh' | 'spec_first' | 'diff_minimal' | 'none';
 
   // Verification
@@ -123,7 +125,7 @@ export type QualityEngineResult = {
 // Internal Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-type PipelineType = 'agentless' | 'agent_loop' | 'multi_pass';
+type PipelineType = 'agentless' | 'agent_loop' | 'multi_pass' | 'fusion';
 type PatternType = 'skeleton_flesh' | 'spec_first' | 'diff_minimal' | 'none';
 
 type AdaptTaskType = AdaptOptions['taskType'];
@@ -293,6 +295,7 @@ export async function runQualityEngine(options: QualityEngineOptions): Promise<Q
       characteristics,
       fewShotExamples,
       warningBlock,
+      selectedPaths: options.selectedPaths,
       signal: options.signal,
       onProgress: (pct, msg) => {
         // Map execution progress (0-100) to our range (45-75)
@@ -562,6 +565,11 @@ function buildExecutionPlan(
     pipeline = 'agentless';
   } else if (tier === 'weak' || complexity.score < 0.3) {
     pipeline = 'agentless';
+  } else if (qualityLevel === 'maximum' && complexity.score > 0.8) {
+    // Hardest maximum-quality tasks: fan out to the multi-model fusion panel
+    // and synthesize via the judge. detectPanel() degrades gracefully to a
+    // single provider when only one is configured.
+    pipeline = 'fusion';
   } else if ((tier === 'strong' || tier === 'frontier') && complexity.score > 0.6) {
     pipeline = 'agent_loop';
   } else {
@@ -593,6 +601,12 @@ function buildExecutionPlan(
   ) {
     pattern = 'diff_minimal';
   } else {
+    pattern = 'none';
+  }
+
+  // The fusion pipeline performs its own multi-candidate generation + judge
+  // synthesis, so single-candidate patterns must not shadow it.
+  if (pipeline === 'fusion') {
     pattern = 'none';
   }
 
@@ -637,6 +651,7 @@ type ExecutionContext = {
   characteristics: TaskCharacteristics;
   fewShotExamples: { task: string; solution: string }[];
   warningBlock: string;
+  selectedPaths?: string[];
   signal?: AbortSignal;
   onProgress?: (percent: number, message: string) => void;
 };
@@ -652,7 +667,9 @@ async function executeWithPlan(plan: ExecutionPlan, ctx: ExecutionContext): Prom
   const enhancedContext = buildEnhancedContext(ctx);
 
   // ─── Best-of-N (maximum quality) ───────────────────────────────────────────
-  if (plan.enableBestOfN && plan.pipeline !== 'agent_loop') {
+  // The agent loop and fusion panel run their own multi-candidate strategies,
+  // so best-of-N must not intercept them.
+  if (plan.enableBestOfN && plan.pipeline !== 'agent_loop' && plan.pipeline !== 'fusion') {
     return executeBestOfN(plan, ctx, enhancedContext);
   }
 
@@ -669,6 +686,8 @@ async function executeWithPlan(plan: ExecutionPlan, ctx: ExecutionContext): Prom
       return executeAgentLoop(plan, ctx);
     case 'multi_pass':
       return executeMultiPass(plan, ctx, enhancedContext);
+    case 'fusion':
+      return executeFusion(plan, ctx, enhancedContext);
     default:
       return executeMultiPass(plan, ctx, enhancedContext);
   }
@@ -779,9 +798,17 @@ async function executeWithPattern(
     case 'diff_minimal': {
       ctx.onProgress?.(30, 'Generating minimal diff...');
 
-      // For diff_minimal, we need a target file
-      const targetFile = ctx.characteristics.keywords[0] ?? 'unknown';
-      const fileContent = extractFileContentFromContext(enhancedContext, targetFile);
+      // For diff_minimal, we need a target file. Prefer an explicitly selected
+      // path and read its real content from storage; only fall back to scraping
+      // the context block when neither a selected path nor a readable file exists.
+      const targetFile =
+        ctx.selectedPaths?.[0] ?? ctx.characteristics.keywords[0] ?? 'unknown';
+      let fileContent = '';
+      try {
+        fileContent = await readFile(ctx.storageKey, targetFile);
+      } catch {
+        fileContent = extractFileContentFromContext(enhancedContext, targetFile);
+      }
 
       const dmResult = await generateMinimalDiff({
         task: ctx.task,
@@ -813,6 +840,33 @@ async function executeWithPattern(
     default:
       return executeMultiPass(plan, ctx, enhancedContext);
   }
+}
+
+async function executeFusion(
+  plan: ExecutionPlan,
+  ctx: ExecutionContext,
+  enhancedContext: string
+): Promise<ExecutionResult> {
+  ctx.onProgress?.(30, 'Fanning out task to multi-model panel...');
+
+  const result = await runFusion({
+    task: ctx.task,
+    context: enhancedContext,
+    workspaceId: ctx.workspaceId,
+    projectId: ctx.projectId,
+    validateSyntax: plan.verification.ast,
+    runLint: plan.verification.lint,
+    runTests: plan.verification.tests,
+    signal: ctx.signal,
+  });
+
+  ctx.onProgress?.(90, 'Synthesis complete');
+
+  return {
+    output: result.deliverable,
+    patches: [],
+    passes: 1,
+  };
 }
 
 async function executeAgentless(
@@ -1000,21 +1054,25 @@ async function runVerification(
     }
   }
 
-  // Test execution
+  // Test execution. Require an explicit project cwd — never fall back to
+  // process.cwd(), which would run the host (Teskel) repo's own test suite.
   if (checks.tests && options.testCommand) {
-    try {
-      const cwd = options.cwd ?? process.cwd();
-      const testResult = await runTests(options.testCommand, cwd);
-      if (testResult.passed) {
-        passedChecks.push('tests');
-      } else {
-        failedChecks.push('tests');
-        for (const failure of testResult.failures) {
-          errors.push(`[Test] ${failure.testName}: ${failure.message}`);
-        }
-      }
-    } catch {
+    if (!options.cwd) {
       passedChecks.push('tests_skipped');
+    } else {
+      try {
+        const testResult = await runTests(options.testCommand, options.cwd);
+        if (testResult.passed) {
+          passedChecks.push('tests');
+        } else {
+          failedChecks.push('tests');
+          for (const failure of testResult.failures) {
+            errors.push(`[Test] ${failure.testName}: ${failure.message}`);
+          }
+        }
+      } catch {
+        passedChecks.push('tests_skipped');
+      }
     }
   }
 

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import {
   handleApiError,
   requireProjectAccess,
+  requireRole,
   validateBody,
   apiError,
   ApiError,
@@ -52,7 +53,8 @@ export async function POST(req: Request, ctx: RouteContext) {
     }
 
     // Access control is derived from the session's project.
-    const { user, project } = await requireProjectAccess(session.projectId);
+    const { user, project, member } = await requireProjectAccess(session.projectId);
+    requireRole(member);
 
     // Verify session ownership - only the session creator can execute commands
     if (!session.userId || session.userId !== user.id) {

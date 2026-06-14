@@ -51,6 +51,11 @@ lint_out2.txt
 
 # vendored reference material (third-party, not part of this project)
 /reference
+/referensi
+
+# ad-hoc audit/analysis scratch artifacts (not part of the build)
+/analyze.js
+/audit_results.json
 # kilo tooling workspace
 /.kilo
 # staging validation artifacts

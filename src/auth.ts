@@ -115,16 +115,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: buildProviders(),
   callbacks: {
     ...authConfig.callbacks,
-    async jwt({ token, user, trigger }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
         token.sub = user.id;
         // Fetch tokenVersion on initial sign-in
         const dbUser = await prisma.user.findUnique({
           where: { id: user.id },
-          select: { tokenVersion: true },
+          select: { tokenVersion: true, preferences: true },
         });
         token.tokenVersion = dbUser?.tokenVersion ?? 0;
+        token.onboardingCompleted =
+          (dbUser?.preferences as { onboardingCompleted?: boolean } | null)
+            ?.onboardingCompleted === true;
       }
 
       // Validate tokenVersion on token refresh
@@ -139,6 +142,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
       }
 
+      // Handle client-side session update
+      if (trigger === "update" && session?.onboardingCompleted) {
+        token.onboardingCompleted = true;
+      }
+
       return token;
     },
     async session({ session, token }) {
@@ -146,8 +154,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = (token.id as string | undefined) ?? token.sub ?? "";
       }
       if (token.tokenVersion !== undefined) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (session as any).tokenVersion = token.tokenVersion;
+        session.tokenVersion = token.tokenVersion as number;
       }
       return session;
     },

@@ -37,8 +37,10 @@ export const authConfig = {
         session.user.id = (token.id as string | undefined) ?? token.sub ?? "";
       }
       if (token.tokenVersion !== undefined) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (session as any).tokenVersion = token.tokenVersion;
+        session.tokenVersion = token.tokenVersion as number;
+      }
+      if (token.onboardingCompleted !== undefined) {
+        session.onboardingCompleted = token.onboardingCompleted as boolean;
       }
       return session;
     },

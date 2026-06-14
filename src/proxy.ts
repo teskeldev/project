@@ -12,6 +12,58 @@ const AUTH_PAGES = ["/login", "/signup", "/forgot-password", "/reset-password"];
 const CSRF_COOKIE_NAME = "csrf";
 const CSRF_COOKIE_MAX_AGE = 60 * 60 * 24; // 1 day
 
+/** Methods that may mutate server state and therefore require a CSRF check. */
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+/**
+ * API paths that legitimately receive cross-origin mutating requests and are
+ * authenticated by their OWN mechanism (not the browser session cookie), so a
+ * same-origin check would wrongly reject them:
+ *   - Stripe webhook: verified via the Stripe signature header.
+ *   - NextAuth routes: ship their own CSRF protection.
+ */
+function isCsrfExempt(pathname: string): boolean {
+  return (
+    pathname === "/api/billing/webhook" || pathname.startsWith("/api/auth/")
+  );
+}
+
+/**
+ * Same-origin enforcement (CSRF defense for state-changing API calls).
+ *
+ * Because every authenticated mutation rides the browser's session cookie, we
+ * reject any mutating /api request whose Origin (or Referer) host does not
+ * match the request host. Same-origin XHR/fetch from our own UI always carries
+ * a matching Origin; a forged cross-site form/fetch cannot set it. This is the
+ * OWASP-recommended header-verification pattern and needs no client changes.
+ */
+function isSameOrigin(req: Request): boolean {
+  // Trust the request Host and, behind a reverse proxy, the forwarded host.
+  const allowedHosts = new Set(
+    [req.headers.get("host"), req.headers.get("x-forwarded-host")].filter(
+      (h): h is string => !!h
+    )
+  );
+  if (allowedHosts.size === 0) return false;
+
+  const matches = (value: string | null): boolean => {
+    if (!value) return false;
+    try {
+      return allowedHosts.has(new URL(value).host);
+    } catch {
+      return false;
+    }
+  };
+
+  const origin = req.headers.get("origin");
+  if (origin) return matches(origin);
+  // Some browsers omit Origin on same-origin requests; fall back to Referer.
+  const referer = req.headers.get("referer");
+  if (referer) return matches(referer);
+  // No Origin and no Referer on a mutating request: treat as untrusted.
+  return false;
+}
+
 /**
  * Applies security-related response headers to every matched request.
  * These supplement the headers defined in next.config.ts (which only apply to
@@ -54,6 +106,24 @@ export default auth(async (req) => {
   const isLoggedIn = !!req.auth?.user;
   const { pathname } = nextUrl;
 
+  // CSRF: reject cross-origin state-changing API calls up front.
+  if (
+    pathname.startsWith("/api/") &&
+    MUTATING_METHODS.has(req.method.toUpperCase()) &&
+    !isCsrfExempt(pathname) &&
+    !isSameOrigin(req)
+  ) {
+    return applySecurityHeaders(
+      NextResponse.json(
+        {
+          success: false,
+          error: { message: "Cross-origin request blocked", code: "CSRF_BLOCKED" },
+        },
+        { status: 403 }
+      )
+    );
+  }
+
   const isAuthPage = AUTH_PAGES.includes(pathname);
   const isProtected =
     pathname === "/dashboard" || pathname.startsWith("/dashboard/");
@@ -66,9 +136,9 @@ export default auth(async (req) => {
       ? incomingRequestId
       : crypto.randomUUID();
 
-  // Ensure every browser gets a `csrf` cookie so the double-submit pattern
-  // works for the very first mutating request. The token is HMAC-signed and
-  // verified server-side in `requireCsrf`.
+  // Primary CSRF defense is the same-origin check above. We still issue an
+  // HMAC-signed `csrf` cookie so routes can optionally layer the double-submit
+  // token check (`requireCsrf`) on top for extra assurance.
   const hasCsrfCookie = (req.headers.get("cookie") ?? "").includes(
     `${CSRF_COOKIE_NAME}=`
   );
@@ -107,6 +177,25 @@ export default auth(async (req) => {
     return applySecurityHeaders(response);
   }
 
+  // Authenticated users must complete onboarding before accessing the dashboard.
+  if (isLoggedIn && isProtected) {
+    const onboardingCompleted = req.auth?.onboardingCompleted;
+    if (!onboardingCompleted && pathname !== "/dashboard/onboarding") {
+      const response = NextResponse.redirect(new URL("/dashboard/onboarding", nextUrl));
+      if (!hasCsrfCookie) {
+        response.cookies.set(CSRF_COOKIE_NAME, await generateCsrfToken(), {
+          httpOnly: true,
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+          path: "/",
+          maxAge: CSRF_COOKIE_MAX_AGE,
+        });
+      }
+      response.headers.set("x-request-id", requestId);
+      return applySecurityHeaders(response);
+    }
+  }
+
   // Forward the request id to downstream route handlers via a request header.
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-request-id", requestId);
@@ -126,6 +215,7 @@ export default auth(async (req) => {
 
 export const config = {
   matcher: [
+    "/api/:path*",
     "/dashboard/:path*",
     "/dashboard",
     "/login",

@@ -44,7 +44,7 @@ export type RoutingOptions = {
 const MODEL_REGISTRY: AvailableModel[] = [
   // Frontier tier
   {
-    id: 'claude-3-opus',
+    id: 'claude-opus-4-8',
     provider: 'anthropic',
     tier: 'frontier',
     costPer1kTokens: 0.045,
@@ -53,7 +53,7 @@ const MODEL_REGISTRY: AvailableModel[] = [
     strengths: ['reasoning', 'code', 'analysis', 'complex_tasks'],
   },
   {
-    id: 'claude-sonnet-4',
+    id: 'claude-sonnet-4-6',
     provider: 'anthropic',
     tier: 'frontier',
     costPer1kTokens: 0.039,
@@ -73,7 +73,7 @@ const MODEL_REGISTRY: AvailableModel[] = [
 
   // Strong tier
   {
-    id: 'claude-3.5-sonnet',
+    id: 'claude-haiku-4-5-20251001',
     provider: 'anthropic',
     tier: 'strong',
     costPer1kTokens: 0.012,

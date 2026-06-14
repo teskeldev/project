@@ -3,6 +3,7 @@ import {
   apiSuccess,
   handleApiError,
   requireProjectAccess,
+  requireRole,
   ApiError,
 } from "@/lib/api";
 
@@ -22,7 +23,8 @@ export async function POST(_req: Request, ctx: RouteContext) {
       throw new ApiError("Changeset not found", 404, "NOT_FOUND");
     }
 
-    await requireProjectAccess(changeSet.projectId);
+    const { member } = await requireProjectAccess(changeSet.projectId);
+    requireRole(member);
 
     if (changeSet.status === "APPLIED") {
       throw new ApiError(

@@ -151,6 +151,31 @@ export async function requireProjectAccess(
 }
 
 /**
+ * Workspace role hierarchy, highest privilege first. Used by `requireRole` to
+ * gate write operations: anything below MEMBER (i.e. VIEWER) is read-only.
+ */
+const ROLE_RANK: Record<Role, number> = {
+  OWNER: 3,
+  ADMIN: 2,
+  MEMBER: 1,
+  VIEWER: 0,
+};
+
+/**
+ * Assert the member holds at least `minRole`. `requireProjectAccess` only
+ * proves membership; call this on any state-changing route so a VIEWER cannot
+ * perform writes. Throws ApiError(403) when the role is insufficient.
+ */
+export function requireRole(
+  member: { role: Role },
+  minRole: Role = "MEMBER"
+): void {
+  if (ROLE_RANK[member.role] < ROLE_RANK[minRole]) {
+    throw new ApiError("Insufficient permissions", 403, "FORBIDDEN");
+  }
+}
+
+/**
  * Parses and validates a JSON request body against a Zod schema.
  * Throws ApiError(422) with the zod issues on failure.
  */

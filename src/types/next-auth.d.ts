@@ -5,11 +5,15 @@ declare module "next-auth" {
     user: {
       id: string;
     } & DefaultSession["user"];
+    tokenVersion?: number;
+    onboardingCompleted?: boolean;
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT {
     id?: string;
+    tokenVersion?: number;
+    onboardingCompleted?: boolean;
   }
 }

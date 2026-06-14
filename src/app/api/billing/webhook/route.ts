@@ -1,13 +1,15 @@
 import { prisma } from "@/lib/db";
 import { apiError, apiSuccess } from "@/lib/api";
 import {
-  verifyWebhookSignature,
-  parseStripeEvent,
+  stripe,
+  STRIPE_WEBHOOK_SECRET,
   PLAN_CONFIGS,
   type PlanTier,
 } from "@/lib/stripe";
+import type Stripe from "stripe";
 import type { SubscriptionStatus, Prisma as PrismaTypes } from "@prisma/client";
 import { Prisma } from "@prisma/client";
+import { logger } from "@/lib/logger";
 
 /**
  * POST /api/billing/webhook
@@ -35,13 +37,17 @@ export async function POST(req: Request) {
       return apiError("Missing stripe-signature header", 400, "BAD_REQUEST");
     }
 
-    const isValid = await verifyWebhookSignature(body, signature);
-    if (!isValid) {
+    let event: Stripe.Event;
+    try {
+      event = stripe.webhooks.constructEvent(body, signature, STRIPE_WEBHOOK_SECRET);
+    } catch (err) {
+      logger.warn("stripe webhook signature verification failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return apiError("Invalid webhook signature", 400, "BAD_REQUEST");
     }
 
-    const event = parseStripeEvent(body);
-    const eventId = (event as { id?: string }).id;
+    const eventId = event.id;
     if (!eventId) {
       return apiError("Malformed Stripe event", 400, "BAD_REQUEST");
     }
@@ -59,7 +65,9 @@ export async function POST(req: Request) {
         return apiSuccess({ received: true, duplicate: true });
       }
     } catch (err) {
-      console.warn("[Stripe Webhook] Idempotency precheck failed:", err);
+      logger.warn("stripe webhook idempotency precheck failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     // Run side effects + write lastEventId in a single transaction so
@@ -93,7 +101,9 @@ export async function POST(req: Request) {
 
     return apiSuccess({ received: true });
   } catch (err) {
-    console.error("[Stripe Webhook Error]", err);
+    logger.error("stripe webhook processing failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
     return apiError("Webhook processing failed", 500, "INTERNAL_ERROR");
   }
 }
@@ -106,17 +116,17 @@ export async function POST(req: Request) {
  */
 async function dispatch(
   tx: Prisma.TransactionClient,
-  event: { type: string; data: { object: Record<string, unknown> } }
+  event: Stripe.Event
 ): Promise<string | null> {
   switch (event.type) {
     case "checkout.session.completed":
-      return handleCheckoutCompleted(tx, event.data.object);
+      return handleCheckoutCompleted(tx, event.data.object as unknown as Record<string, unknown>);
     case "invoice.paid":
-      return handleInvoicePaid(tx, event.data.object);
+      return handleInvoicePaid(tx, event.data.object as unknown as Record<string, unknown>);
     case "customer.subscription.updated":
-      return handleSubscriptionUpdated(tx, event.data.object);
+      return handleSubscriptionUpdated(tx, event.data.object as unknown as Record<string, unknown>);
     case "customer.subscription.deleted":
-      return handleSubscriptionDeleted(tx, event.data.object);
+      return handleSubscriptionDeleted(tx, event.data.object as unknown as Record<string, unknown>);
     default:
       return null;
   }
@@ -127,11 +137,8 @@ async function dispatch(
  * Returns the row (or null) so the caller can check `lastEventId` for
  * idempotency.
  */
-async function findSubscriptionForEvent(event: {
-  type: string;
-  data: { object: Record<string, unknown> };
-}) {
-  const obj = event.data.object as Record<string, unknown>;
+async function findSubscriptionForEvent(event: Stripe.Event) {
+  const obj = event.data.object as unknown as Record<string, unknown>;
   const customerId = obj.customer as string | undefined;
   const subscriptionId = obj.subscription as string | undefined;
   const metadata = obj.metadata as Record<string, string> | undefined;

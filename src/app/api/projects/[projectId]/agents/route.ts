@@ -3,6 +3,7 @@ import {
   apiSuccess,
   handleApiError,
   requireProjectAccess,
+  requireRole,
   validateBody,
   apiError,
 } from "@/lib/api";
@@ -66,6 +67,7 @@ export async function POST(req: Request, ctx: RouteContext) {
   try {
     const { projectId } = await ctx.params;
     const { user, member } = await requireProjectAccess(projectId);
+    requireRole(member);
     const { goal, threadId } = await validateBody(req, createAgentRunSchema);
 
     // Throttle run creation per user (10/min). Production: back with Redis.
