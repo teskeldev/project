@@ -88,15 +88,15 @@ function statusBadge(f: GitFileStatus, staged: boolean): {
   const code = (staged ? f.index : f.working) || f.index || f.working;
   switch (code) {
     case "A":
-      return { letter: "A", className: "text-green-600 dark:text-green-400" };
+      return { letter: "A", className: "text-green-600" };
     case "M":
-      return { letter: "M", className: "text-amber-600 dark:text-amber-400" };
+      return { letter: "M", className: "text-amber-600" };
     case "D":
-      return { letter: "D", className: "text-red-600 dark:text-red-400" };
+      return { letter: "D", className: "text-red-600" };
     case "R":
-      return { letter: "R", className: "text-blue-600 dark:text-blue-400" };
+      return { letter: "R", className: "text-accent" };
     case "?":
-      return { letter: "U", className: "text-green-600 dark:text-green-400" };
+      return { letter: "U", className: "text-green-600" };
     default:
       return { letter: code || "?", className: "text-[var(--text-secondary)]" };
   }
@@ -477,7 +477,7 @@ export default function GitPage() {
       {/* Top bar */}
       <div className="flex h-11 items-center justify-between border-b border-[var(--border)] px-4">
         <div className="flex items-center gap-3">
-          <GitBranch size={16} className="text-blue-500 dark:text-blue-400" />
+          <GitBranch size={16} className="text-accent" />
           <span className="text-sm font-medium text-[var(--foreground)]">
             Source Control
           </span>
@@ -509,19 +509,19 @@ export default function GitPage() {
 
       {/* Alerts */}
       {error && (
-        <div className="flex items-center gap-2 border-b border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">
+        <div className="flex items-center gap-2 border-b border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">
           <AlertCircle size={13} />
           <span className="flex-1">{error}</span>
-          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 dark:text-red-500 dark:hover:text-red-300">
+          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600">
             <X size={12} />
           </button>
         </div>
       )}
       {actionMsg && !error && (
-        <div className="flex items-center gap-2 border-b border-blue-200 bg-blue-50 px-4 py-2 text-xs text-blue-700 dark:border-blue-900/50 dark:bg-blue-900/20 dark:text-blue-300">
+        <div className="flex items-center gap-2 border-b border-accent bg-accent-light px-4 py-2 text-xs text-accent">
           <Check size={13} />
           <span className="flex-1">{actionMsg}</span>
-          <button onClick={() => setActionMsg(null)} className="text-blue-400 hover:text-blue-600 dark:text-blue-500 dark:hover:text-blue-300">
+          <button onClick={() => setActionMsg(null)} className="text-accent hover:text-accent">
             <X size={12} />
           </button>
         </div>
@@ -643,13 +643,13 @@ export default function GitPage() {
                     {(status?.ahead || status?.behind) && (
                       <div className="mt-2 flex items-center gap-3 text-[11px] text-[var(--text-muted)]">
                         {status.ahead > 0 && (
-                          <span className="flex items-center gap-0.5 text-green-600 dark:text-green-400">
+                          <span className="flex items-center gap-0.5 text-green-600">
                             <ArrowUp size={10} />
                             {status.ahead} ahead
                           </span>
                         )}
                         {status.behind > 0 && (
-                          <span className="flex items-center gap-0.5 text-amber-600 dark:text-amber-400">
+                          <span className="flex items-center gap-0.5 text-amber-600">
                             <ArrowDown size={10} />
                             {status.behind} behind
                           </span>
@@ -783,12 +783,12 @@ export default function GitPage() {
                       <div
                         key={b.name}
                         className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 ${
-                          b.current ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-[var(--surface-soft)]"
+                          b.current ? "bg-accent-light" : "hover:bg-[var(--surface-soft)]"
                         }`}
                       >
                         <GitBranch
                           size={14}
-                          className={b.current ? "text-blue-500 dark:text-blue-400" : "text-[var(--text-muted)]"}
+                          className={b.current ? "text-accent" : "text-[var(--text-muted)]"}
                         />
                         <span
                           className={`flex-1 truncate text-sm ${
@@ -950,7 +950,7 @@ export default function GitPage() {
                                   ? "success"
                                   : "destructive"
                               }
-                              className={selectedPr.merged ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" : ""}
+                              className={selectedPr.merged ? "bg-purple-100 text-purple-700" : ""}
                             >
                               {selectedPr.merged ? "Merged" : selectedPr.state}
                             </Badge>
@@ -963,8 +963,8 @@ export default function GitPage() {
                           )}
 
                           <div className="mt-4 flex items-center gap-4 text-xs text-[var(--text-secondary)]">
-                            <span className="text-green-600 dark:text-green-400">+{selectedPr.additions}</span>
-                            <span className="text-red-600 dark:text-red-400">-{selectedPr.deletions}</span>
+                            <span className="text-green-600">+{selectedPr.additions}</span>
+                            <span className="text-red-600">-{selectedPr.deletions}</span>
                             <span>{selectedPr.changedFiles} files</span>
                             <span className="flex items-center gap-1">
                               <MessageSquare size={11} /> {selectedPr.comments}
@@ -976,7 +976,7 @@ export default function GitPage() {
                               <Button
                                 onClick={() => void handleMergePR(selectedPr.number)}
                                 disabled={merging}
-                                className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600"
+                                className="bg-green-600 hover:bg-green-700"
                               >
                                 {merging ? (
                                   <Loader2 size={13} className="animate-spin" />
@@ -1040,7 +1040,7 @@ export default function GitPage() {
                                 <Button
                                   onClick={() => void handleCreatePR()}
                                   disabled={prCreating || !prTitle.trim()}
-                                  className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600"
+                                  className="bg-green-600 hover:bg-green-700"
                                   size="sm"
                                 >
                                   {prCreating ? (
@@ -1092,10 +1092,10 @@ export default function GitPage() {
 
                       {/* Error */}
                       {prsError && !prsLoading && (
-                        <Card className="border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-900/20">
-                          <CardContent className="px-4 py-3 text-xs text-amber-700 dark:text-amber-300">
+                        <Card className="border-amber-200 bg-amber-50">
+                          <CardContent className="px-4 py-3 text-xs text-amber-700">
                             <p className="font-medium">Could not load pull requests</p>
-                            <p className="mt-1 text-amber-600 dark:text-amber-400">{prsError}</p>
+                            <p className="mt-1 text-amber-600">{prsError}</p>
                           </CardContent>
                         </Card>
                       )}
@@ -1126,10 +1126,10 @@ export default function GitPage() {
                                   size={16}
                                   className={
                                     pr.merged
-                                      ? "mt-0.5 text-purple-500 dark:text-purple-400"
+                                      ? "mt-0.5 text-purple-500"
                                       : pr.state === "open"
-                                      ? "mt-0.5 text-green-500 dark:text-green-400"
-                                      : "mt-0.5 text-red-500 dark:text-red-400"
+                                      ? "mt-0.5 text-green-500"
+                                      : "mt-0.5 text-red-500"
                                   }
                                 />
                                 <div className="min-w-0 flex-1">
@@ -1152,8 +1152,8 @@ export default function GitPage() {
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
-                                  <span className="text-green-600 dark:text-green-400">+{pr.additions}</span>
-                                  <span className="text-red-600 dark:text-red-400">-{pr.deletions}</span>
+                                  <span className="text-green-600">+{pr.additions}</span>
+                                  <span className="text-red-600">-{pr.deletions}</span>
                                   {pr.comments > 0 && (
                                     <span className="flex items-center gap-0.5">
                                       <MessageSquare size={10} /> {pr.comments}
@@ -1204,10 +1204,10 @@ export default function GitPage() {
                       {diffText.split("\n").map((line, i) => {
                         let cls = "text-[var(--text-secondary)]";
                         if (line.startsWith("+") && !line.startsWith("+++"))
-                          cls = "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400";
+                          cls = "bg-green-50 text-green-700";
                         else if (line.startsWith("-") && !line.startsWith("---"))
-                          cls = "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400";
-                        else if (line.startsWith("@@")) cls = "text-blue-500 dark:text-blue-400";
+                          cls = "bg-red-50 text-red-700";
+                        else if (line.startsWith("@@")) cls = "text-accent";
                         else if (
                           line.startsWith("diff ") ||
                           line.startsWith("index ") ||

@@ -129,7 +129,7 @@ export default function TeamTab() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 size={24} className="animate-spin text-gray-400" />
+        <Loader2 size={24} className="animate-spin text-text-muted" />
       </div>
     );
   }
@@ -137,7 +137,7 @@ export default function TeamTab() {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-medium text-gray-900">Team Members</h2>
+        <h2 className="text-lg font-medium text-foreground">Team Members</h2>
         <Button onClick={() => setShowInvite(true)}>
           <Plus size={14} />
           Invite member
@@ -151,7 +151,7 @@ export default function TeamTab() {
           <CardContent className="pt-4">
             <div className="flex items-end gap-3">
               <div className="flex-1">
-                <label className="mb-1 block text-xs text-gray-500">
+                <label className="mb-1 block text-xs text-text-muted">
                   Email
                 </label>
                 <Input
@@ -162,13 +162,13 @@ export default function TeamTab() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs text-gray-500">
+                <label className="mb-1 block text-xs text-text-muted">
                   Role
                 </label>
                 <select
                   value={inviteRole}
                   onChange={(e) => setInviteRole(e.target.value)}
-                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  className="rounded-lg border border-border px-3 py-2 text-sm"
                 >
                   <option value="MEMBER">Member</option>
                   <option value="ADMIN">Admin</option>
@@ -178,7 +178,7 @@ export default function TeamTab() {
               <Button
                 onClick={handleInvite}
                 disabled={inviting}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-accent hover:bg-accent-hover"
               >
                 {inviting ? "Inviting..." : "Send invite"}
               </Button>
@@ -195,14 +195,14 @@ export default function TeamTab() {
           <div key={member.id}>
             <div className="flex items-center justify-between px-6 py-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-sm font-medium text-gray-600">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-soft text-sm font-medium text-text-secondary">
                   {(member.name ?? member.email)[0].toUpperCase()}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-700">
+                  <p className="text-sm font-medium text-text-secondary">
                     {member.name ?? member.email}
                   </p>
-                  <p className="text-xs text-gray-400">{member.email}</p>
+                  <p className="text-xs text-text-muted">{member.email}</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -214,7 +214,7 @@ export default function TeamTab() {
                     onChange={(e) =>
                       handleRoleChange(member.id, e.target.value)
                     }
-                    className="rounded-full border border-gray-200 px-2.5 py-0.5 text-xs"
+                    className="rounded-full border border-border px-2.5 py-0.5 text-xs"
                   >
                     <option value="ADMIN">Admin</option>
                     <option value="MEMBER">Member</option>
@@ -224,7 +224,7 @@ export default function TeamTab() {
                 {member.role !== "OWNER" && (
                   <button
                     onClick={() => handleRemove(member.id, member.name)}
-                    className="text-gray-300 hover:text-red-500"
+                    className="text-text-muted hover:text-red-500"
                   >
                     <MoreHorizontal size={16} />
                   </button>
@@ -235,7 +235,7 @@ export default function TeamTab() {
           </div>
         ))}
         {members.length === 0 && (
-          <p className="px-6 py-8 text-center text-sm text-gray-400">
+          <p className="px-6 py-8 text-center text-sm text-text-muted">
             No members yet. Invite someone to get started.
           </p>
         )}

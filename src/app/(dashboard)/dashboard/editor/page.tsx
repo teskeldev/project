@@ -60,7 +60,7 @@ import {
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
   loading: () => (
-    <div className="flex h-full items-center justify-center text-sm text-gray-400">
+    <div className="flex h-full items-center justify-center text-sm text-text-muted">
       <Loader2 size={16} className="mr-2 animate-spin" />
       Loading editor...
     </div>
@@ -122,12 +122,12 @@ function toMonacoLanguage(lang: string | null | undefined, name: string): string
 }
 
 const fileLangColor: Record<string, string> = {
-  typescript: "text-blue-500",
+  typescript: "text-accent",
   javascript: "text-yellow-500",
   css: "text-purple-500",
   scss: "text-purple-500",
   json: "text-yellow-600",
-  markdown: "text-gray-500",
+  markdown: "text-text-muted",
   html: "text-orange-500",
 };
 
@@ -194,7 +194,7 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
               ? "bg-red-600 text-white"
               : t.type === "success"
               ? "bg-green-600 text-white"
-              : "bg-gray-800 text-white"
+              : "bg-foreground text-white"
           }`}
         >
           <span className="flex-1">{t.message}</span>
@@ -245,7 +245,7 @@ function InlineInput({
         }
       }}
       onBlur={() => onCancel()}
-      className="ml-1 w-full rounded border border-blue-400 bg-white px-1 py-0.5 text-[13px] text-gray-900 outline-none dark:bg-gray-800 dark:text-gray-100"
+      className="ml-1 w-full rounded border border-accent bg-surface px-1 py-0.5 text-[13px] text-foreground outline-none"
     />
   );
 }
@@ -267,14 +267,14 @@ function ConfirmPopover({
 }) {
   return (
     <div
-      className="fixed z-[60] w-64 rounded-lg border border-gray-200 bg-white p-3 shadow-xl dark:border-gray-700 dark:bg-gray-800"
+      className="fixed z-[60] w-64 rounded-lg border border-border bg-surface p-3 shadow-xl"
       style={{ top: position.y, left: position.x }}
     >
-      <p className="text-sm text-gray-700 dark:text-gray-300">{message}</p>
+      <p className="text-sm text-text-secondary">{message}</p>
       <div className="mt-3 flex justify-end gap-2">
         <button
           onClick={onCancel}
-          className="rounded px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+          className="rounded px-3 py-1 text-xs text-text-secondary hover:bg-surface-soft"
         >
           Cancel
         </button>
@@ -325,13 +325,13 @@ function FileTreeItem({
         <button
           onClick={() => setExpanded(!expanded)}
           onContextMenu={(e) => onContext(e, node)}
-          className="flex w-full items-center gap-1 py-1 pr-2 text-left text-[13px] text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+          className="flex w-full items-center gap-1 py-1 pr-2 text-left text-[13px] text-text-secondary hover:bg-surface-soft"
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
         >
           {expanded ? (
-            <ChevronDown size={14} className="shrink-0 text-gray-400" />
+            <ChevronDown size={14} className="shrink-0 text-text-muted" />
           ) : (
-            <ChevronRight size={14} className="shrink-0 text-gray-400" />
+            <ChevronRight size={14} className="shrink-0 text-text-muted" />
           )}
           {expanded ? (
             <FolderOpen size={14} className="shrink-0 text-amber-500" />
@@ -372,14 +372,14 @@ function FileTreeItem({
       onContextMenu={(e) => onContext(e, node)}
       className={`flex w-full items-center gap-1 py-1 pr-2 text-left text-[13px] transition-colors ${
         selectedPath === node.path
-          ? "bg-blue-50 text-gray-900 dark:bg-blue-900/30 dark:text-gray-100"
-          : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+          ? "bg-accent-light text-foreground"
+          : "text-text-secondary hover:bg-surface-soft"
       }`}
       style={{ paddingLeft: `${depth * 12 + 22}px` }}
     >
       <FileIcon
         size={14}
-        className={`shrink-0 ${fileLangColor[lang] || "text-gray-400"}`}
+        className={`shrink-0 ${fileLangColor[lang] || "text-text-muted"}`}
       />
       {isRenaming ? (
         <InlineInput
@@ -468,11 +468,11 @@ function QuickOpenModal({
   return (
     <div className="fixed inset-0 z-[80] flex items-start justify-center pt-[15%]" onClick={onClose}>
       <div
-        className="w-[500px] max-w-[90vw] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900"
+        className="w-[500px] max-w-[90vw] overflow-hidden rounded-lg border border-border bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-700">
-          <Search size={14} className="text-gray-400" />
+        <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+          <Search size={14} className="text-text-muted" />
           <input
             ref={inputRef}
             type="text"
@@ -480,12 +480,12 @@ function QuickOpenModal({
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Search files by name..."
-            className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none dark:text-gray-100"
+            className="flex-1 bg-transparent text-sm text-foreground placeholder:text-text-muted focus:outline-none"
           />
         </div>
         <div className="max-h-64 overflow-y-auto">
           {filtered.length === 0 ? (
-            <p className="px-3 py-4 text-center text-xs text-gray-400">No files found</p>
+            <p className="px-3 py-4 text-center text-xs text-text-muted">No files found</p>
           ) : (
             filtered.map((f, i) => (
               <button
@@ -496,11 +496,11 @@ function QuickOpenModal({
                 }}
                 className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm ${
                   i === selectedIdx
-                    ? "bg-blue-50 text-gray-900 dark:bg-blue-900/30 dark:text-gray-100"
-                    : "text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                    ? "bg-accent-light text-foreground"
+                    : "text-text-secondary hover:bg-surface-soft"
                 }`}
               >
-                <FileIcon size={12} className="shrink-0 text-gray-400" />
+                <FileIcon size={12} className="shrink-0 text-text-muted" />
                 <span className="truncate">{f.path}</span>
               </button>
             ))
@@ -536,11 +536,11 @@ function SettingsDropdown({
 }) {
   return (
     <div
-      className="fixed right-3 top-12 z-[70] w-56 rounded-lg border border-gray-200 bg-white p-3 shadow-xl dark:border-gray-700 dark:bg-gray-800"
+      className="fixed right-3 top-12 z-[70] w-56 rounded-lg border border-border bg-surface p-3 shadow-xl"
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="mb-2 text-xs font-semibold uppercase text-gray-500">Editor Settings</div>
-      <label className="flex items-center justify-between py-1 text-xs text-gray-700 dark:text-gray-300">
+      <div className="mb-2 text-xs font-semibold uppercase text-text-muted">Editor Settings</div>
+      <label className="flex items-center justify-between py-1 text-xs text-text-secondary">
         Font Size
         <input
           type="number"
@@ -548,10 +548,10 @@ function SettingsDropdown({
           max={24}
           value={settings.fontSize}
           onChange={(e) => onChange({ ...settings, fontSize: Number(e.target.value) })}
-          className="w-14 rounded border border-gray-200 px-1 py-0.5 text-center text-xs dark:border-gray-600 dark:bg-gray-700"
+          className="w-14 rounded border border-border px-1 py-0.5 text-center text-xs"
         />
       </label>
-      <label className="flex items-center justify-between py-1 text-xs text-gray-700 dark:text-gray-300">
+      <label className="flex items-center justify-between py-1 text-xs text-text-secondary">
         Word Wrap
         <input
           type="checkbox"
@@ -560,7 +560,7 @@ function SettingsDropdown({
           className="h-3.5 w-3.5"
         />
       </label>
-      <label className="flex items-center justify-between py-1 text-xs text-gray-700 dark:text-gray-300">
+      <label className="flex items-center justify-between py-1 text-xs text-text-secondary">
         Minimap
         <input
           type="checkbox"
@@ -569,30 +569,30 @@ function SettingsDropdown({
           className="h-3.5 w-3.5"
         />
       </label>
-      <div className="my-2 h-px bg-gray-100 dark:bg-gray-700" />
-      <div className="mb-1 text-xs font-semibold uppercase text-gray-500">Theme</div>
+      <div className="my-2 h-px bg-surface-soft" />
+      <div className="mb-1 text-xs font-semibold uppercase text-text-muted">Theme</div>
       <div className="flex gap-1">
         <button
           onClick={() => onThemeChange("light")}
-          className={`flex items-center gap-1 rounded px-2 py-1 text-xs ${theme === "light" ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"}`}
+          className={`flex items-center gap-1 rounded px-2 py-1 text-xs ${theme === "light" ? "bg-accent-light text-accent" : "text-text-secondary hover:bg-surface-soft"}`}
         >
           <Sun size={11} /> Light
         </button>
         <button
           onClick={() => onThemeChange("dark")}
-          className={`flex items-center gap-1 rounded px-2 py-1 text-xs ${theme === "dark" ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"}`}
+          className={`flex items-center gap-1 rounded px-2 py-1 text-xs ${theme === "dark" ? "bg-accent-light text-accent" : "text-text-secondary hover:bg-surface-soft"}`}
         >
           <Moon size={11} /> Dark
         </button>
         <button
           onClick={() => onThemeChange("system")}
-          className={`flex items-center gap-1 rounded px-2 py-1 text-xs ${theme === "system" ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"}`}
+          className={`flex items-center gap-1 rounded px-2 py-1 text-xs ${theme === "system" ? "bg-accent-light text-accent" : "text-text-secondary hover:bg-surface-soft"}`}
         >
           <Monitor size={11} /> Auto
         </button>
       </div>
       <div className="mt-3 flex justify-end">
-        <button onClick={onClose} className="text-xs text-gray-400 hover:text-gray-600">
+        <button onClick={onClose} className="text-xs text-text-muted hover:text-text-secondary">
           Close
         </button>
       </div>
@@ -1118,21 +1118,21 @@ export default function EditorPage() {
 
   if (!projectLoading && !projectId) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 bg-white text-center dark:bg-gray-900">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+      <div className="flex h-full flex-col items-center justify-center gap-4 bg-surface text-center">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-light text-accent">
           <FolderGit2 size={26} />
         </div>
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          <h2 className="text-lg font-semibold text-foreground">
             No project selected
           </h2>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-text-muted">
             Create or select a project to start editing.
           </p>
         </div>
         <Link
           href="/dashboard/projects"
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
         >
           Go to projects
         </Link>
@@ -1147,22 +1147,22 @@ export default function EditorPage() {
   const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
 
   return (
-    <div className="flex h-full flex-col bg-white dark:bg-gray-900">
+    <div className="flex h-full flex-col bg-surface">
       {/* Top bar */}
-      <div className="flex h-10 items-center justify-between border-b border-gray-200 bg-gray-50 px-3 dark:border-gray-700 dark:bg-gray-800">
+      <div className="flex h-10 items-center justify-between border-b border-border bg-surface-soft px-3">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 text-sm text-gray-500">
+          <div className="flex items-center gap-1.5 text-sm text-text-muted">
             <GitBranch size={14} />
             <span className="text-xs font-medium">{gitBranch}</span>
           </div>
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-text-muted">
             {activeProject?.name ?? "..."}
           </span>
         </div>
         <div className="flex items-center gap-2">
           {/* Save indicator */}
           {saveStatus === "saving" && (
-            <span className="flex items-center gap-1 text-[11px] text-gray-400">
+            <span className="flex items-center gap-1 text-[11px] text-text-muted">
               <Loader2 size={12} className="animate-spin" /> Saving
             </span>
           )}
@@ -1182,7 +1182,7 @@ export default function EditorPage() {
           <button
             onClick={() => void saveActive()}
             disabled={!dirty}
-            className="rounded px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-200 disabled:opacity-40 dark:text-gray-300 dark:hover:bg-gray-700"
+            className="rounded px-2 py-1 text-xs font-medium text-text-secondary hover:bg-surface-soft disabled:opacity-40"
             title="Save (Ctrl+S)"
           >
             Save
@@ -1190,42 +1190,42 @@ export default function EditorPage() {
           <div className="flex items-center gap-1">
             <button
               onClick={handleSearchTrigger}
-              className="rounded p-1.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700"
+              className="rounded p-1.5 text-text-muted hover:bg-surface-soft hover:text-text-secondary"
               title="Find in file"
             >
               <Search size={14} />
             </button>
             <button
               onClick={handlePlay}
-              className="rounded p-1.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700"
+              className="rounded p-1.5 text-text-muted hover:bg-surface-soft hover:text-text-secondary"
               title="Open terminal"
             >
               <Play size={14} />
             </button>
             <button
               onClick={() => setShowSplit(!showSplit)}
-              className={`rounded p-1.5 ${showSplit ? "bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-200" : "text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700"}`}
+              className={`rounded p-1.5 ${showSplit ? "bg-surface-soft text-text-secondary" : "text-text-muted hover:bg-surface-soft hover:text-text-secondary"}`}
               title="Toggle split editor"
             >
               <Split size={14} />
             </button>
             <button
               onClick={() => setShowPreview(!showPreview)}
-              className={`rounded p-1.5 ${showPreview ? "bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-200" : "text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700"}`}
+              className={`rounded p-1.5 ${showPreview ? "bg-surface-soft text-text-secondary" : "text-text-muted hover:bg-surface-soft hover:text-text-secondary"}`}
               title="Toggle preview"
             >
               <Globe size={14} />
             </button>
             <button
               onClick={() => setShowTerminal(!showTerminal)}
-              className={`rounded p-1.5 ${showTerminal ? "bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-200" : "text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700"}`}
+              className={`rounded p-1.5 ${showTerminal ? "bg-surface-soft text-text-secondary" : "text-text-muted hover:bg-surface-soft hover:text-text-secondary"}`}
               title="Toggle terminal"
             >
               <Terminal size={14} />
             </button>
             <button
               onClick={() => setAiEnabled(!aiEnabled)}
-              className={`rounded p-1.5 ${aiEnabled ? "bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-400" : "text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700"}`}
+              className={`rounded p-1.5 ${aiEnabled ? "bg-purple-100 text-purple-600" : "text-text-muted hover:bg-surface-soft hover:text-text-secondary"}`}
               title={aiEnabled ? "AI completions enabled" : "AI completions disabled"}
             >
               <Sparkles size={14} />
@@ -1235,7 +1235,7 @@ export default function EditorPage() {
                 e.stopPropagation();
                 setSettingsOpen(!settingsOpen);
               }}
-              className={`rounded p-1.5 ${settingsOpen ? "bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-200" : "text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700"}`}
+              className={`rounded p-1.5 ${settingsOpen ? "bg-surface-soft text-text-secondary" : "text-text-muted hover:bg-surface-soft hover:text-text-secondary"}`}
               title="Editor settings"
               data-settings-dropdown
             >
@@ -1259,29 +1259,29 @@ export default function EditorPage() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* File explorer */}
-        <div className="flex w-56 flex-col border-r border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-          <div className="flex h-9 items-center justify-between border-b border-gray-100 px-3 dark:border-gray-800">
-            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+        <div className="flex w-56 flex-col border-r border-border bg-surface">
+          <div className="flex h-9 items-center justify-between border-b border-border px-3">
+            <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
               Explorer
             </span>
             <div className="flex items-center gap-0.5">
               <button
                 onClick={() => void handleNewFile("")}
-                className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+                className="rounded p-1 text-text-muted hover:bg-surface-soft hover:text-text-secondary"
                 title="New file"
               >
                 <FilePlus size={12} />
               </button>
               <button
                 onClick={() => void handleNewFolder("")}
-                className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+                className="rounded p-1 text-text-muted hover:bg-surface-soft hover:text-text-secondary"
                 title="New folder"
               >
                 <FolderPlus size={12} />
               </button>
               <button
                 onClick={() => void loadTree()}
-                className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+                className="rounded p-1 text-text-muted hover:bg-surface-soft hover:text-text-secondary"
                 title="Refresh"
               >
                 <RefreshCw size={12} />
@@ -1294,7 +1294,7 @@ export default function EditorPage() {
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div
                     key={i}
-                    className="h-4 animate-pulse rounded bg-gray-100 dark:bg-gray-800"
+                    className="h-4 animate-pulse rounded bg-surface-soft"
                     style={{ width: `${60 + ((i * 13) % 35)}%` }}
                   />
                 ))}
@@ -1304,13 +1304,13 @@ export default function EditorPage() {
                 <p className="text-xs text-red-600">{treeError}</p>
                 <button
                   onClick={() => void loadTree()}
-                  className="mt-2 rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-400"
+                  className="mt-2 rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-soft"
                 >
                   Retry
                 </button>
               </div>
             ) : tree.length === 0 ? (
-              <p className="px-3 py-4 text-center text-xs text-gray-400">
+              <p className="px-3 py-4 text-center text-xs text-text-muted">
                 No files yet. Use the + buttons above.
               </p>
             ) : (
@@ -1340,7 +1340,7 @@ export default function EditorPage() {
                 {inlineInput && inlineInput.type !== "rename" && inlineInput.parentPath === "" && (
                   <div className="flex items-center gap-1 py-1 pl-[22px] pr-2">
                     {inlineInput.type === "newFile" ? (
-                      <FileIcon size={14} className="shrink-0 text-gray-400" />
+                      <FileIcon size={14} className="shrink-0 text-text-muted" />
                     ) : (
                       <Folder size={14} className="shrink-0 text-amber-500" />
                     )}
@@ -1366,23 +1366,23 @@ export default function EditorPage() {
         {/* Editor area */}
         <div className={`flex flex-col overflow-hidden ${showPreview ? "w-1/2" : "flex-1"}`}>
           {/* Tabs */}
-          <div className="flex h-9 items-center overflow-x-auto border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
+          <div className="flex h-9 items-center overflow-x-auto border-b border-border bg-surface-soft">
             {tabs.map((tab) => {
               const tabDirty = tab.content !== tab.savedContent;
               return (
                 <div
                   key={tab.path}
                   onClick={() => setActivePath(tab.path)}
-                  className={`group flex h-full cursor-pointer items-center gap-2 border-r border-gray-200 px-3 text-[13px] dark:border-gray-700 ${
+                  className={`group flex h-full cursor-pointer items-center gap-2 border-r border-border px-3 text-[13px] ${
                     activePath === tab.path
-                      ? "border-b-2 border-b-blue-500 bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100"
-                      : "text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                      ? "border-b-2 border-b-accent bg-surface text-foreground"
+                      : "text-text-muted hover:bg-surface-soft"
                   }`}
                 >
-                  <FileIcon size={12} className="text-blue-500" />
+                  <FileIcon size={12} className="text-accent" />
                   <span>{tab.name}</span>
                   {tabDirty ? (
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-gray-400" />
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ink-muted" />
                   ) : null}
                   <button
                     onClick={(e) => {
@@ -1394,7 +1394,7 @@ export default function EditorPage() {
                         closeTab(tab.path);
                       }
                     }}
-                    className={`rounded p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 ${
+                    className={`rounded p-0.5 hover:bg-surface-soft ${
                       tabDirty ? "" : "opacity-0 group-hover:opacity-100"
                     }`}
                   >
@@ -1410,10 +1410,10 @@ export default function EditorPage() {
             {/* Monaco editor(s) */}
             <div className="relative flex flex-1 overflow-hidden">
               {/* Primary editor */}
-              <div className={`flex-1 overflow-hidden ${showSplit ? "border-r border-gray-200 dark:border-gray-700" : ""}`}>
+              <div className={`flex-1 overflow-hidden ${showSplit ? "border-r border-border" : ""}`}>
                 {activeTab ? (
                   activeTab.loading ? (
-                    <div className="flex h-full items-center justify-center text-sm text-gray-400">
+                    <div className="flex h-full items-center justify-center text-sm text-text-muted">
                       <Loader2 size={16} className="mr-2 animate-spin" />
                       Loading file...
                     </div>
@@ -1444,7 +1444,7 @@ export default function EditorPage() {
                     />
                   )
                 ) : (
-                  <div className="flex h-full items-center justify-center text-sm text-gray-400">
+                  <div className="flex h-full items-center justify-center text-sm text-text-muted">
                     Select a file to view
                   </div>
                 )}
@@ -1473,7 +1473,7 @@ export default function EditorPage() {
                       }}
                     />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-sm text-gray-400">
+                    <div className="flex h-full items-center justify-center text-sm text-text-muted">
                       Open a file to split
                     </div>
                   )}
@@ -1483,34 +1483,34 @@ export default function EditorPage() {
 
             {/* Terminal panel */}
             {showTerminal && (
-              <div className="flex flex-col border-t border-gray-200 dark:border-gray-700">
-                <div className="flex h-8 items-center justify-between bg-gray-950 px-3">
+              <div className="flex flex-col border-t border-border">
+                <div className="flex h-8 items-center justify-between bg-editor-bg px-3">
                   <div className="flex items-center gap-3">
-                    <span className="text-[11px] font-medium text-gray-400">
+                    <span className="text-[11px] font-medium text-text-muted">
                       TERMINAL
                     </span>
-                    <span className="text-[11px] text-gray-600">PROBLEMS</span>
-                    <span className="text-[11px] text-gray-600">OUTPUT</span>
+                    <span className="text-[11px] text-text-secondary">PROBLEMS</span>
+                    <span className="text-[11px] text-text-secondary">OUTPUT</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <button className="rounded p-1 text-gray-500 hover:text-gray-300">
+                    <button className="rounded p-1 text-text-muted hover:text-text-muted">
                       <Plus size={12} />
                     </button>
-                    <button className="rounded p-1 text-gray-500 hover:text-gray-300">
+                    <button className="rounded p-1 text-text-muted hover:text-text-muted">
                       <Copy size={12} />
                     </button>
-                    <button className="rounded p-1 text-gray-500 hover:text-gray-300">
+                    <button className="rounded p-1 text-text-muted hover:text-text-muted">
                       <Maximize2 size={12} />
                     </button>
                     <button
                       onClick={() => setShowTerminal(false)}
-                      className="rounded p-1 text-gray-500 hover:text-gray-300"
+                      className="rounded p-1 text-text-muted hover:text-text-muted"
                     >
                       <X size={12} />
                     </button>
                   </div>
                 </div>
-                <div className="h-36 overflow-hidden bg-gray-950">
+                <div className="h-36 overflow-hidden bg-editor-bg">
                   {terminalSession ? (
                     <XtermTerminal
                       sessionId={terminalSession.id}
@@ -1519,12 +1519,12 @@ export default function EditorPage() {
                       onRegister={() => {}}
                     />
                   ) : terminalLoading ? (
-                    <div className="flex h-full items-center justify-center text-sm text-gray-500">
+                    <div className="flex h-full items-center justify-center text-sm text-text-muted">
                       <Loader2 size={14} className="mr-2 animate-spin" />
                       Starting terminal...
                     </div>
                   ) : (
-                    <div className="flex h-full items-center justify-center text-sm text-gray-500">
+                    <div className="flex h-full items-center justify-center text-sm text-text-muted">
                       Terminal unavailable
                     </div>
                   )}
@@ -1546,7 +1546,7 @@ export default function EditorPage() {
       </div>
 
       {/* Status bar */}
-      <div className="flex h-6 items-center justify-between border-t border-gray-200 bg-gray-50 px-3 text-[11px] text-gray-500 dark:border-gray-700 dark:bg-gray-800">
+      <div className="flex h-6 items-center justify-between border-t border-border bg-surface-soft px-3 text-[11px] text-text-muted">
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
             <GitBranch size={11} /> {gitBranch}
@@ -1568,7 +1568,7 @@ export default function EditorPage() {
       {/* Context menu */}
       {context && (
         <div
-          className="fixed z-50 w-44 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-700 dark:bg-gray-800"
+          className="fixed z-50 w-44 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-xl"
           style={{ top: context.y, left: context.x }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -1580,9 +1580,9 @@ export default function EditorPage() {
                   setContext(null);
                   setInlineInput({ parentPath: path, type: "newFile" });
                 }}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-text-secondary hover:bg-surface-soft"
               >
-                <FilePlus size={14} className="text-gray-400" /> New file
+                <FilePlus size={14} className="text-text-muted" /> New file
               </button>
               <button
                 onClick={() => {
@@ -1590,11 +1590,11 @@ export default function EditorPage() {
                   setContext(null);
                   setInlineInput({ parentPath: path, type: "newFolder" });
                 }}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-text-secondary hover:bg-surface-soft"
               >
-                <FolderPlus size={14} className="text-gray-400" /> New folder
+                <FolderPlus size={14} className="text-text-muted" /> New folder
               </button>
-              <div className="my-1 h-px bg-gray-100 dark:bg-gray-700" />
+              <div className="my-1 h-px bg-surface-soft" />
             </>
           )}
           <button
@@ -1603,9 +1603,9 @@ export default function EditorPage() {
               setContext(null);
               void handleRename(node);
             }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-text-secondary hover:bg-surface-soft"
           >
-            <Pencil size={14} className="text-gray-400" /> Rename
+            <Pencil size={14} className="text-text-muted" /> Rename
           </button>
           <button
             onClick={(e) => {
@@ -1614,7 +1614,7 @@ export default function EditorPage() {
               setContext(null);
               setDeleteConfirm({ node, position: pos });
             }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
           >
             <Trash2 size={14} /> Delete
           </button>

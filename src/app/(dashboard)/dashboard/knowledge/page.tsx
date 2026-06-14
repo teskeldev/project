@@ -35,10 +35,10 @@ const TYPE_META: Record<
   KnowledgeType,
   { label: string; icon: typeof FileText; cls: string }
 > = {
-  TEXT: { label: "Text", icon: Book, cls: "bg-accent-light text-accent dark:bg-blue-900/30 dark:text-blue-400" },
-  NOTE: { label: "Note", icon: FileText, cls: "bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400" },
+  TEXT: { label: "Text", icon: Book, cls: "bg-accent-light text-accent" },
+  NOTE: { label: "Note", icon: FileText, cls: "bg-purple-50 text-purple-600" },
   FILE: { label: "File", icon: Folder, cls: "bg-surface-soft text-text-secondary" },
-  URL: { label: "URL", icon: Link2, cls: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400" },
+  URL: { label: "URL", icon: Link2, cls: "bg-emerald-50 text-emerald-600" },
 };
 
 function isStarred(item: KnowledgeItem): boolean {
@@ -315,9 +315,9 @@ export default function KnowledgePage() {
         </div>
 
         {error && (
-          <Card className="mb-4 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/50">
+          <Card className="mb-4 border-red-200 bg-red-50">
             <CardContent className="px-3 py-2">
-              <p className="text-[13px] text-red-600 dark:text-red-400">{error}</p>
+              <p className="text-[13px] text-red-600">{error}</p>
             </CardContent>
           </Card>
         )}

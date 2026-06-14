@@ -189,7 +189,7 @@ export default function TerminalPage() {
   return (
     <div className="flex h-full flex-col bg-editor-bg">
       {/* Tab bar */}
-      <div className="flex items-center justify-between border-b border-editor-border bg-surface dark:bg-editor-bg">
+      <div className="flex items-center justify-between border-b border-editor-border bg-surface">
         <div className="flex items-center overflow-x-auto">
           {sessions.map((s) => (
             <div
@@ -197,8 +197,8 @@ export default function TerminalPage() {
               onClick={() => setActiveId(s.id)}
               className={`group flex cursor-pointer items-center gap-2 border-r border-editor-border px-4 py-2 text-[13px] ${
                 activeId === s.id
-                  ? "bg-editor-bg text-foreground dark:text-gray-200"
-                  : "text-text-muted hover:bg-surface-soft hover:text-text-secondary dark:hover:bg-gray-800"
+                  ? "bg-editor-bg text-foreground"
+                  : "text-text-muted hover:bg-surface-soft hover:text-text-secondary"
               }`}
             >
               <span
@@ -215,7 +215,7 @@ export default function TerminalPage() {
                   e.stopPropagation();
                   void removeTab(s.id);
                 }}
-                className="rounded p-0.5 opacity-0 hover:bg-surface-soft group-hover:opacity-100 dark:hover:bg-gray-700"
+                className="rounded p-0.5 opacity-0 hover:bg-surface-soft group-hover:opacity-100"
                 aria-label="Close terminal"
               >
                 <X size={10} className="text-text-muted" />
@@ -296,7 +296,7 @@ export default function TerminalPage() {
       </div>
 
       {/* AI Suggestion bar */}
-      <div className="border-t border-editor-border bg-surface dark:bg-editor-bg px-4 py-2">
+      <div className="border-t border-editor-border bg-surface px-4 py-2">
         <div className="flex items-center gap-2">
           <Sparkles size={14} className="shrink-0 text-accent" />
           <label htmlFor="ai-suggestion-input" className="sr-only">
@@ -334,7 +334,7 @@ export default function TerminalPage() {
 
         {/* AI suggestion result */}
         {aiSuggestion && (
-          <div className="mt-2 flex items-center gap-2 rounded border border-editor-border bg-surface-soft px-3 py-2 dark:bg-gray-800">
+          <div className="mt-2 flex items-center gap-2 rounded border border-editor-border bg-surface-soft px-3 py-2">
             <code className="flex-1 text-[13px] text-success">{aiSuggestion}</code>
             <Button
               variant="ghost"
@@ -374,7 +374,7 @@ export default function TerminalPage() {
       </div>
 
       {/* Status bar */}
-      <div className="flex h-6 items-center justify-between border-t border-editor-border bg-surface px-4 text-[11px] text-text-muted dark:bg-editor-bg">
+      <div className="flex h-6 items-center justify-between border-t border-editor-border bg-surface px-4 text-[11px] text-text-muted">
         <div className="flex items-center gap-3">
           <span>{sessions.length} terminals</span>
           <span>sandboxed</span>

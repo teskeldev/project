@@ -319,8 +319,8 @@ function AutonomySelector({
 function CompactionMessage({ compactedCount }: { compactedCount: number }) {
   return (
     <div className="my-4 flex items-center justify-center">
-      <div className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 dark:bg-amber-950 px-4 py-2">
-        <Minimize2 size={14} className="text-amber-600 dark:text-amber-400" />
+      <div className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2">
+        <Minimize2 size={14} className="text-amber-600" />
         <span className="text-xs font-medium text-amber-700">
           {compactedCount} messages summarized to save context
         </span>
@@ -336,8 +336,8 @@ function CompactionMessage({ compactedCount }: { compactedCount: number }) {
 function NoProjectState() {
   return (
     <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-950">
-        <Sparkles size={22} className="text-blue-500" />
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-accent-light">
+        <Sparkles size={22} className="text-accent" />
       </div>
       <h2 className="text-base font-semibold text-foreground">
         Select or create a project to chat
@@ -903,16 +903,16 @@ function ChatSurface() {
             {activeProject.name}
           </span>
           {streaming && (
-            <span className="flex items-center gap-1 rounded bg-green-50 dark:bg-green-950 px-1.5 py-0.5 text-[10px] font-medium text-green-600 dark:text-green-400">
+            <span className="flex items-center gap-1 rounded bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-600">
               <Loader2 size={10} className="animate-spin" />
               Streaming
             </span>
           )}
           {actionMsg && (
-            <span className="flex items-center gap-1 rounded bg-blue-50 dark:bg-blue-950 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+            <span className="flex items-center gap-1 rounded bg-accent-light px-1.5 py-0.5 text-[10px] font-medium text-accent">
               <GitBranch size={10} />
               {actionMsg}
-              <button onClick={() => setActionMsg(null)} className="ml-1 text-blue-400 hover:text-blue-600 dark:hover:text-blue-400"><X size={8} /></button>
+              <button onClick={() => setActionMsg(null)} className="ml-1 text-accent hover:text-accent"><X size={8} /></button>
             </span>
           )}
           {/* Feature B: Autonomy Mode Selector */}
@@ -991,13 +991,13 @@ function ChatSurface() {
               <MessageSkeleton />
             ) : loadError ? (
               <div className="mx-auto max-w-3xl px-6 py-6">
-                <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 dark:bg-red-950 px-4 py-3">
+                <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
                   <AlertTriangle size={16} className="mt-0.5 text-red-500" />
                   <div>
                     <p className="text-sm font-medium text-red-700">
                       Couldn&apos;t load this conversation
                     </p>
-                    <p className="text-xs text-red-600 dark:text-red-400">{loadError}</p>
+                    <p className="text-xs text-red-600">{loadError}</p>
                   </div>
                 </div>
               </div>
@@ -1125,22 +1125,22 @@ function ChatSurface() {
             <div className="mx-auto max-w-3xl">
               {/* Changeset confirmation / error */}
               {changesetState.status === "ready" && (
-                <div className="mb-2 flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950 px-3 py-2">
-                  <span className="text-xs text-blue-700">
+                <div className="mb-2 flex items-center justify-between rounded-lg border border-accent bg-accent-light px-3 py-2">
+                  <span className="text-xs text-accent">
                     Proposed changes ready
                   </span>
                   <Link
                     href="/dashboard/composer"
-                    className="text-xs font-medium text-blue-600 dark:text-blue-400 underline hover:text-blue-800"
+                    className="text-xs font-medium text-accent underline hover:text-accent"
                   >
                     Review in Composer
                   </Link>
                 </div>
               )}
               {changesetState.status === "error" && (
-                <div className="mb-2 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 dark:bg-red-950 px-3 py-2">
+                <div className="mb-2 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
                   <AlertTriangle size={12} className="text-red-500" />
-                  <span className="text-xs text-red-600 dark:text-red-400">
+                  <span className="text-xs text-red-600">
                     {changesetState.message}
                   </span>
                 </div>
@@ -1148,9 +1148,9 @@ function ChatSurface() {
 
               {/* Auto-edit confirmation banner */}
               {autoEditPending && (
-                <div className="mb-2 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950 px-3 py-2">
+                <div className="mb-2 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
                   <div className="flex items-center gap-2">
-                    <Zap size={12} className="text-amber-600 dark:text-amber-400" />
+                    <Zap size={12} className="text-amber-600" />
                     <span className="text-xs text-amber-700">
                       Auto-edit generated changes ready to apply
                     </span>
@@ -1158,7 +1158,7 @@ function ChatSurface() {
                   <div className="flex items-center gap-2">
                     <Link
                       href="/dashboard/composer"
-                      className="text-xs font-medium text-amber-600 dark:text-amber-400 underline hover:text-amber-800"
+                      className="text-xs font-medium text-amber-600 underline hover:text-amber-800"
                     >
                       Review
                     </Link>
@@ -1180,11 +1180,11 @@ function ChatSurface() {
 
               {/* Auto-edit notification */}
               {autoEditNotification && (
-                <div className="mb-2 flex items-center justify-between rounded-lg border border-green-200 bg-green-50 dark:bg-green-950 px-3 py-2">
+                <div className="mb-2 flex items-center justify-between rounded-lg border border-green-200 bg-green-50 px-3 py-2">
                   <span className="text-xs text-green-700">{autoEditNotification}</span>
                   <button
                     onClick={() => setAutoEditNotification(null)}
-                    className="text-green-400 hover:text-green-600 dark:hover:text-green-400"
+                    className="text-green-400 hover:text-green-600"
                   >
                     <X size={12} />
                   </button>
@@ -1240,7 +1240,7 @@ function ChatSurface() {
                           onClick={() => { setSelectedCommand(cmd); setShowCommandDropdown(false); setInputValue(""); const defaults: Record<string, string> = {}; for (const v of cmd.variables) { defaults[v.name] = v.defaultValue ?? ""; } setCommandValues(defaults); }}
                           className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-soft"
                         >
-                          <span className="font-mono text-xs text-blue-600 dark:text-blue-400">/{cmd.name}</span>
+                          <span className="font-mono text-xs text-accent">/{cmd.name}</span>
                           <span className="text-xs text-text-secondary">{cmd.description}</span>
                         </button>
                       ))}
@@ -1259,10 +1259,10 @@ function ChatSurface() {
                     {selectedCommand.variables.map((v) => (
                       <div key={v.name} className="mb-2">
                         <label className="mb-0.5 block text-[10px] text-text-secondary">{v.name}{v.required && <span className="text-red-400">*</span>}: {v.description}</label>
-                        <input value={commandValues[v.name] ?? ""} onChange={(e) => setCommandValues((prev) => ({ ...prev, [v.name]: e.target.value }))} className="w-full rounded border border-border px-2 py-1 text-xs focus:border-blue-400 focus:outline-none" placeholder={v.defaultValue ?? v.description} />
+                        <input value={commandValues[v.name] ?? ""} onChange={(e) => setCommandValues((prev) => ({ ...prev, [v.name]: e.target.value }))} className="w-full rounded border border-border px-2 py-1 text-xs focus:border-accent focus:outline-none" placeholder={v.defaultValue ?? v.description} />
                       </div>
                     ))}
-                    <button type="button" onClick={() => { const resolved = resolveCommandTemplate(selectedCommand.template, commandValues); setInputValue(resolved); setSelectedCommand(null); }} className="mt-1 rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700">Fill Template</button>
+                    <button type="button" onClick={() => { const resolved = resolveCommandTemplate(selectedCommand.template, commandValues); setInputValue(resolved); setSelectedCommand(null); }} className="mt-1 rounded bg-accent px-2 py-1 text-xs font-medium text-white hover:bg-accent-hover">Fill Template</button>
                   </div>
                 )}
                 <div className="flex items-center gap-2">
@@ -1295,7 +1295,7 @@ function ChatSurface() {
                       <div className="absolute bottom-full right-0 mb-1 w-56 rounded-lg border border-border bg-surface py-1 shadow-lg z-50 max-h-64 overflow-y-auto">
                         <button
                           onClick={() => { setSelectedModel(null); setShowModelDropdown(false); }}
-                          className={`flex w-full items-center px-3 py-1.5 text-left text-xs hover:bg-surface-soft ${!selectedModel ? "text-blue-600 dark:text-blue-400 font-medium" : "text-text-secondary"}`}
+                          className={`flex w-full items-center px-3 py-1.5 text-left text-xs hover:bg-surface-soft ${!selectedModel ? "text-accent font-medium" : "text-text-secondary"}`}
                         >
                           Auto (default)
                         </button>
@@ -1308,7 +1308,7 @@ function ChatSurface() {
                               <button
                                 key={m.id}
                                 onClick={() => { setSelectedModel(m.id); setShowModelDropdown(false); }}
-                                className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-xs hover:bg-surface-soft ${selectedModel === m.id ? "text-blue-600 dark:text-blue-400 font-medium" : "text-text-secondary"}`}
+                                className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-xs hover:bg-surface-soft ${selectedModel === m.id ? "text-accent font-medium" : "text-text-secondary"}`}
                               >
                                 <span>{m.name}</span>
                                 {m.pricing && (
@@ -1336,7 +1336,7 @@ function ChatSurface() {
                     <button
                       onClick={() => void send()}
                       disabled={!inputValue.trim() || creatingThread}
-                      className="flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-40"
+                      className="flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-40"
                       title="Send"
                     >
                       {creatingThread ? (
@@ -1443,7 +1443,7 @@ function AssistantError({
 }) {
   const notConfigured = code === "AI_NOT_CONFIGURED";
   return (
-    <div className="rounded-xl border border-red-200 bg-red-50 dark:bg-red-950 px-4 py-3">
+    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
       <div className="flex items-start gap-2">
         <AlertTriangle size={16} className="mt-0.5 text-red-500" />
         <div>
@@ -1451,7 +1451,7 @@ function AssistantError({
           {notConfigured && (
             <Link
               href="/dashboard/integrations"
-              className="mt-1 inline-block text-xs font-medium text-blue-600 dark:text-blue-400 underline hover:text-blue-800"
+              className="mt-1 inline-block text-xs font-medium text-accent underline hover:text-accent"
             >
               Add an OpenAI API key in Integrations
             </Link>

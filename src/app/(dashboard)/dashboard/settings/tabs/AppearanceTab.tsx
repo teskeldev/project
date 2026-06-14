@@ -73,7 +73,7 @@ export default function AppearanceTab() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 size={24} className="animate-spin text-gray-400" />
+        <Loader2 size={24} className="animate-spin text-text-muted" />
       </div>
     );
   }
@@ -95,12 +95,12 @@ export default function AppearanceTab() {
 
   return (
     <div>
-      <h2 className="mb-4 text-lg font-medium text-gray-900">Appearance</h2>
+      <h2 className="mb-4 text-lg font-medium text-foreground">Appearance</h2>
 
       {/* Theme selector */}
       <Card>
         <CardContent className="pt-6">
-          <h3 className="mb-4 text-sm font-medium text-gray-700">Theme</h3>
+          <h3 className="mb-4 text-sm font-medium text-text-secondary">Theme</h3>
           <div className="flex gap-4">
             {(
               [
@@ -114,17 +114,17 @@ export default function AppearanceTab() {
                 onClick={() => persist({ theme: t.id })}
                 className={`flex flex-1 flex-col items-center gap-2 rounded-xl border p-4 transition-colors ${
                   theme === t.id
-                    ? "border-blue-300 bg-blue-50"
-                    : "border-gray-200 hover:border-gray-300"
+                    ? "border-accent bg-accent-light"
+                    : "border-border hover:border-border-strong"
                 }`}
               >
                 <t.icon
                   size={20}
                   className={
-                    theme === t.id ? "text-blue-500" : "text-gray-400"
+                    theme === t.id ? "text-accent" : "text-text-muted"
                   }
                 />
-                <span className="text-xs text-gray-600">{t.label}</span>
+                <span className="text-xs text-text-secondary">{t.label}</span>
               </button>
             ))}
           </div>
@@ -134,10 +134,10 @@ export default function AppearanceTab() {
       {/* Editor settings */}
       <Card className="mt-6">
         <CardContent className="pt-6">
-          <h3 className="mb-4 text-sm font-medium text-gray-700">Editor</h3>
+          <h3 className="mb-4 text-sm font-medium text-text-secondary">Editor</h3>
           <div className="space-y-4">
             <div>
-              <label className="mb-1.5 block text-xs text-gray-500">
+              <label className="mb-1.5 block text-xs text-text-muted">
                 Font size: {fontSize}px
               </label>
               <input
@@ -158,8 +158,8 @@ export default function AppearanceTab() {
 
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-700">Word wrap</p>
-                <p className="text-xs text-gray-400">
+                <p className="text-sm text-text-secondary">Word wrap</p>
+                <p className="text-xs text-text-muted">
                   Wrap long lines in the editor
                 </p>
               </div>
@@ -171,8 +171,8 @@ export default function AppearanceTab() {
 
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-700">Minimap</p>
-                <p className="text-xs text-gray-400">
+                <p className="text-sm text-text-secondary">Minimap</p>
+                <p className="text-xs text-text-muted">
                   Show code overview minimap
                 </p>
               </div>
@@ -184,8 +184,8 @@ export default function AppearanceTab() {
 
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-700">Vim keybindings</p>
-                <p className="text-xs text-gray-400">
+                <p className="text-sm text-text-secondary">Vim keybindings</p>
+                <p className="text-xs text-text-muted">
                   Use Vim-style keyboard shortcuts
                 </p>
               </div>

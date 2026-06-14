@@ -384,7 +384,7 @@ export default function CommandPalette() {
       {/* Toast notification rendered via state */}
       {toast && (
         <div
-          className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] rounded-lg bg-gray-900 px-4 py-2 text-sm text-white shadow-lg animate-fade-in"
+          className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] rounded-lg bg-foreground px-4 py-2 text-sm text-white shadow-lg animate-fade-in"
           role="status"
           aria-live="polite"
         >
@@ -404,8 +404,8 @@ export default function CommandPalette() {
             onClick={close}
             aria-hidden="true"
           />
-          <div className="animate-scale-in relative w-full max-w-lg overflow-hidden rounded-2xl border border-gray-200/80 bg-white/95 shadow-2xl backdrop-blur-xl">
-            <div className="flex items-center gap-3 border-b border-gray-200 px-4 py-3">
+          <div className="animate-scale-in relative w-full max-w-lg overflow-hidden rounded-2xl border border-border/80 bg-surface/95 shadow-2xl backdrop-blur-xl">
+            <div className="flex items-center gap-3 border-b border-border px-4 py-3">
               {mode === "open-file" ? (
                 <button
                   onClick={() => {
@@ -414,13 +414,13 @@ export default function CommandPalette() {
                     setSelectedIndex(0);
                     inputRef.current?.focus();
                   }}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-text-muted hover:text-text-secondary"
                   title="Back to commands"
                 >
                   <ArrowLeft size={16} />
                 </button>
               ) : (
-                <Search size={16} className="text-gray-400" />
+                <Search size={16} className="text-text-muted" />
               )}
               <input
                 ref={inputRef}
@@ -436,9 +436,9 @@ export default function CommandPalette() {
                     ? "Search files by path..."
                     : "Type a command or search..."
                 }
-                className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
+                className="flex-1 bg-transparent text-sm text-foreground placeholder:text-text-muted focus:outline-none"
               />
-              <kbd className="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] text-gray-400">ESC</kbd>
+              <kbd className="rounded border border-border bg-surface-soft px-1.5 py-0.5 text-[10px] text-text-muted">ESC</kbd>
             </div>
 
             {error && (
@@ -449,8 +449,8 @@ export default function CommandPalette() {
             )}
 
             {!hasProject && mode === "commands" && (
-              <div className="border-b border-gray-100 bg-gray-50 px-4 py-2">
-                <span className="text-[11px] text-gray-400">
+              <div className="border-b border-border bg-surface-soft px-4 py-2">
+                <span className="text-[11px] text-text-muted">
                   No active project &mdash; project-scoped commands are disabled.
                 </span>
               </div>
@@ -459,11 +459,11 @@ export default function CommandPalette() {
             <div className="max-h-72 overflow-y-auto p-2">
               {mode === "open-file" ? (
                 filesLoading ? (
-                  <div className="flex items-center justify-center gap-2 py-6 text-sm text-gray-400">
+                  <div className="flex items-center justify-center gap-2 py-6 text-sm text-text-muted">
                     <Loader2 size={14} className="animate-spin" /> Loading files...
                   </div>
                 ) : filteredFiles.length === 0 ? (
-                  <p className="px-3 py-4 text-center text-sm text-gray-400">
+                  <p className="px-3 py-4 text-center text-sm text-text-muted">
                     No files found
                   </p>
                 ) : (
@@ -473,13 +473,13 @@ export default function CommandPalette() {
                       onClick={() => openFile(file)}
                       className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-all duration-150 ${
                         i === selectedIndex
-                          ? "bg-blue-50/70 text-gray-900"
-                          : "text-gray-600 hover:bg-gray-50"
+                          ? "bg-accent-light/70 text-foreground"
+                          : "text-text-secondary hover:bg-surface-soft"
                       }`}
                     >
-                      <FileIcon size={16} className="shrink-0 text-gray-400" />
+                      <FileIcon size={16} className="shrink-0 text-text-muted" />
                       <span className="flex-1 truncate">{file.name}</span>
-                      <span className="truncate text-[10px] text-gray-400">
+                      <span className="truncate text-[10px] text-text-muted">
                         {file.path}
                       </span>
                     </button>
@@ -489,7 +489,7 @@ export default function CommandPalette() {
                 <>
                   {categories.map((cat) => (
                     <div key={cat}>
-                      <p className="mb-1 mt-2 px-3 text-[10px] font-medium uppercase tracking-wider text-gray-400 first:mt-0">
+                      <p className="mb-1 mt-2 px-3 text-[10px] font-medium uppercase tracking-wider text-text-muted first:mt-0">
                         {cat}
                       </p>
                       {filteredCommands
@@ -504,30 +504,30 @@ export default function CommandPalette() {
                               disabled={disabled || busy}
                               className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-all duration-150 ${
                                 disabled
-                                  ? "cursor-not-allowed text-gray-300"
+                                  ? "cursor-not-allowed text-text-muted"
                                   : globalIndex === selectedIndex
-                                    ? "bg-blue-50/70 text-gray-900"
-                                    : "text-gray-600 hover:bg-gray-50"
+                                    ? "bg-accent-light/70 text-foreground"
+                                    : "text-text-secondary hover:bg-surface-soft"
                               }`}
                             >
                               {cmd.emojiIcon ? (
                                 <EmojiIcon emoji={cmd.emojiIcon} size={16} />
                               ) : (
-                                <cmd.icon size={16} className="shrink-0 text-gray-400" />
+                                <cmd.icon size={16} className="shrink-0 text-text-muted" />
                               )}
                               <span className="flex-1">{cmd.label}</span>
                               {disabled && (
-                                <span className="text-[10px] text-gray-300">
+                                <span className="text-[10px] text-text-muted">
                                   needs project
                                 </span>
                               )}
                               {!disabled && cmd.shortcut && (
-                                <kbd className="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] text-gray-400">
+                                <kbd className="rounded border border-border bg-surface-soft px-1.5 py-0.5 text-[10px] text-text-muted">
                                   {cmd.shortcut}
                                 </kbd>
                               )}
                               {!disabled && globalIndex === selectedIndex && (
-                                <ArrowRight size={12} className="text-gray-400" />
+                                <ArrowRight size={12} className="text-text-muted" />
                               )}
                             </button>
                           );
@@ -535,7 +535,7 @@ export default function CommandPalette() {
                     </div>
                   ))}
                   {filteredCommands.length === 0 && (
-                    <p className="px-3 py-4 text-center text-sm text-gray-400">
+                    <p className="px-3 py-4 text-center text-sm text-text-muted">
                       No commands found
                     </p>
                   )}

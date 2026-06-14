@@ -130,10 +130,10 @@ export default function OnboardingPage() {
               key={s}
               className={`h-1.5 rounded-full transition-all duration-300 ${
                 s === step
-                  ? "w-8 bg-blue-600"
+                  ? "w-8 bg-accent"
                   : s < step
-                    ? "w-4 bg-blue-300"
-                    : "w-4 bg-gray-200"
+                    ? "w-4 bg-accent"
+                    : "w-4 bg-surface-soft"
               }`}
             />
           ))}
@@ -155,14 +155,14 @@ export default function OnboardingPage() {
                 <div className="mb-6 inline-flex items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 p-4 shadow-lg shadow-blue-200/50">
                   <Sparkles size={32} className="text-white" />
                 </div>
-                <h1 className="text-2xl font-bold text-gray-900">
+                <h1 className="text-2xl font-bold text-foreground">
                   Welcome to Teskel
                 </h1>
-                <p className="mt-2 text-sm text-gray-500">
+                <p className="mt-2 text-sm text-text-muted">
                   Let&apos;s get you set up in just a few steps.
                 </p>
                 <div className="mt-8">
-                  <label htmlFor="onboarding-name" className="mb-2 block text-left text-xs font-medium text-gray-600">
+                  <label htmlFor="onboarding-name" className="mb-2 block text-left text-xs font-medium text-text-secondary">
                     What should we call you?
                   </label>
                   <input
@@ -171,7 +171,7 @@ export default function OnboardingPage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Your name"
-                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-foreground placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
                     autoFocus
                     onKeyDown={(e) => {
                       if (e.key === "Enter") void handleNameSubmit();
@@ -181,7 +181,7 @@ export default function OnboardingPage() {
                 <button
                   onClick={() => void handleNameSubmit()}
                   disabled={!name.trim() || submitting}
-                  className="mt-6 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                  className="mt-6 inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
                 >
                   {submitting ? (
                     <Loader2 size={16} className="animate-spin" />
@@ -201,10 +201,10 @@ export default function OnboardingPage() {
                 <div className="mb-6 inline-flex items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 p-4 shadow-lg shadow-purple-200/50">
                   <FolderPlus size={32} className="text-white" />
                 </div>
-                <h1 className="text-2xl font-bold text-gray-900">
+                <h1 className="text-2xl font-bold text-foreground">
                   Your Workspace
                 </h1>
-                <p className="mt-2 text-sm text-gray-500">
+                <p className="mt-2 text-sm text-text-muted">
                   {activeWorkspace
                     ? `You already have a workspace: "${activeWorkspace.name}". You can continue or create a new one.`
                     : "A workspace organizes your projects and team members."}
@@ -212,7 +212,7 @@ export default function OnboardingPage() {
 
                 {!activeWorkspace && (
                   <div className="mt-8">
-                    <label htmlFor="onboarding-workspace" className="mb-2 block text-left text-xs font-medium text-gray-600">
+                    <label htmlFor="onboarding-workspace" className="mb-2 block text-left text-xs font-medium text-text-secondary">
                       Workspace name
                     </label>
                     <input
@@ -221,7 +221,7 @@ export default function OnboardingPage() {
                       value={workspaceName}
                       onChange={(e) => setWorkspaceName(e.target.value)}
                       placeholder="My Workspace"
-                      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-foreground placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
                       autoFocus
                     />
                   </div>
@@ -230,14 +230,14 @@ export default function OnboardingPage() {
                 <div className="mt-6 flex items-center justify-center gap-3">
                   <button
                     onClick={goBack}
-                    className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
+                    className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-3 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-soft"
                   >
                     <ArrowLeft size={16} />
                     Back
                   </button>
                   <button
                     onClick={goNext}
-                    className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                    className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
                   >
                     {activeWorkspace ? "Continue" : "Skip for now"}
                     <ArrowRight size={16} />
@@ -249,10 +249,10 @@ export default function OnboardingPage() {
             {/* Step 3: Create project */}
             {step === 3 && (
               <div className="text-center">
-                <h1 className="text-2xl font-bold text-gray-900">
+                <h1 className="text-2xl font-bold text-foreground">
                   Create Your First Project
                 </h1>
-                <p className="mt-2 text-sm text-gray-500">
+                <p className="mt-2 text-sm text-text-muted">
                   {projects.length > 0
                     ? "You already have projects. Create another or skip this step."
                     : "Choose a template to get started quickly."}
@@ -260,7 +260,7 @@ export default function OnboardingPage() {
 
                 <div className="mt-6 space-y-4">
                   <div>
-                    <label htmlFor="onboarding-project-name" className="mb-2 block text-left text-xs font-medium text-gray-600">
+                    <label htmlFor="onboarding-project-name" className="mb-2 block text-left text-xs font-medium text-text-secondary">
                       Project name
                     </label>
                     <input
@@ -269,13 +269,13 @@ export default function OnboardingPage() {
                       value={projectName}
                       onChange={(e) => setProjectName(e.target.value)}
                       placeholder="my-awesome-app"
-                      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-foreground placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
                       autoFocus
                     />
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-left text-xs font-medium text-gray-600">
+                    <label className="mb-2 block text-left text-xs font-medium text-text-secondary">
                       Template
                     </label>
                     <div className="grid grid-cols-2 gap-2">
@@ -286,14 +286,14 @@ export default function OnboardingPage() {
                           onClick={() => setSelectedTemplate(t.id)}
                           className={`rounded-xl border px-4 py-3 text-left transition-all ${
                             selectedTemplate === t.id
-                              ? "border-blue-400 bg-blue-50 ring-2 ring-blue-100"
-                              : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                              ? "border-accent bg-accent-light ring-2 ring-accent"
+                              : "border-border hover:border-border-strong hover:bg-surface-soft"
                           }`}
                         >
-                          <p className="text-sm font-medium text-gray-900">
+                          <p className="text-sm font-medium text-foreground">
                             {t.label}
                           </p>
-                          <p className="mt-0.5 text-[11px] text-gray-500">
+                          <p className="mt-0.5 text-[11px] text-text-muted">
                             {t.description}
                           </p>
                         </button>
@@ -309,7 +309,7 @@ export default function OnboardingPage() {
                 <div className="mt-6 flex items-center justify-center gap-3">
                   <button
                     onClick={goBack}
-                    className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
+                    className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-3 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-soft"
                   >
                     <ArrowLeft size={16} />
                     Back
@@ -317,7 +317,7 @@ export default function OnboardingPage() {
                   {projects.length > 0 && (
                     <button
                       onClick={goNext}
-                      className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
+                      className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-3 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-soft"
                     >
                       <SkipForward size={16} />
                       Skip
@@ -326,7 +326,7 @@ export default function OnboardingPage() {
                   <button
                     onClick={() => void handleCreateProject()}
                     disabled={!projectName.trim() || submitting}
-                    className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                    className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
                   >
                     {submitting ? (
                       <Loader2 size={16} className="animate-spin" />
@@ -344,10 +344,10 @@ export default function OnboardingPage() {
             {/* Step 4: Quick tour */}
             {step === 4 && (
               <div className="text-center">
-                <h1 className="text-2xl font-bold text-gray-900">
+                <h1 className="text-2xl font-bold text-foreground">
                   Quick Tour
                 </h1>
-                <p className="mt-2 text-sm text-gray-500">
+                <p className="mt-2 text-sm text-text-muted">
                   Here&apos;s what you can do with Teskel.
                 </p>
 
@@ -355,15 +355,15 @@ export default function OnboardingPage() {
                   {tourHighlights.map((item) => (
                     <div
                       key={item.title}
-                      className="rounded-xl border border-gray-200 bg-white p-4 text-left transition-all hover:border-gray-300 hover:shadow-sm"
+                      className="rounded-xl border border-border bg-surface p-4 text-left transition-all hover:border-border-strong hover:shadow-sm"
                     >
-                      <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50">
-                        <item.icon size={18} className="text-blue-600" />
+                      <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-accent-light">
+                        <item.icon size={18} className="text-accent" />
                       </div>
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-sm font-medium text-foreground">
                         {item.title}
                       </p>
-                      <p className="mt-1 text-[11px] leading-relaxed text-gray-500">
+                      <p className="mt-1 text-[11px] leading-relaxed text-text-muted">
                         {item.description}
                       </p>
                     </div>
@@ -373,14 +373,14 @@ export default function OnboardingPage() {
                 <div className="mt-6 flex items-center justify-center gap-3">
                   <button
                     onClick={goBack}
-                    className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
+                    className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-3 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-soft"
                   >
                     <ArrowLeft size={16} />
                     Back
                   </button>
                   <button
                     onClick={goNext}
-                    className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                    className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
                   >
                     Finish Setup
                     <ArrowRight size={16} />
@@ -395,17 +395,17 @@ export default function OnboardingPage() {
                 <div className="mb-6 inline-flex items-center justify-center rounded-full bg-green-100 p-4">
                   <Check size={32} className="text-green-600" />
                 </div>
-                <h1 className="text-2xl font-bold text-gray-900">
+                <h1 className="text-2xl font-bold text-foreground">
                   You&apos;re All Set!
                 </h1>
-                <p className="mt-2 text-sm text-gray-500">
+                <p className="mt-2 text-sm text-text-muted">
                   Your workspace is ready. Start building something amazing.
                 </p>
 
                 <button
                   onClick={() => void completeOnboarding()}
                   disabled={submitting}
-                  className="mt-8 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                  className="mt-8 inline-flex items-center gap-2 rounded-xl bg-accent px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
                 >
                   {submitting ? (
                     <Loader2 size={16} className="animate-spin" />

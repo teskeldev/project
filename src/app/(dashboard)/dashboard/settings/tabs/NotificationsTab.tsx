@@ -56,7 +56,7 @@ export default function NotificationsTab() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 size={24} className="animate-spin text-gray-400" />
+        <Loader2 size={24} className="animate-spin text-text-muted" />
       </div>
     );
   }
@@ -97,7 +97,7 @@ export default function NotificationsTab() {
 
   return (
     <div>
-      <h2 className="mb-4 text-lg font-medium text-gray-900">Notifications</h2>
+      <h2 className="mb-4 text-lg font-medium text-foreground">Notifications</h2>
       <Card>
         <CardContent className="pt-6">
           <div className="space-y-6">
@@ -105,8 +105,8 @@ export default function NotificationsTab() {
               <div key={item.key}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-700">{item.label}</p>
-                    <p className="text-xs text-gray-400">{item.desc}</p>
+                    <p className="text-sm text-text-secondary">{item.label}</p>
+                    <p className="text-xs text-text-muted">{item.desc}</p>
                   </div>
                   <Toggle
                     checked={prefs[item.key]}

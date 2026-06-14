@@ -543,9 +543,9 @@ export default function DesignPage() {
 
         {/* Error display */}
         {error && (
-          <Card className="mx-3 mb-2 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/50">
+          <Card className="mx-3 mb-2 border-red-200 bg-red-50">
             <CardContent className="px-3 py-2">
-              <p className="text-[12px] text-red-700 dark:text-red-400">{error}</p>
+              <p className="text-[12px] text-red-700">{error}</p>
             </CardContent>
           </Card>
         )}

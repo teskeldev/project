@@ -244,8 +244,8 @@ export default function BillingPage() {
         <Card className="mb-8">
           <CardContent className="flex items-center justify-between px-6 py-5">
             <div className="flex items-center gap-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-950/30">
-                <Crown size={18} className="text-blue-600 dark:text-blue-400" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-light">
+                <Crown size={18} className="text-accent" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
@@ -333,7 +333,7 @@ export default function BillingPage() {
                   key={plan.tier}
                   className={`relative p-5 transition-all ${
                     isCurrent
-                      ? "border-blue-200 ring-1 ring-blue-100 dark:border-blue-800 dark:ring-blue-900/30"
+                      ? "border-accent ring-1 ring-accent"
                       : ""
                   }`}
                 >
@@ -374,7 +374,7 @@ export default function BillingPage() {
                     size="sm"
                     className={`mt-4 w-full ${
                       isCurrent
-                        ? "border-blue-200 bg-blue-50 text-blue-600 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400"
+                        ? "border-accent bg-accent-light text-accent"
                         : ""
                     }`}
                   >
@@ -424,19 +424,19 @@ function UsageMeterCard({
 
   const colorMap = {
     blue: {
-      bg: "bg-blue-50 dark:bg-blue-950/30",
-      icon: "text-blue-500",
-      bar: "bg-blue-500",
+      bg: "bg-accent-light",
+      icon: "text-accent",
+      bar: "bg-accent",
       barHigh: "bg-red-500",
     },
     purple: {
-      bg: "bg-purple-50 dark:bg-purple-950/30",
+      bg: "bg-purple-50",
       icon: "text-purple-500",
       bar: "bg-purple-500",
       barHigh: "bg-red-500",
     },
     amber: {
-      bg: "bg-amber-50 dark:bg-amber-950/30",
+      bg: "bg-amber-50",
       icon: "text-amber-500",
       bar: "bg-amber-500",
       barHigh: "bg-red-500",

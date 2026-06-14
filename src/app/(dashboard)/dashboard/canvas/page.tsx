@@ -330,7 +330,7 @@ export default function CanvasPage() {
               size="sm"
               onClick={handleDelete}
               disabled={!activeDoc}
-              className="gap-1.5 border-red-200 text-[12px] text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
+              className="gap-1.5 border-red-200 text-[12px] text-red-600 hover:bg-red-50"
             >
               <Trash2 size={12} />
               Delete
@@ -389,8 +389,8 @@ export default function CanvasPage() {
 
         {/* Error display */}
         {error && (
-          <div className="border-t border-red-200 bg-red-50 px-6 py-3 dark:border-red-800 dark:bg-red-950/50">
-            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          <div className="border-t border-red-200 bg-red-50 px-6 py-3">
+            <p className="text-sm text-red-600">{error}</p>
           </div>
         )}
       </div>

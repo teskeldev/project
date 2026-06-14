@@ -25,9 +25,9 @@ import {
 } from "@/lib/client/artifacts";
 
 const artifactTypes = [
-  { id: "CODE" as const, icon: Code, label: "Code", color: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950" },
+  { id: "CODE" as const, icon: Code, label: "Code", color: "text-accent bg-accent-light" },
   { id: "DOCUMENT" as const, icon: FileText, label: "Document", color: "text-purple-600 bg-purple-50" },
-  { id: "CHART" as const, icon: BarChart3, label: "Chart", color: "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950" },
+  { id: "CHART" as const, icon: BarChart3, label: "Chart", color: "text-green-600 bg-green-50" },
   { id: "WEBAPP" as const, icon: Globe, label: "Web App", color: "text-orange-600 bg-orange-50" },
   { id: "IMAGE" as const, icon: ImageIcon, label: "Image", color: "text-pink-600 bg-pink-50" },
 ];
@@ -280,7 +280,7 @@ export default function ArtifactsPage() {
                   {activeArtifact.type}
                 </span>
                 {activeArtifact.language && (
-                  <span className="rounded bg-blue-50 dark:bg-blue-950 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:text-blue-400">
+                  <span className="rounded bg-accent-light px-2 py-0.5 text-[11px] font-medium text-accent">
                     {activeArtifact.language}
                   </span>
                 )}
@@ -300,7 +300,7 @@ export default function ArtifactsPage() {
                 </button>
                 <button
                   onClick={() => setDeleteConfirmId(activeArtifact.id)}
-                  className="rounded-md border border-red-200 px-3 py-1.5 text-[12px] font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950"
+                  className="rounded-md border border-red-200 px-3 py-1.5 text-[12px] font-medium text-red-600 hover:bg-red-50"
                 >
                   <Trash2 size={12} />
                 </button>
@@ -401,7 +401,7 @@ function ArtifactContent({ artifact }: { artifact: Artifact }) {
               return (
                 <div key={i} className="flex flex-1 flex-col items-center gap-1">
                   <div
-                    className="w-full rounded-t bg-blue-500/80"
+                    className="w-full rounded-t bg-accent/80"
                     style={{ height: `${pct}%` }}
                   />
                   <span className="text-[10px] text-text-muted">
@@ -538,7 +538,7 @@ function CreateArtifactModal({
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-[13px] outline-none focus:border-gray-400"
+              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-[13px] outline-none focus:border-border-strong"
               placeholder="My Artifact"
             />
           </div>
@@ -547,7 +547,7 @@ function CreateArtifactModal({
             <select
               value={type}
               onChange={(e) => setType(e.target.value as ArtifactType)}
-              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-[13px] outline-none focus:border-gray-400"
+              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-[13px] outline-none focus:border-border-strong"
             >
               {artifactTypes.map((t) => (
                 <option key={t.id} value={t.id}>{t.label}</option>
@@ -561,7 +561,7 @@ function CreateArtifactModal({
                 type="text"
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
-                className="mt-1 w-full rounded-md border border-border px-3 py-2 text-[13px] outline-none focus:border-gray-400"
+                className="mt-1 w-full rounded-md border border-border px-3 py-2 text-[13px] outline-none focus:border-border-strong"
                 placeholder="typescript"
               />
             </div>
@@ -572,7 +572,7 @@ function CreateArtifactModal({
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={8}
-              className="mt-1 w-full rounded-md border border-border px-3 py-2 font-mono text-[12px] outline-none focus:border-gray-400"
+              className="mt-1 w-full rounded-md border border-border px-3 py-2 font-mono text-[12px] outline-none focus:border-border-strong"
               placeholder="Paste or type content..."
             />
           </div>

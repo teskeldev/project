@@ -73,17 +73,17 @@ type RegistryResponse = {
 type TabId = "my-skills" | "registry";
 
 const CATEGORY_COLORS: Record<string, string> = {
-  development: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800",
-  productivity: "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800",
-  integrations: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800",
-  "ai-ml": "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800",
-  design: "bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-900/30 dark:text-pink-400 dark:border-pink-800",
-  communication: "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-400 dark:border-cyan-800",
-  finance: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800",
-  marketing: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800",
-  data: "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800",
-  security: "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800",
-  devops: "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/30 dark:text-slate-400 dark:border-slate-800",
+  development: "bg-accent-light text-accent border-accent",
+  productivity: "bg-green-50 text-green-700 border-green-200",
+  integrations: "bg-purple-50 text-purple-700 border-purple-200",
+  "ai-ml": "bg-orange-50 text-orange-700 border-orange-200",
+  design: "bg-pink-50 text-pink-700 border-pink-200",
+  communication: "bg-cyan-50 text-cyan-700 border-cyan-200",
+  finance: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  marketing: "bg-amber-50 text-amber-700 border-amber-200",
+  data: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  security: "bg-red-50 text-red-700 border-red-200",
+  devops: "bg-slate-50 text-slate-700 border-slate-200",
 };
 
 export default function SkillsPage() {
@@ -444,13 +444,13 @@ export default function SkillsPage() {
                 <Loader2 size={20} className="animate-spin text-[var(--text-muted)]" />
               </div>
             ) : error ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400">
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
                 {error}
               </div>
             ) : skills.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/30">
-                  <BookOpen size={22} className="text-blue-500 dark:text-blue-400" />
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-accent-light">
+                  <BookOpen size={22} className="text-accent" />
                 </div>
                 <h2 className="text-base font-semibold text-[var(--foreground)]">
                   No skills yet
@@ -620,7 +620,7 @@ export default function SkillsPage() {
                       setRegistryCategory("");
                       setRegistryPage(1);
                     }}
-                    className="ml-0.5 rounded-full p-0.5 hover:bg-black/5 dark:hover:bg-white/10"
+                    className="ml-0.5 rounded-full p-0.5 hover:bg-black/5"
                   >
                     <X size={10} />
                   </button>
@@ -630,7 +630,7 @@ export default function SkillsPage() {
 
             {/* Error */}
             {registryError && (
-              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400">
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
                 {registryError}
               </div>
             )}
@@ -766,7 +766,7 @@ export default function SkillsPage() {
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in">
           <div
-            className="absolute inset-0 bg-black/20 backdrop-blur-md dark:bg-black/40"
+            className="absolute inset-0 bg-black/20 backdrop-blur-md"
             onClick={() => setShowForm(false)}
           />
           <form
@@ -847,7 +847,7 @@ export default function SkillsPage() {
                 />
               </div>
               {formError && (
-                <p className="text-xs text-red-600 dark:text-red-400">{formError}</p>
+                <p className="text-xs text-red-600">{formError}</p>
               )}
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border)] px-5 py-3">
@@ -881,7 +881,7 @@ export default function SkillsPage() {
       {showTemplates && (
         <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in">
           <div
-            className="absolute inset-0 bg-black/20 backdrop-blur-md dark:bg-black/40"
+            className="absolute inset-0 bg-black/20 backdrop-blur-md"
             onClick={() => setShowTemplates(false)}
           />
           <div className="animate-scale-in relative w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]/95 shadow-2xl backdrop-blur-xl">
@@ -900,7 +900,7 @@ export default function SkillsPage() {
             </div>
             <div className="max-h-[60vh] overflow-y-auto p-5">
               {formError && (
-                <p className="mb-3 text-xs text-red-600 dark:text-red-400">{formError}</p>
+                <p className="mb-3 text-xs text-red-600">{formError}</p>
               )}
               <div className="space-y-3">
                 {SKILL_TEMPLATES.map((template) => {
@@ -945,7 +945,7 @@ export default function SkillsPage() {
       {previewSkill && (
         <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in">
           <div
-            className="absolute inset-0 bg-black/20 backdrop-blur-md dark:bg-black/40"
+            className="absolute inset-0 bg-black/20 backdrop-blur-md"
             onClick={() => setPreviewSkill(null)}
           />
           <div className="animate-scale-in relative w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]/95 shadow-2xl backdrop-blur-xl">
@@ -975,7 +975,7 @@ export default function SkillsPage() {
       {registryPreview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in">
           <div
-            className="absolute inset-0 bg-black/20 backdrop-blur-md dark:bg-black/40"
+            className="absolute inset-0 bg-black/20 backdrop-blur-md"
             onClick={() => setRegistryPreview(null)}
           />
           <div className="animate-scale-in relative w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]/95 shadow-2xl backdrop-blur-xl">

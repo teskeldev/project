@@ -41,9 +41,9 @@ const suggestions = [
   { icon: Zap, label: "Build a feature", prompt: "Build a new feature for my project", color: "text-amber-500" },
   { icon: Bug, label: "Fix a bug", prompt: "Help me debug and fix an issue", color: "text-red-500" },
   { icon: Palette, label: "Design a component", prompt: "Design and implement a UI component", color: "text-purple-500" },
-  { icon: Database, label: "Set up database", prompt: "Set up database schema and queries", color: "text-blue-500" },
+  { icon: Database, label: "Set up database", prompt: "Set up database schema and queries", color: "text-accent" },
   { icon: Shield, label: "Add authentication", prompt: "Implement authentication and authorization", color: "text-green-500" },
-  { icon: Rocket, label: "Deploy project", prompt: "Help me deploy my project to production", color: "text-blue-500" },
+  { icon: Rocket, label: "Deploy project", prompt: "Help me deploy my project to production", color: "text-accent" },
 ];
 
 /** sessionStorage key the chat page can read to prefill the composer. */
@@ -212,7 +212,7 @@ export default function DashboardPage() {
     <div className="flex h-full flex-col items-center overflow-y-auto bg-surface/50 px-6 py-12 backdrop-blur-sm">
       <div className="w-full max-w-2xl">
         <div className="animate-fade-in-up mb-8 text-center">
-          <div className="mb-4 inline-flex animate-float items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 p-3 shadow-lg shadow-blue-200/50 dark:shadow-blue-900/30">
+          <div className="mb-4 inline-flex animate-float items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 p-3 shadow-lg shadow-blue-200/50">
             <Sparkles size={28} className="text-white" />
           </div>
           <h1 className="text-2xl font-semibold text-foreground">
@@ -224,7 +224,7 @@ export default function DashboardPage() {
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3.5 shadow-sm transition-all duration-300 focus-within:border-blue-200 focus-within:shadow-lg focus-within:shadow-blue-50 dark:focus-within:border-blue-800 dark:focus-within:shadow-blue-950/30">
+          <div className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3.5 shadow-sm transition-all duration-300 focus-within:border-accent focus-within:shadow-lg focus-within:shadow-blue-50">
             <Plus size={18} className="shrink-0 text-text-muted" />
             <input
               type="text"
@@ -292,10 +292,10 @@ export default function DashboardPage() {
 
         {/* No-project prompt-to-create + submit errors */}
         {needsProject && (
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-800 dark:bg-blue-950/30">
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-accent bg-accent-light px-4 py-3">
             <div className="flex items-center gap-2">
-              <FolderPlus size={16} className="text-blue-500" />
-              <p className="text-xs text-blue-700 dark:text-blue-300">
+              <FolderPlus size={16} className="text-accent" />
+              <p className="text-xs text-accent">
                 You need a project to start. Create one to continue.
               </p>
             </div>
@@ -304,7 +304,7 @@ export default function DashboardPage() {
               onClick={() => void handleCreateAndContinue()}
               disabled={submitting}
               size="sm"
-              className="gap-1 bg-blue-600 hover:bg-blue-700"
+              className="gap-1 bg-accent hover:bg-accent-hover"
             >
               {submitting ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
               Create project
@@ -312,9 +312,9 @@ export default function DashboardPage() {
           </div>
         )}
         {submitError && (
-          <div className="mt-3 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 dark:border-red-800 dark:bg-red-950/30">
+          <div className="mt-3 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
             <AlertTriangle size={14} className="text-red-500" />
-            <p className="text-xs text-red-600 dark:text-red-400">{submitError}</p>
+            <p className="text-xs text-red-600">{submitError}</p>
           </div>
         )}
 
@@ -394,16 +394,16 @@ function ActivitySection({
 
   if (error) {
     return (
-      <div className="mt-10 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 dark:border-red-800 dark:bg-red-950/30">
+      <div className="mt-10 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
         <div className="flex items-center gap-2">
           <AlertTriangle size={14} className="text-red-500" />
-          <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+          <p className="text-xs text-red-600">{error}</p>
         </div>
         <Button
           onClick={onRetry}
           variant="outline"
           size="sm"
-          className="border-red-200 text-red-600 hover:bg-red-100 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/50"
+          className="border-red-200 text-red-600 hover:bg-red-100"
         >
           Retry
         </Button>
@@ -416,8 +416,8 @@ function ActivitySection({
   if (!hasProjects) {
     return (
       <div className="mt-10 flex flex-col items-center rounded-2xl border border-dashed border-border bg-surface/60 px-6 py-10 text-center">
-        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-950/30">
-          <FolderPlus size={22} className="text-blue-500" />
+        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-accent-light">
+          <FolderPlus size={22} className="text-accent" />
         </div>
         <h3 className="text-sm font-semibold text-foreground">No projects yet</h3>
         <p className="mt-1 max-w-sm text-xs text-text-secondary">
@@ -540,7 +540,7 @@ function ActivitySection({
             className="flex w-full items-center justify-between px-5 py-4 text-left"
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-950/30">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
                 <Layers size={16} className="text-amber-500" />
               </div>
               <div>
@@ -561,8 +561,8 @@ function ActivitySection({
             className="flex w-full items-center justify-between px-5 py-4 text-left"
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-950/30">
-                <GitBranch size={16} className="text-blue-500" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent-light">
+                <GitBranch size={16} className="text-accent" />
               </div>
               <div>
                 <p className="text-xs font-medium text-foreground">
@@ -611,7 +611,7 @@ function Panel({
         </div>
         <button
           onClick={onAction}
-          className="text-[11px] text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+          className="text-[11px] text-accent hover:text-accent"
         >
           {actionLabel}
         </button>

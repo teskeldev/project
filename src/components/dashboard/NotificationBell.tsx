@@ -154,7 +154,7 @@ export default function NotificationBell() {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setOpen(!open)}
-        className="relative rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+        className="relative rounded-lg p-2 text-text-muted transition-colors hover:bg-surface-soft hover:text-text-secondary"
         title="Notifications"
         aria-label="Notifications"
         aria-expanded={open}
@@ -162,7 +162,7 @@ export default function NotificationBell() {
       >
         <Bell size={16} />
         {unreadCount > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-bold text-white">
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-white">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
@@ -175,16 +175,16 @@ export default function NotificationBell() {
           aria-modal="true"
           aria-label="Notifications panel"
           tabIndex={-1}
-          className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl outline-none"
+          className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-border bg-surface shadow-xl outline-none"
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-            <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <h3 className="text-sm font-semibold text-foreground">Notifications</h3>
             <div className="flex items-center gap-1">
               {unreadCount > 0 && (
                 <button
                   onClick={() => void handleMarkAllRead()}
-                  className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                  className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-text-muted hover:bg-surface-soft hover:text-text-secondary"
                   title="Mark all as read"
                 >
                   <CheckCheck size={12} />
@@ -193,7 +193,7 @@ export default function NotificationBell() {
               )}
               <button
                 onClick={() => setOpen(false)}
-                className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                className="rounded p-1 text-text-muted hover:bg-surface-soft hover:text-text-secondary"
                 aria-label="Close notifications"
               >
                 <X size={14} />
@@ -212,19 +212,19 @@ export default function NotificationBell() {
           <div className="max-h-80 overflow-y-auto">
             {loading && notifications.length === 0 ? (
               <div className="px-4 py-8 text-center">
-                <p className="text-xs text-gray-400">Loading...</p>
+                <p className="text-xs text-text-muted">Loading...</p>
               </div>
             ) : notifications.length === 0 ? (
               <div className="px-4 py-8 text-center">
-                <Bell size={20} className="mx-auto mb-2 text-gray-300" />
-                <p className="text-xs text-gray-400">No notifications yet</p>
+                <Bell size={20} className="mx-auto mb-2 text-text-muted" />
+                <p className="text-xs text-text-muted">No notifications yet</p>
               </div>
             ) : (
               notifications.map((notification) => (
                 <div
                   key={notification.id}
-                  className={`group flex items-start gap-3 border-b border-gray-50 px-4 py-3 transition-colors hover:bg-gray-50 ${
-                    !notification.read ? "bg-blue-50/30" : ""
+                  className={`group flex items-start gap-3 border-b border-border px-4 py-3 transition-colors hover:bg-surface-soft ${
+                    !notification.read ? "bg-accent-light/30" : ""
                   }`}
                 >
                   <button
@@ -233,16 +233,16 @@ export default function NotificationBell() {
                   >
                     <div className="flex items-center gap-2">
                       {!notification.read && (
-                        <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-accent" />
                       )}
-                      <p className="truncate text-xs font-medium text-gray-900">
+                      <p className="truncate text-xs font-medium text-foreground">
                         {notification.title}
                       </p>
-                      <span className="shrink-0 text-[10px] text-gray-400">
+                      <span className="shrink-0 text-[10px] text-text-muted">
                         {relativeTime(notification.createdAt)}
                       </span>
                     </div>
-                    <p className="mt-0.5 line-clamp-2 text-[11px] text-gray-500">
+                    <p className="mt-0.5 line-clamp-2 text-[11px] text-text-muted">
                       {notification.message}
                     </p>
                   </button>
@@ -250,7 +250,7 @@ export default function NotificationBell() {
                     {!notification.read && (
                       <button
                         onClick={() => void handleMarkRead(notification.id)}
-                        className="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+                        className="rounded p-1 text-text-muted hover:bg-surface-soft hover:text-text-secondary"
                         title="Mark as read"
                       >
                         <Check size={12} />
@@ -258,7 +258,7 @@ export default function NotificationBell() {
                     )}
                     <button
                       onClick={() => void handleDelete(notification.id)}
-                      className="rounded p-1 text-gray-400 hover:bg-red-100 hover:text-red-500"
+                      className="rounded p-1 text-text-muted hover:bg-red-100 hover:text-red-500"
                       title="Delete"
                     >
                       <Trash2 size={12} />

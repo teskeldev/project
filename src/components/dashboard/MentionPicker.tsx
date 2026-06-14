@@ -184,10 +184,10 @@ export function MentionPicker({ projectId, visible, filter, onSelect, onClose }:
   };
 
   return (
-    <div className="absolute bottom-full left-0 mb-2 w-full max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg z-50">
+    <div className="absolute bottom-full left-0 mb-2 w-full max-h-64 overflow-y-auto rounded-lg border border-border bg-surface py-1 shadow-lg z-50">
       {stage === "menu" && (
         <>
-          <div className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400">
+          <div className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-text-muted">
             Mention context
           </div>
           <div role="listbox" aria-label="Mention type options">
@@ -201,12 +201,12 @@ export function MentionPicker({ projectId, visible, filter, onSelect, onClose }:
                   aria-selected={false}
                   aria-label={`Select ${opt.type} mention`}
                   onClick={() => handleOptionClick(opt.type)}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-soft"
                 >
-                  <Icon size={14} className="text-gray-500" />
-                  <span className="text-xs text-gray-700">{opt.label}</span>
+                  <Icon size={14} className="text-text-muted" />
+                  <span className="text-xs text-text-secondary">{opt.label}</span>
                   {(opt.type === "file" || opt.type === "folder") && (
-                    <ChevronRight size={12} className="ml-auto text-gray-300" />
+                    <ChevronRight size={12} className="ml-auto text-text-muted" />
                   )}
                 </button>
               );
@@ -217,28 +217,28 @@ export function MentionPicker({ projectId, visible, filter, onSelect, onClose }:
 
       {(stage === "file" || stage === "folder") && (
         <>
-          <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2">
-            <Search size={12} className="text-gray-400" />
+          <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+            <Search size={12} className="text-text-muted" />
             <input
               type="text"
               value={fileFilter}
               onChange={(e) => setFileFilter(e.target.value)}
               placeholder={`Search ${stage}s...`}
               aria-label={`Search ${stage}s`}
-              className="flex-1 bg-transparent text-xs text-gray-700 placeholder:text-gray-400 focus:outline-none"
+              className="flex-1 bg-transparent text-xs text-text-secondary placeholder:text-text-muted focus:outline-none"
               autoFocus
             />
             <button
               type="button"
               onClick={onClose}
               aria-label="Close picker"
-              className="text-gray-400 hover:text-gray-600"
+              className="text-text-muted hover:text-text-secondary"
             >
               <X size={12} />
             </button>
           </div>
           {treeLoading ? (
-            <div className="px-3 py-3 text-xs text-gray-400">Loading...</div>
+            <div className="px-3 py-3 text-xs text-text-muted">Loading...</div>
           ) : (
             <div className="max-h-48 overflow-y-auto" role="listbox" aria-label={`${stage} list`}>
               {(stage === "file" ? filteredFiles : filteredFolders).map((item) => (
@@ -253,18 +253,18 @@ export function MentionPicker({ projectId, visible, filter, onSelect, onClose }:
                       ? handleFileSelect(item.path)
                       : handleFolderSelect(item.path)
                   }
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-gray-50"
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-surface-soft"
                 >
                   {stage === "file" ? (
-                    <File size={12} className="text-gray-400" />
+                    <File size={12} className="text-text-muted" />
                   ) : (
                     <Folder size={12} className="text-amber-400" />
                   )}
-                  <span className="truncate text-gray-700">{item.path}</span>
+                  <span className="truncate text-text-secondary">{item.path}</span>
                 </button>
               ))}
               {(stage === "file" ? filteredFiles : filteredFolders).length === 0 && (
-                <p className="px-3 py-2 text-xs text-gray-400">No results</p>
+                <p className="px-3 py-2 text-xs text-text-muted">No results</p>
               )}
             </div>
           )}
@@ -274,18 +274,18 @@ export function MentionPicker({ projectId, visible, filter, onSelect, onClose }:
       {stage === "web" && (
         <div className="px-3 py-2">
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-medium text-gray-600">Enter URL</span>
+            <span className="text-xs font-medium text-text-secondary">Enter URL</span>
             <button
               type="button"
               onClick={onClose}
               aria-label="Close picker"
-              className="text-gray-400 hover:text-gray-600"
+              className="text-text-muted hover:text-text-secondary"
             >
               <X size={12} />
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <Globe size={12} className="text-gray-400" />
+            <Globe size={12} className="text-text-muted" />
             <input
               type="url"
               value={urlInput}
@@ -298,7 +298,7 @@ export function MentionPicker({ projectId, visible, filter, onSelect, onClose }:
               }}
               placeholder="https://..."
               aria-label="URL input"
-              className="flex-1 rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none"
+              className="flex-1 rounded border border-border bg-surface px-2 py-1 text-xs text-text-secondary placeholder:text-text-muted focus:border-accent focus:outline-none"
               autoFocus
             />
             <button
@@ -306,7 +306,7 @@ export function MentionPicker({ projectId, visible, filter, onSelect, onClose }:
               onClick={handleWebSubmit}
               disabled={!urlInput.trim()}
               aria-label="Add URL mention"
-              className="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-40"
+              className="rounded bg-accent px-2 py-1 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-40"
             >
               Add
             </button>
@@ -333,7 +333,7 @@ export function MentionChips({
   const iconForType = (type: MentionType) => {
     switch (type) {
       case "file":
-        return <File size={10} className="text-blue-500" />;
+        return <File size={10} className="text-accent" />;
       case "folder":
         return <Folder size={10} className="text-amber-500" />;
       case "web":
@@ -348,7 +348,7 @@ export function MentionChips({
       {chips.map((chip) => (
         <span
           key={chip.id}
-          className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-600"
+          className="inline-flex items-center gap-1 rounded-full border border-border bg-surface-soft px-2 py-0.5 text-[11px] text-text-secondary"
         >
           {iconForType(chip.type)}
           <span className="max-w-[120px] truncate">{chip.label}</span>
@@ -356,7 +356,7 @@ export function MentionChips({
             type="button"
             onClick={() => onRemove(chip.id)}
             aria-label={`Remove ${chip.label} mention`}
-            className="ml-0.5 text-gray-400 hover:text-gray-600"
+            className="ml-0.5 text-text-muted hover:text-text-secondary"
           >
             <X size={10} />
           </button>

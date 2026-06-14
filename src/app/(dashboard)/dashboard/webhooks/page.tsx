@@ -114,16 +114,16 @@ function WebhookFormModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-lg rounded-xl border border-gray-200 bg-white shadow-xl"
+        className="w-full max-w-lg rounded-xl border border-border bg-surface shadow-xl"
       >
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-          <h2 className="text-[15px] font-semibold text-gray-900">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <h2 className="text-[15px] font-semibold text-foreground">
             {isEdit ? "Edit webhook" : "Create webhook"}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-md p-1 text-text-muted hover:bg-surface-soft hover:text-text-secondary"
           >
             <X size={18} />
           </button>
@@ -132,7 +132,7 @@ function WebhookFormModal({
         <div className="space-y-4 px-5 py-5">
           {/* URL */}
           <div>
-            <label className="mb-1 block text-[12px] font-medium text-gray-700">
+            <label className="mb-1 block text-[12px] font-medium text-text-secondary">
               Payload URL <span className="text-red-500">*</span>
             </label>
             <input
@@ -141,28 +141,28 @@ function WebhookFormModal({
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://example.com/webhook"
               required
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] text-gray-900 placeholder-gray-400 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50"
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-[13px] text-foreground placeholder:text-text-muted outline-none focus:border-accent focus:ring-2 focus:ring-accent"
             />
           </div>
 
           {/* Events */}
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <label className="text-[12px] font-medium text-gray-700">
+              <label className="text-[12px] font-medium text-text-secondary">
                 Events <span className="text-red-500">*</span>
               </label>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={selectAll}
-                  className="text-[11px] text-blue-600 hover:underline"
+                  className="text-[11px] text-accent hover:underline"
                 >
                   Select all
                 </button>
                 <button
                   type="button"
                   onClick={selectNone}
-                  className="text-[11px] text-gray-500 hover:underline"
+                  className="text-[11px] text-text-muted hover:underline"
                 >
                   Clear
                 </button>
@@ -172,13 +172,13 @@ function WebhookFormModal({
               {AVAILABLE_EVENTS.map((event) => (
                 <label
                   key={event}
-                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-100 px-2.5 py-1.5 text-[12px] text-gray-700 hover:bg-gray-50"
+                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-surface-soft"
                 >
                   <input
                     type="checkbox"
                     checked={events.includes(event)}
                     onChange={() => toggleEvent(event)}
-                    className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="h-3.5 w-3.5 rounded border-border-strong text-accent focus:ring-accent"
                   />
                   <span className="font-mono">{event}</span>
                 </label>
@@ -190,17 +190,17 @@ function WebhookFormModal({
           <label className="flex cursor-pointer items-center gap-3">
             <div
               className={`relative h-5 w-9 rounded-full transition-colors ${
-                enabled ? "bg-blue-600" : "bg-gray-300"
+                enabled ? "bg-accent" : "bg-border-strong"
               }`}
               onClick={() => setEnabled(!enabled)}
             >
               <div
-                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                className={`absolute top-0.5 h-4 w-4 rounded-full bg-surface shadow transition-transform ${
                   enabled ? "translate-x-4" : "translate-x-0.5"
                 }`}
               />
             </div>
-            <span className="text-[13px] text-gray-700">
+            <span className="text-[13px] text-text-secondary">
               {enabled ? "Active" : "Inactive"}
             </span>
           </label>
@@ -213,19 +213,19 @@ function WebhookFormModal({
           )}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-4">
+        <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
           <button
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="rounded-lg px-4 py-2 text-[13px] font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+            className="rounded-lg px-4 py-2 text-[13px] font-medium text-text-secondary hover:bg-surface-soft disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={!url.trim() || events.length === 0 || saving}
-            className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-[13px] font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-white hover:bg-foreground disabled:opacity-50"
           >
             {saving && <Loader2 size={14} className="animate-spin" />}
             {isEdit ? "Save changes" : "Create webhook"}
@@ -244,33 +244,33 @@ function DeliveryRow({ delivery }: { delivery: WebhookDelivery }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="border-b border-gray-50 last:border-0">
+    <div className="border-b border-border last:border-0">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-gray-50"
+        className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-surface-soft"
       >
         {delivery.success ? (
           <CheckCircle2 size={14} className="shrink-0 text-green-500" />
         ) : (
           <XCircle size={14} className="shrink-0 text-red-500" />
         )}
-        <span className="flex-1 truncate font-mono text-[11px] text-gray-700">
+        <span className="flex-1 truncate font-mono text-[11px] text-text-secondary">
           {delivery.event}
         </span>
-        <span className="text-[11px] text-gray-400">
+        <span className="text-[11px] text-text-muted">
           {delivery.statusCode ?? "—"}
         </span>
-        <span className="text-[10px] text-gray-400">
+        <span className="text-[10px] text-text-muted">
           {new Date(delivery.createdAt).toLocaleString()}
         </span>
         {expanded ? (
-          <ChevronDown size={12} className="text-gray-400" />
+          <ChevronDown size={12} className="text-text-muted" />
         ) : (
-          <ChevronRight size={12} className="text-gray-400" />
+          <ChevronRight size={12} className="text-text-muted" />
         )}
       </button>
       {expanded && (
-        <div className="space-y-2 bg-gray-50 px-3 py-2 text-[11px]">
+        <div className="space-y-2 bg-surface-soft px-3 py-2 text-[11px]">
           {delivery.error && (
             <div className="rounded bg-red-50 px-2 py-1 text-red-600">
               {delivery.error}
@@ -278,16 +278,16 @@ function DeliveryRow({ delivery }: { delivery: WebhookDelivery }) {
           )}
           {delivery.requestBody && (
             <div>
-              <p className="mb-0.5 font-medium text-gray-500">Request</p>
-              <pre className="max-h-32 overflow-auto rounded bg-gray-900 p-2 text-[10px] text-gray-300">
+              <p className="mb-0.5 font-medium text-text-muted">Request</p>
+              <pre className="max-h-32 overflow-auto rounded bg-foreground p-2 text-[10px] text-text-muted">
                 {delivery.requestBody}
               </pre>
             </div>
           )}
           {delivery.responseBody && (
             <div>
-              <p className="mb-0.5 font-medium text-gray-500">Response</p>
-              <pre className="max-h-32 overflow-auto rounded bg-gray-900 p-2 text-[10px] text-gray-300">
+              <p className="mb-0.5 font-medium text-text-muted">Response</p>
+              <pre className="max-h-32 overflow-auto rounded bg-foreground p-2 text-[10px] text-text-muted">
                 {delivery.responseBody}
               </pre>
             </div>
@@ -381,13 +381,13 @@ function WebhookCard({
   };
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white transition-shadow hover:shadow-md">
+    <div className="rounded-xl border border-border bg-surface transition-shadow hover:shadow-md">
       <div className="p-5">
         <div className="flex items-start justify-between">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <ExternalLink size={14} className="shrink-0 text-gray-400" />
-              <span className="truncate font-mono text-[13px] text-gray-900">
+              <ExternalLink size={14} className="shrink-0 text-text-muted" />
+              <span className="truncate font-mono text-[13px] text-foreground">
                 {webhook.url}
               </span>
             </div>
@@ -395,7 +395,7 @@ function WebhookCard({
               {webhook.events.map((event) => (
                 <span
                   key={event}
-                  className="rounded-full bg-gray-100 px-2 py-0.5 font-mono text-[10px] text-gray-600"
+                  className="rounded-full bg-surface-soft px-2 py-0.5 font-mono text-[10px] text-text-secondary"
                 >
                   {event}
                 </span>
@@ -409,7 +409,7 @@ function WebhookCard({
                 Active
               </span>
             ) : (
-              <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-500">
+              <span className="rounded-full bg-surface-soft px-2.5 py-1 text-[11px] font-medium text-text-muted">
                 Inactive
               </span>
             )}
@@ -448,7 +448,7 @@ function WebhookCard({
           <button
             onClick={handleTest}
             disabled={testing || busy}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-[12px] font-medium text-text-secondary hover:bg-surface-soft disabled:opacity-50"
           >
             {testing ? (
               <Loader2 size={13} className="animate-spin" />
@@ -460,7 +460,7 @@ function WebhookCard({
           <button
             onClick={() => setEditing(true)}
             disabled={busy}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-[12px] font-medium text-text-secondary hover:bg-surface-soft disabled:opacity-50"
           >
             <Pencil size={13} />
             Edit
@@ -468,7 +468,7 @@ function WebhookCard({
           <button
             onClick={handleToggle}
             disabled={busy}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-[12px] font-medium text-text-secondary hover:bg-surface-soft disabled:opacity-50"
           >
             <Power size={13} />
             {webhook.enabled ? "Disable" : "Enable"}
@@ -476,7 +476,7 @@ function WebhookCard({
           <button
             onClick={loadDeliveries}
             disabled={deliveriesLoading}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-[12px] font-medium text-text-secondary hover:bg-surface-soft disabled:opacity-50"
           >
             {deliveriesLoading ? (
               <Loader2 size={13} className="animate-spin" />
@@ -487,7 +487,7 @@ function WebhookCard({
             )}
             Deliveries
             {webhook._count?.deliveries != null && (
-              <span className="text-gray-400">
+              <span className="text-text-muted">
                 ({webhook._count.deliveries})
               </span>
             )}
@@ -505,14 +505,14 @@ function WebhookCard({
 
       {/* Delivery history */}
       {showDeliveries && (
-        <div className="border-t border-gray-100">
+        <div className="border-t border-border">
           <div className="px-5 py-2">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-text-muted">
               Recent deliveries
             </p>
           </div>
           {deliveries.length === 0 ? (
-            <div className="px-5 pb-4 text-[12px] text-gray-400">
+            <div className="px-5 pb-4 text-[12px] text-text-muted">
               No deliveries yet.
             </div>
           ) : (
@@ -583,16 +583,16 @@ export default function WebhooksPage() {
         {/* Header */}
         <div className="mb-8 flex items-start justify-between">
           <div>
-            <h1 className="text-[22px] font-semibold text-gray-900">
+            <h1 className="text-[22px] font-semibold text-foreground">
               Webhooks
             </h1>
-            <p className="mt-1 text-[14px] text-gray-500">
+            <p className="mt-1 text-[14px] text-text-muted">
               Receive HTTP callbacks when events happen in your workspace.
             </p>
             {activeWorkspace && (
-              <p className="mt-2 text-[12px] text-gray-400">
+              <p className="mt-2 text-[12px] text-text-muted">
                 Workspace:{" "}
-                <span className="font-medium text-gray-600">
+                <span className="font-medium text-text-secondary">
                   {activeWorkspace.name}
                 </span>
               </p>
@@ -601,7 +601,7 @@ export default function WebhooksPage() {
           {activeWorkspace && (
             <button
               onClick={() => setCreating(true)}
-              className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-[13px] font-medium text-white hover:bg-gray-800"
+              className="flex items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-white hover:bg-foreground"
             >
               <Plus size={14} />
               Add webhook
@@ -611,16 +611,16 @@ export default function WebhooksPage() {
 
         {/* States */}
         {!activeWorkspace && !projectLoading ? (
-          <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-10 text-center">
-            <p className="text-[14px] font-medium text-gray-700">
+          <div className="rounded-xl border border-dashed border-border bg-surface-soft p-10 text-center">
+            <p className="text-[14px] font-medium text-text-secondary">
               No active workspace
             </p>
-            <p className="mt-1 text-[13px] text-gray-500">
+            <p className="mt-1 text-[13px] text-text-muted">
               Select or create a workspace to manage webhooks.
             </p>
           </div>
         ) : loading || projectLoading ? (
-          <div className="flex items-center justify-center gap-2 py-16 text-[13px] text-gray-500">
+          <div className="flex items-center justify-center gap-2 py-16 text-[13px] text-text-muted">
             <Loader2 size={16} className="animate-spin" />
             Loading webhooks...
           </div>
@@ -639,17 +639,17 @@ export default function WebhooksPage() {
             </div>
           </div>
         ) : webhooks.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-10 text-center">
-            <Zap size={32} className="mx-auto mb-3 text-gray-300" />
-            <p className="text-[14px] font-medium text-gray-700">
+          <div className="rounded-xl border border-dashed border-border bg-surface-soft p-10 text-center">
+            <Zap size={32} className="mx-auto mb-3 text-text-muted" />
+            <p className="text-[14px] font-medium text-text-secondary">
               No webhooks configured
             </p>
-            <p className="mt-1 text-[13px] text-gray-500">
+            <p className="mt-1 text-[13px] text-text-muted">
               Create a webhook to receive event notifications via HTTP.
             </p>
             <button
               onClick={() => setCreating(true)}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-[13px] font-medium text-white hover:bg-gray-800"
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-[13px] font-medium text-white hover:bg-foreground"
             >
               <Plus size={14} />
               Create your first webhook

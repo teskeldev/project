@@ -11,12 +11,12 @@ import {
 export default function BillingTab() {
   return (
     <div>
-      <h2 className="mb-4 text-lg font-medium text-gray-900">
+      <h2 className="mb-4 text-lg font-medium text-foreground">
         Billing & Plans
       </h2>
       <Card>
         <CardContent className="pt-6">
-          <p className="mb-4 text-sm text-gray-600">
+          <p className="mb-4 text-sm text-text-secondary">
             Manage your subscription and billing on the dedicated Billing page.
           </p>
           <Button asChild>

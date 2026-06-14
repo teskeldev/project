@@ -88,7 +88,7 @@ export default function ProfileTab() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-border-strong border-t-foreground" />
       </div>
     );
   }
@@ -113,19 +113,19 @@ export default function ProfileTab() {
     <div className="space-y-6">
       {/* Profile section */}
       <div>
-        <h2 className="mb-4 text-lg font-medium text-gray-900">Profile</h2>
+        <h2 className="mb-4 text-lg font-medium text-foreground">Profile</h2>
         <Card>
           <CardContent className="pt-6">
             <div className="mb-6 flex items-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-900 text-2xl font-bold text-white">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-foreground text-2xl font-bold text-white">
                 {initials}
               </div>
               <div>
                 <Button variant="link" disabled className="px-0">
                   Change avatar{" "}
-                  <span className="text-xs text-gray-400">(Coming soon)</span>
+                  <span className="text-xs text-text-muted">(Coming soon)</span>
                 </Button>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-text-muted">
                   JPG, PNG or GIF. Max 2MB.
                 </p>
               </div>
@@ -133,7 +133,7 @@ export default function ProfileTab() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                <label className="mb-1.5 block text-sm font-medium text-text-secondary">
                   Full name
                 </label>
                 <Input
@@ -143,16 +143,16 @@ export default function ProfileTab() {
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                <label className="mb-1.5 block text-sm font-medium text-text-secondary">
                   Email
                 </label>
                 <Input type="email" value={email} disabled />
-                <p className="mt-1 text-xs text-gray-400">
+                <p className="mt-1 text-xs text-text-muted">
                   Contact support@teskel.dev to change your email.
                 </p>
               </div>
               <div className="sm:col-span-2">
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                <label className="mb-1.5 block text-sm font-medium text-text-secondary">
                   Bio
                 </label>
                 <Textarea
@@ -178,22 +178,22 @@ export default function ProfileTab() {
 
       {/* Security section */}
       <div>
-        <h2 className="mb-4 text-lg font-medium text-gray-900">Security</h2>
+        <h2 className="mb-4 text-lg font-medium text-foreground">Security</h2>
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-700">
+                <p className="text-sm font-medium text-text-secondary">
                   Two-factor authentication
                 </p>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-text-muted">
                   Add an extra layer of security to your account
                 </p>
               </div>
               <Button variant="outline" disabled>
                 <Shield size={14} />
                 Enable 2FA{" "}
-                <span className="text-xs text-gray-400">(Coming soon)</span>
+                <span className="text-xs text-text-muted">(Coming soon)</span>
               </Button>
             </div>
           </CardContent>
@@ -209,16 +209,16 @@ export default function ProfileTab() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-700">
+                <p className="text-sm font-medium text-text-secondary">
                   Delete account
                 </p>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-text-muted">
                   Permanently delete your account and all data
                 </p>
               </div>
               <Button variant="destructive" disabled>
                 Delete account{" "}
-                <span className="text-xs text-gray-400">(Coming soon)</span>
+                <span className="text-xs text-text-muted">(Coming soon)</span>
               </Button>
             </div>
           </CardContent>

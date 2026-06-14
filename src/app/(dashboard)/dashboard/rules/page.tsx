@@ -256,7 +256,7 @@ export default function RulesPage() {
           </Button>
         </div>
 
-        <div className="mb-6 rounded-lg bg-blue-50 px-3 py-2 text-[12px] text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+        <div className="mb-6 rounded-lg bg-accent-light px-3 py-2 text-[12px] text-accent">
           Enabled rules are injected into AI chat &amp; agent context.
         </div>
 
@@ -281,7 +281,7 @@ export default function RulesPage() {
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-600 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400">
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-600">
             {error}
           </div>
         )}
@@ -376,7 +376,7 @@ export default function RulesPage() {
 
       {/* Create / edit modal */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 dark:bg-black/50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
           <Card className="w-full max-w-lg p-6 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-[16px] font-semibold text-[var(--foreground)]">
@@ -491,7 +491,7 @@ export default function RulesPage() {
               </div>
 
               {formError && (
-                <p className="text-[12px] text-red-600 dark:text-red-400">{formError}</p>
+                <p className="text-[12px] text-red-600">{formError}</p>
               )}
 
               <div className="flex justify-end gap-2 pt-2">

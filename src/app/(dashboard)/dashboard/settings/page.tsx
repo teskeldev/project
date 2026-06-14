@@ -64,7 +64,7 @@ export default function SettingsPage() {
   return (
     <div className="p-8">
       <div className="mx-auto max-w-5xl">
-        <h1 className="mb-8 text-2xl font-semibold text-gray-900">Settings</h1>
+        <h1 className="mb-8 text-2xl font-semibold text-foreground">Settings</h1>
 
         <div className="flex gap-8">
           {/* Sidebar tabs */}
@@ -76,8 +76,8 @@ export default function SettingsPage() {
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
                     activeTab === tab.id
-                      ? "bg-blue-50 text-blue-700"
-                      : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                      ? "bg-accent-light text-accent"
+                      : "text-text-muted hover:bg-surface-soft hover:text-text-secondary"
                   }`}
                 >
                   <tab.icon size={16} />

@@ -200,7 +200,7 @@ export default function PermissionsPage() {
   if (!workspaceId) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-sm text-gray-500">Select a workspace to manage permissions.</p>
+        <p className="text-sm text-text-muted">Select a workspace to manage permissions.</p>
       </div>
     );
   }
@@ -210,14 +210,14 @@ export default function PermissionsPage() {
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-gray-900">AI Permissions</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-lg font-semibold text-foreground">AI Permissions</h1>
+          <p className="mt-1 text-sm text-text-muted">
             Control what the AI agent can do. Set rules per tool and file pattern.
           </p>
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent-hover"
         >
           <Plus size={14} />
           Add Rule
@@ -235,16 +235,16 @@ export default function PermissionsPage() {
       {showForm && (
         <form
           onSubmit={handleCreate}
-          className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
+          className="mb-6 rounded-xl border border-border bg-surface p-4 shadow-sm"
         >
-          <h3 className="mb-3 text-sm font-medium text-gray-900">New Permission Rule</h3>
+          <h3 className="mb-3 text-sm font-medium text-foreground">New Permission Rule</h3>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">Tool</label>
+              <label className="mb-1 block text-xs font-medium text-text-secondary">Tool</label>
               <select
                 value={formTool}
                 onChange={(e) => setFormTool(e.target.value as AITool)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
               >
                 {(Object.keys(TOOL_INFO) as AITool[]).map((tool) => (
                   <option key={tool} value={tool}>
@@ -254,22 +254,22 @@ export default function PermissionsPage() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">
-                Pattern <span className="text-gray-400">(glob)</span>
+              <label className="mb-1 block text-xs font-medium text-text-secondary">
+                Pattern <span className="text-text-muted">(glob)</span>
               </label>
               <input
                 value={formPattern}
                 onChange={(e) => setFormPattern(e.target.value)}
                 placeholder="*.ts, src/**, *"
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">Action</label>
+              <label className="mb-1 block text-xs font-medium text-text-secondary">Action</label>
               <select
                 value={formAction}
                 onChange={(e) => setFormAction(e.target.value as PermissionAction)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
               >
                 <option value="ALLOW">ALLOW (silent)</option>
                 <option value="ASK">ASK (prompt user)</option>
@@ -284,7 +284,7 @@ export default function PermissionsPage() {
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
             >
               {saving && <Loader2 size={12} className="animate-spin" />}
               Create Rule
@@ -292,7 +292,7 @@ export default function PermissionsPage() {
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="rounded-lg px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100"
+              className="rounded-lg px-3 py-1.5 text-sm text-text-secondary hover:bg-surface-soft"
             >
               Cancel
             </button>
@@ -302,7 +302,7 @@ export default function PermissionsPage() {
 
       {/* Default permissions */}
       <div className="mb-6">
-        <h2 className="mb-3 text-sm font-medium text-gray-700">Default Permissions</h2>
+        <h2 className="mb-3 text-sm font-medium text-text-secondary">Default Permissions</h2>
         <div className="grid grid-cols-2 gap-2">
           {(Object.keys(TOOL_INFO) as AITool[]).map((tool) => {
             const info = TOOL_INFO[tool];
@@ -311,12 +311,12 @@ export default function PermissionsPage() {
             return (
               <div
                 key={tool}
-                className="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50/50 px-3 py-2"
+                className="flex items-center gap-3 rounded-lg border border-border bg-surface-soft/50 px-3 py-2"
               >
-                <Icon size={14} className="shrink-0 text-gray-400" />
+                <Icon size={14} className="shrink-0 text-text-muted" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium text-gray-600">{info.label}</p>
-                  <p className="truncate text-[10px] text-gray-400">{info.description}</p>
+                  <p className="text-xs font-medium text-text-secondary">{info.label}</p>
+                  <p className="truncate text-[10px] text-text-muted">{info.description}</p>
                 </div>
                 <span
                   className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${ACTION_BADGE[defaultAction]}`}
@@ -332,46 +332,46 @@ export default function PermissionsPage() {
 
       {/* Custom rules */}
       <div>
-        <h2 className="mb-3 text-sm font-medium text-gray-700">Custom Rules</h2>
+        <h2 className="mb-3 text-sm font-medium text-text-secondary">Custom Rules</h2>
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 size={20} className="animate-spin text-gray-400" />
+            <Loader2 size={20} className="animate-spin text-text-muted" />
           </div>
         ) : permissions.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-gray-200 px-6 py-8 text-center">
-            <Shield size={32} className="mx-auto mb-2 text-gray-300" />
-            <p className="text-sm text-gray-500">No custom permission rules yet.</p>
-            <p className="mt-1 text-xs text-gray-400">
+          <div className="rounded-xl border border-dashed border-border px-6 py-8 text-center">
+            <Shield size={32} className="mx-auto mb-2 text-text-muted" />
+            <p className="text-sm text-text-muted">No custom permission rules yet.</p>
+            <p className="mt-1 text-xs text-text-muted">
               Add rules to override the defaults for specific tools or file patterns.
             </p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-gray-200">
+          <div className="overflow-hidden rounded-xl border border-border">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50">
+              <thead className="border-b border-border bg-surface-soft">
                 <tr>
-                  <th className="px-4 py-2.5 text-xs font-medium text-gray-500">Tool</th>
-                  <th className="px-4 py-2.5 text-xs font-medium text-gray-500">Pattern</th>
-                  <th className="px-4 py-2.5 text-xs font-medium text-gray-500">Action</th>
-                  <th className="px-4 py-2.5 text-xs font-medium text-gray-500"></th>
+                  <th className="px-4 py-2.5 text-xs font-medium text-text-muted">Tool</th>
+                  <th className="px-4 py-2.5 text-xs font-medium text-text-muted">Pattern</th>
+                  <th className="px-4 py-2.5 text-xs font-medium text-text-muted">Action</th>
+                  <th className="px-4 py-2.5 text-xs font-medium text-text-muted"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-border">
                 {permissions.map((perm) => {
                   const toolInfo = TOOL_INFO[perm.tool as AITool];
                   const Icon = toolInfo?.icon ?? Shield;
                   return (
-                    <tr key={perm.id} className="hover:bg-gray-50">
+                    <tr key={perm.id} className="hover:bg-surface-soft">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <Icon size={14} className="text-gray-400" />
-                          <span className="font-medium text-gray-700">
+                          <Icon size={14} className="text-text-muted" />
+                          <span className="font-medium text-text-secondary">
                             {toolInfo?.label ?? perm.tool}
                           </span>
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">
+                        <code className="rounded bg-surface-soft px-1.5 py-0.5 text-xs text-text-secondary">
                           {perm.pattern}
                         </code>
                       </td>
@@ -393,7 +393,7 @@ export default function PermissionsPage() {
                         <button
                           onClick={() => handleDelete(perm.id)}
                           disabled={busyId === perm.id}
-                          className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+                          className="rounded p-1 text-text-muted hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
                           title="Delete rule"
                         >
                           {busyId === perm.id ? (

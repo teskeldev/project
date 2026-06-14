@@ -192,7 +192,7 @@ export default function CommandsPage() {
   if (!activeWorkspace) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-text-muted">
           Select a workspace to manage commands.
         </p>
       </div>
@@ -202,18 +202,18 @@ export default function CommandsPage() {
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
+      <div className="flex items-center justify-between border-b border-border bg-surface px-6 py-4">
         <div>
-          <h1 className="text-lg font-semibold text-gray-900">
+          <h1 className="text-lg font-semibold text-foreground">
             Slash Commands
           </h1>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-text-muted">
             Custom prompt templates triggered with /command-name in chat.
           </p>
         </div>
         <button
           onClick={openCreate}
-          className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent-hover"
         >
           <Plus size={14} />
           New Command
@@ -224,7 +224,7 @@ export default function CommandsPage() {
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 size={20} className="animate-spin text-gray-400" />
+            <Loader2 size={20} className="animate-spin text-text-muted" />
           </div>
         ) : error ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
@@ -235,30 +235,30 @@ export default function CommandsPage() {
             {/* Built-in commands */}
             {builtinCommands.length > 0 && (
               <div>
-                <h2 className="mb-2 text-xs font-medium uppercase tracking-wider text-gray-400">
+                <h2 className="mb-2 text-xs font-medium uppercase tracking-wider text-text-muted">
                   Built-in Commands
                 </h2>
                 <div className="space-y-2">
                   {builtinCommands.map((cmd) => (
                     <div
                       key={cmd.id}
-                      className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3"
+                      className="flex items-center justify-between rounded-lg border border-border bg-surface px-4 py-3"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <Terminal size={14} className="text-gray-400" />
-                          <span className="text-sm font-medium text-gray-900">
+                          <Terminal size={14} className="text-text-muted" />
+                          <span className="text-sm font-medium text-foreground">
                             /{cmd.name}
                           </span>
-                          <Lock size={10} className="text-gray-300" />
+                          <Lock size={10} className="text-text-muted" />
                         </div>
-                        <p className="mt-0.5 pl-6 text-xs text-gray-500">
+                        <p className="mt-0.5 pl-6 text-xs text-text-muted">
                           {cmd.description}
                         </p>
                       </div>
                       <button
                         onClick={() => openPreview(cmd)}
-                        className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                        className="rounded p-1.5 text-text-muted hover:bg-surface-soft hover:text-text-secondary"
                         title="Preview"
                       >
                         <Eye size={14} />
@@ -271,23 +271,23 @@ export default function CommandsPage() {
 
             {/* Custom commands */}
             <div>
-              <h2 className="mb-2 text-xs font-medium uppercase tracking-wider text-gray-400">
+              <h2 className="mb-2 text-xs font-medium uppercase tracking-wider text-text-muted">
                 Custom Commands
               </h2>
               {customCommands.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-gray-200 py-10 text-center">
-                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-blue-50">
-                    <Zap size={18} className="text-blue-500" />
+                <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-10 text-center">
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-accent-light">
+                    <Zap size={18} className="text-accent" />
                   </div>
-                  <p className="text-sm font-medium text-gray-700">
+                  <p className="text-sm font-medium text-text-secondary">
                     No custom commands yet
                   </p>
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-text-muted">
                     Create reusable prompt templates for common tasks.
                   </p>
                   <button
                     onClick={openCreate}
-                    className="mt-3 flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                    className="mt-3 flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover"
                   >
                     <Plus size={12} />
                     Create Command
@@ -298,36 +298,36 @@ export default function CommandsPage() {
                   {customCommands.map((cmd) => (
                     <div
                       key={cmd.id}
-                      className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3 transition-colors hover:border-gray-300"
+                      className="flex items-center justify-between rounded-lg border border-border bg-surface px-4 py-3 transition-colors hover:border-border-strong"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <Terminal size={14} className="text-blue-500" />
-                          <span className="text-sm font-medium text-gray-900">
+                          <Terminal size={14} className="text-accent" />
+                          <span className="text-sm font-medium text-foreground">
                             /{cmd.name}
                           </span>
                           {cmd.variables.length > 0 && (
-                            <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">
+                            <span className="rounded bg-surface-soft px-1.5 py-0.5 text-[10px] text-text-muted">
                               {cmd.variables.length} var
                               {cmd.variables.length !== 1 ? "s" : ""}
                             </span>
                           )}
                         </div>
-                        <p className="mt-0.5 pl-6 text-xs text-gray-500">
+                        <p className="mt-0.5 pl-6 text-xs text-text-muted">
                           {cmd.description}
                         </p>
                       </div>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => openPreview(cmd)}
-                          className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                          className="rounded p-1.5 text-text-muted hover:bg-surface-soft hover:text-text-secondary"
                           title="Preview"
                         >
                           <Eye size={14} />
                         </button>
                         <button
                           onClick={() => openEdit(cmd)}
-                          className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                          className="rounded p-1.5 text-text-muted hover:bg-surface-soft hover:text-text-secondary"
                           title="Edit"
                         >
                           <Edit3 size={14} />
@@ -335,7 +335,7 @@ export default function CommandsPage() {
                         <button
                           onClick={() => handleDelete(cmd)}
                           disabled={busyId === cmd.id}
-                          className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-red-500 disabled:opacity-50"
+                          className="rounded p-1.5 text-text-muted hover:bg-surface-soft hover:text-red-500 disabled:opacity-50"
                           title="Delete"
                         >
                           <Trash2 size={14} />
@@ -359,16 +359,16 @@ export default function CommandsPage() {
           />
           <form
             onSubmit={handleSave}
-            className="animate-scale-in relative w-full max-w-2xl overflow-hidden rounded-2xl border border-gray-200/80 bg-white/95 shadow-2xl backdrop-blur-xl"
+            className="animate-scale-in relative w-full max-w-2xl overflow-hidden rounded-2xl border border-border/80 bg-surface/95 shadow-2xl backdrop-blur-xl"
           >
-            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
-              <h2 className="text-sm font-semibold text-gray-900">
+            <div className="flex items-center justify-between border-b border-border px-5 py-3">
+              <h2 className="text-sm font-semibold text-foreground">
                 {editingId ? "Edit Command" : "New Command"}
               </h2>
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                className="rounded p-1 text-text-muted hover:bg-surface-soft hover:text-text-secondary"
               >
                 <X size={14} />
               </button>
@@ -376,23 +376,23 @@ export default function CommandsPage() {
             <div className="max-h-[70vh] space-y-4 overflow-y-auto p-5">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">
+                  <label className="mb-1 block text-xs font-medium text-text-secondary">
                     Name (lowercase, hyphens)
                   </label>
                   <div className="flex items-center">
-                    <span className="mr-1 text-sm text-gray-400">/</span>
+                    <span className="mr-1 text-sm text-text-muted">/</span>
                     <input
                       value={form.name}
                       onChange={(e) =>
                         setForm((f) => ({ ...f, name: e.target.value }))
                       }
                       placeholder="my-command"
-                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 font-mono text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      className="w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-sm text-foreground placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">
+                  <label className="mb-1 block text-xs font-medium text-text-secondary">
                     Description
                   </label>
                   <input
@@ -401,12 +401,12 @@ export default function CommandsPage() {
                       setForm((f) => ({ ...f, description: e.target.value }))
                     }
                     placeholder="What this command does"
-                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
                   />
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">
+                <label className="mb-1 block text-xs font-medium text-text-secondary">
                   Template (use {"{{variable}}"} for placeholders)
                 </label>
                 <textarea
@@ -416,27 +416,27 @@ export default function CommandsPage() {
                   }
                   placeholder={"Review {{file}} and focus on {{aspect}}"}
                   rows={6}
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 font-mono text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-sm text-foreground placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
                 />
               </div>
 
               {/* Variables */}
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <label className="text-xs font-medium text-gray-600">
+                  <label className="text-xs font-medium text-text-secondary">
                     Variables
                   </label>
                   <button
                     type="button"
                     onClick={addVariable}
-                    className="flex items-center gap-1 rounded px-2 py-1 text-xs text-blue-600 hover:bg-blue-50"
+                    className="flex items-center gap-1 rounded px-2 py-1 text-xs text-accent hover:bg-accent-light"
                   >
                     <Plus size={12} />
                     Add Variable
                   </button>
                 </div>
                 {form.variables.length === 0 ? (
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-text-muted">
                     No variables defined. Add {"{{placeholders}}"} in your
                     template and define them here.
                   </p>
@@ -445,7 +445,7 @@ export default function CommandsPage() {
                     {form.variables.map((v, i) => (
                       <div
                         key={i}
-                        className="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 p-2"
+                        className="flex items-center gap-2 rounded-lg border border-border bg-surface-soft p-2"
                       >
                         <input
                           value={v.name}
@@ -453,7 +453,7 @@ export default function CommandsPage() {
                             updateVariable(i, "name", e.target.value)
                           }
                           placeholder="name"
-                          className="w-24 rounded border border-gray-200 bg-white px-2 py-1 font-mono text-xs"
+                          className="w-24 rounded border border-border bg-surface px-2 py-1 font-mono text-xs"
                         />
                         <input
                           value={v.description}
@@ -461,9 +461,9 @@ export default function CommandsPage() {
                             updateVariable(i, "description", e.target.value)
                           }
                           placeholder="Description"
-                          className="flex-1 rounded border border-gray-200 bg-white px-2 py-1 text-xs"
+                          className="flex-1 rounded border border-border bg-surface px-2 py-1 text-xs"
                         />
-                        <label className="flex items-center gap-1 text-xs text-gray-500">
+                        <label className="flex items-center gap-1 text-xs text-text-muted">
                           <input
                             type="checkbox"
                             checked={v.required}
@@ -477,7 +477,7 @@ export default function CommandsPage() {
                         <button
                           type="button"
                           onClick={() => removeVariable(i)}
-                          className="rounded p-1 text-gray-400 hover:text-red-500"
+                          className="rounded p-1 text-text-muted hover:text-red-500"
                         >
                           <X size={12} />
                         </button>
@@ -491,11 +491,11 @@ export default function CommandsPage() {
                 <p className="text-xs text-red-600">{formError}</p>
               )}
             </div>
-            <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-5 py-3">
+            <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-3">
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="rounded-lg px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100"
+                className="rounded-lg px-3 py-1.5 text-sm text-text-secondary hover:bg-surface-soft"
               >
                 Cancel
               </button>
@@ -506,7 +506,7 @@ export default function CommandsPage() {
                   !form.template.trim() ||
                   saving
                 }
-                className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
               >
                 {saving && <Loader2 size={14} className="animate-spin" />}
                 {editingId ? "Save Changes" : "Create Command"}
@@ -523,29 +523,29 @@ export default function CommandsPage() {
             className="absolute inset-0 bg-black/20 backdrop-blur-md"
             onClick={() => setPreviewCmd(null)}
           />
-          <div className="animate-scale-in relative w-full max-w-lg overflow-hidden rounded-2xl border border-gray-200/80 bg-white/95 shadow-2xl backdrop-blur-xl">
-            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
-              <h2 className="text-sm font-semibold text-gray-900">
+          <div className="animate-scale-in relative w-full max-w-lg overflow-hidden rounded-2xl border border-border/80 bg-surface/95 shadow-2xl backdrop-blur-xl">
+            <div className="flex items-center justify-between border-b border-border px-5 py-3">
+              <h2 className="text-sm font-semibold text-foreground">
                 Preview: /{previewCmd.name}
               </h2>
               <button
                 onClick={() => setPreviewCmd(null)}
-                className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                className="rounded p-1 text-text-muted hover:bg-surface-soft hover:text-text-secondary"
               >
                 <X size={14} />
               </button>
             </div>
             <div className="space-y-4 p-5">
-              <p className="text-xs text-gray-500">{previewCmd.description}</p>
+              <p className="text-xs text-text-muted">{previewCmd.description}</p>
 
               {previewCmd.variables.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-gray-600">
+                  <p className="text-xs font-medium text-text-secondary">
                     Variables:
                   </p>
                   {previewCmd.variables.map((v) => (
                     <div key={v.name} className="flex items-center gap-2">
-                      <label className="w-24 text-xs font-mono text-gray-500">
+                      <label className="w-24 text-xs font-mono text-text-muted">
                         {v.name}
                         {v.required && (
                           <span className="text-red-400">*</span>
@@ -560,7 +560,7 @@ export default function CommandsPage() {
                           }))
                         }
                         placeholder={v.description}
-                        className="flex-1 rounded border border-gray-200 bg-white px-2 py-1 text-xs"
+                        className="flex-1 rounded border border-border bg-surface px-2 py-1 text-xs"
                       />
                     </div>
                   ))}
@@ -568,10 +568,10 @@ export default function CommandsPage() {
               )}
 
               <div>
-                <p className="mb-1 text-xs font-medium text-gray-600">
+                <p className="mb-1 text-xs font-medium text-text-secondary">
                   Resolved output:
                 </p>
-                <pre className="whitespace-pre-wrap rounded-lg bg-gray-50 p-3 font-mono text-xs text-gray-700">
+                <pre className="whitespace-pre-wrap rounded-lg bg-surface-soft p-3 font-mono text-xs text-text-secondary">
                   {resolveCommandTemplate(previewCmd.template, previewValues)}
                 </pre>
               </div>

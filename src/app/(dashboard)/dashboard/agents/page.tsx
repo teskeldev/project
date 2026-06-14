@@ -37,10 +37,10 @@ const statusConfig: Record<
   { icon: typeof CheckCircle2; color: string; bg: string; label: string; badgeVariant: "default" | "success" | "warning" | "destructive" | "outline"; spin?: boolean }
 > = {
   QUEUED: { icon: Clock, color: "text-[var(--text-secondary)]", bg: "bg-[var(--surface-soft)]", label: "Queued", badgeVariant: "outline" },
-  RUNNING: { icon: Loader2, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-900/30", label: "Running", badgeVariant: "default", spin: true },
-  WAITING_APPROVAL: { icon: Sparkles, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-900/30", label: "Awaiting review", badgeVariant: "warning" },
-  COMPLETED: { icon: CheckCircle2, color: "text-green-600 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/30", label: "Completed", badgeVariant: "success" },
-  FAILED: { icon: AlertCircle, color: "text-red-600 dark:text-red-400", bg: "bg-red-50 dark:bg-red-900/30", label: "Failed", badgeVariant: "destructive" },
+  RUNNING: { icon: Loader2, color: "text-accent", bg: "bg-accent-light", label: "Running", badgeVariant: "default", spin: true },
+  WAITING_APPROVAL: { icon: Sparkles, color: "text-amber-600", bg: "bg-amber-50", label: "Awaiting review", badgeVariant: "warning" },
+  COMPLETED: { icon: CheckCircle2, color: "text-green-600", bg: "bg-green-50", label: "Completed", badgeVariant: "success" },
+  FAILED: { icon: AlertCircle, color: "text-red-600", bg: "bg-red-50", label: "Failed", badgeVariant: "destructive" },
   CANCELLED: { icon: X, color: "text-[var(--text-secondary)]", bg: "bg-[var(--surface-soft)]", label: "Cancelled", badgeVariant: "outline" },
 };
 
@@ -275,7 +275,7 @@ export default function BackgroundAgentsPage() {
               {creating ? "Starting..." : "New Agent"}
             </Button>
             {createError && (
-              <p className="mt-1.5 text-[11px] text-red-600 dark:text-red-400">{createError}</p>
+              <p className="mt-1.5 text-[11px] text-red-600">{createError}</p>
             )}
           </div>
         </div>
@@ -309,7 +309,7 @@ export default function BackgroundAgentsPage() {
             </div>
           )}
           {listError && (
-            <p className="px-3 py-2 text-[12px] text-red-600 dark:text-red-400">{listError}</p>
+            <p className="px-3 py-2 text-[12px] text-red-600">{listError}</p>
           )}
           {!loading && !listError && filtered.length === 0 && (
             <p className="px-3 py-8 text-center text-[12px] text-[var(--text-muted)]">
@@ -366,7 +366,7 @@ export default function BackgroundAgentsPage() {
             Select an agent to view its progress.
           </div>
         ) : detailError ? (
-          <div className="flex flex-1 items-center justify-center text-[13px] text-red-600 dark:text-red-400">
+          <div className="flex flex-1 items-center justify-center text-[13px] text-red-600">
             {detailError}
           </div>
         ) : !detail ? (
@@ -438,20 +438,20 @@ function AgentDetail({
       <div className="flex-1 overflow-auto p-6">
         {/* Failed error banner */}
         {detail.status === "FAILED" && detail.error && (
-          <Card className="mb-4 border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-900/20">
+          <Card className="mb-4 border-red-200 bg-red-50">
             <CardContent className="flex items-start gap-2 p-3">
-              <AlertCircle size={14} className="mt-0.5 text-red-600 dark:text-red-400" />
-              <p className="text-[12px] text-red-700 dark:text-red-300">{detail.error}</p>
+              <AlertCircle size={14} className="mt-0.5 text-red-600" />
+              <p className="text-[12px] text-red-700">{detail.error}</p>
             </CardContent>
           </Card>
         )}
 
         {/* Waiting-approval callout */}
         {detail.status === "WAITING_APPROVAL" && (
-          <Card className="mb-4 border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-900/20">
+          <Card className="mb-4 border-amber-200 bg-amber-50">
             <CardContent className="flex items-start gap-2 p-3">
-              <Sparkles size={14} className="mt-0.5 text-amber-600 dark:text-amber-400" />
-              <div className="text-[12px] text-amber-800 dark:text-amber-300">
+              <Sparkles size={14} className="mt-0.5 text-amber-600" />
+              <div className="text-[12px] text-amber-800">
                 <p className="font-medium">Changes proposed for review</p>
                 <p className="mt-0.5">
                   {detail.result?.message ??
@@ -522,11 +522,11 @@ function StepItem({
         <div
           className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-medium ${
             status === "COMPLETED"
-              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+              ? "bg-green-100 text-green-700"
               : status === "RUNNING"
-              ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+              ? "bg-accent-light text-accent"
               : status === "FAILED"
-              ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+              ? "bg-red-100 text-red-700"
               : "bg-[var(--surface-soft)] text-[var(--text-muted)]"
           }`}
         >

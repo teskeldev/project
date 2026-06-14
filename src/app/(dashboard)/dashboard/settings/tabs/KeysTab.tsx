@@ -116,7 +116,7 @@ export default function KeysTab() {
 
   return (
     <div>
-      <h2 className="mb-4 text-lg font-medium text-gray-900">API Keys</h2>
+      <h2 className="mb-4 text-lg font-medium text-foreground">API Keys</h2>
 
       {/* New key modal */}
       {newKey && (
@@ -124,7 +124,7 @@ export default function KeysTab() {
           <Card className="mx-4 w-full max-w-md shadow-xl">
             <CardContent className="pt-6">
               <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className="text-lg font-semibold text-foreground">
                   API Key Created
                 </h3>
                 <button
@@ -132,7 +132,7 @@ export default function KeysTab() {
                     setNewKey(null);
                     setCopied(false);
                   }}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-text-muted hover:text-text-secondary"
                 >
                   <X size={20} />
                 </button>
@@ -141,8 +141,8 @@ export default function KeysTab() {
                 <strong>Warning:</strong> This key will only be shown once. Copy
                 it now and store it securely.
               </div>
-              <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-                <code className="flex-1 break-all text-xs text-gray-700">
+              <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-soft px-3 py-2">
+                <code className="flex-1 break-all text-xs text-text-secondary">
                   {newKey.key}
                 </code>
                 <Button variant="ghost" size="icon" onClick={handleCopy}>
@@ -169,7 +169,7 @@ export default function KeysTab() {
 
       <Card>
         <CardContent className="pt-6">
-          <p className="mb-4 text-sm text-gray-500">
+          <p className="mb-4 text-sm text-text-muted">
             Use API keys to integrate Teskel with your own tools and workflows.
           </p>
 
@@ -178,7 +178,7 @@ export default function KeysTab() {
           {showCreate ? (
             <div className="mb-4 flex items-end gap-3">
               <div className="flex-1">
-                <label className="mb-1 block text-xs text-gray-500">
+                <label className="mb-1 block text-xs text-text-muted">
                   Key name
                 </label>
                 <Input
@@ -207,22 +207,22 @@ export default function KeysTab() {
 
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 size={24} className="animate-spin text-gray-400" />
+              <Loader2 size={24} className="animate-spin text-text-muted" />
             </div>
           ) : (
             <div className="mt-6 space-y-3">
               {keys.map((k, i) => (
                 <div key={k.id}>
-                  <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                  <div className="flex items-center justify-between rounded-lg border border-border bg-surface-soft px-4 py-3">
                     <div>
-                      <p className="text-sm font-medium text-gray-700">
+                      <p className="text-sm font-medium text-text-secondary">
                         {k.name}
                       </p>
-                      <p className="mt-0.5 font-mono text-xs text-gray-400">
+                      <p className="mt-0.5 font-mono text-xs text-text-muted">
                         {k.maskedKey}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                    <div className="flex items-center gap-2 text-xs text-text-muted">
                       <span>
                         Created{" "}
                         {new Date(k.createdAt).toLocaleDateString()}
@@ -241,7 +241,7 @@ export default function KeysTab() {
                 </div>
               ))}
               {keys.length === 0 && !loading && (
-                <p className="py-4 text-center text-sm text-gray-400">
+                <p className="py-4 text-center text-sm text-text-muted">
                   No API keys yet.
                 </p>
               )}

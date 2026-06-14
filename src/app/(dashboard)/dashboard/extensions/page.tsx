@@ -307,7 +307,7 @@ export default function ExtensionsPage() {
             <Loader2 size={24} className="animate-spin text-[var(--text-muted)]" />
           </div>
         ) : error ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400">
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-600">
             {error}
             <button onClick={fetchData} className="ml-2 underline hover:no-underline">
               Retry

@@ -190,7 +190,7 @@ export default function SearchPage() {
 
         {/* Error */}
         {error && (
-          <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400">
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">
             <AlertCircle size={16} />
             {error}
           </div>
@@ -264,7 +264,7 @@ export default function SearchPage() {
                           <div className="mt-2 overflow-hidden rounded bg-[var(--surface-soft)] px-3 py-2">
                             <code className="block truncate text-[12px] text-[var(--text-secondary)]">
                               {before}
-                              <mark className="rounded bg-yellow-200 px-0.5 text-[var(--foreground)] dark:bg-yellow-500/30">
+                              <mark className="rounded bg-yellow-200 px-0.5 text-[var(--foreground)]">
                                 {match}
                               </mark>
                               {after}
