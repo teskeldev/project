@@ -5,16 +5,16 @@ export default function Features() {
     <section id="product" className="px-6 py-20 md:py-28">
       <div className="mx-auto max-w-[1100px]">
         <h2 className="text-center text-[1.75rem] font-medium tracking-tight text-foreground md:text-[2.25rem]">
-          Stay on the frontier
+          A workspace that works with you
         </h2>
 
         {/* Feature grid */}
         <div className="mt-16 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {/* Use the best model */}
           <div className="rounded-xl border border-border bg-surface p-6 dark:bg-surface">
-            <h3 className="text-[16px] font-semibold text-foreground">Use the best model for every task</h3>
+            <h3 className="text-[16px] font-semibold text-foreground">The right model for every task</h3>
             <p className="mt-2 text-[14px] leading-relaxed text-text-secondary">
-              Choose between every cutting-edge model from OpenAI, Anthropic, Gemini, xAI, and Teskel.
+              Teskel routes each step to the best frontier model automatically — or pick your own.
             </p>
             <Link href="/docs" className="mt-4 inline-flex items-center gap-1 text-[13px] font-medium text-foreground hover:text-accent">
               Explore models <span className="text-[11px]">↗</span>
@@ -22,11 +22,11 @@ export default function Features() {
             {/* Model selector preview */}
             <div className="mt-5 overflow-hidden rounded-lg border border-border bg-surface-soft">
               <div className="space-y-0 divide-y divide-border">
-                <ModelRow name="Auto" badge="Suggested" active />
-                <ModelRow name="Composer 2.5" />
+                <ModelRow name="Auto" badge="Recommended" active />
+                <ModelRow name="Claude Opus 4.8" />
                 <ModelRow name="GPT-5.5" />
-                <ModelRow name="Opus 4.8" />
                 <ModelRow name="Gemini 3.1 Pro" />
+                <ModelRow name="Teskel Fast" />
               </div>
             </div>
           </div>

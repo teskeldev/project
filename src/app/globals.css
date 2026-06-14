@@ -1,23 +1,151 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   TESKEL DESIGN SYSTEM — "Living Canvas"
+   Light-first. Teal = AI presence. Iris = human. Motion = state.
+   Primitive tokens below; legacy token names are aliased onto them so the
+   existing component tree keeps working while pages migrate.
+   ========================================================================== */
+
 :root {
-  --background: #F7F7F5;
-  --foreground: #0F172A;
-  --accent: #3B82F6;
-  --accent-light: #EFF6FF;
+  /* ---- COLOR · canvas & ink ---- */
+  --canvas: #F8F8F6;
   --surface: #FFFFFF;
-  --surface-soft: #F3F4F6;
-  --border: #E5E7EB;
-  --text-secondary: #64748B;
-  --text-muted: #94A3B8;
-  --primary: #111827;
-  --primary-hover: #020617;
-  --accent-hover: #2563EB;
+  --surface-soft: #F3F3F0;
+  --elevated: #FFFFFF;
+  --ink: #0F172A;
+  --ink-2: #475569;
+  --ink-muted: #94A3B8;
+
+  /* ---- COLOR · signature semantics ---- */
+  --ai: #10B7A8;            /* AGENT presence — reserve for AI only */
+  --ai-soft: #E7F8F6;
+  --human: #6D5DF6;         /* YOU — reserve for human actions */
+  --human-soft: #EEECFD;
+
+  /* ---- COLOR · state ---- */
+  --success: #16A34A;
+  --warning: #D97706;
+  --danger: #DC2626;
+  --info: #3B82F6;
+
+  /* ---- COLOR · structure ---- */
+  --border: #ECEAE4;
+  --border-strong: #DCD9D1;
+
+  /* ---- TYPOGRAPHY ---- */
+  --leading-tight: 1.15;
+  --leading-normal: 1.5;
+  --tracking-tight: -0.02em;
+
+  /* ---- SPACING (4px base) ---- */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
+  --space-12: 48px; --space-16: 64px;
+
+  /* ---- RADIUS ---- */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+
+  /* ---- ELEVATION (5-step) ---- */
+  --elev-0: none;
+  --elev-1: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --elev-2: 0 4px 12px -2px rgba(15, 23, 42, 0.06);
+  --elev-3: 0 12px 32px -8px rgba(15, 23, 42, 0.10);
+  --elev-4: 0 24px 64px -16px rgba(15, 23, 42, 0.14);
+
+  /* ---- MOTION ---- */
+  --ease-canvas: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+  --dur-breathe: 2500ms;
+  --spring-stiff: 300;
+  --spring-damp: 30;
+
+  /* ---- EDITOR (opt-in dark surface; light-native preferred in-app) ---- */
   --editor-bg: #0B0F19;
   --editor-border: #1E293B;
+
+  /* ========================================================================
+     LEGACY ALIASES — keep the existing component tree compiling.
+     New code should prefer the primitives above.
+     ======================================================================== */
+  --background: var(--canvas);
+  --foreground: var(--ink);
+  --accent: #3B82F6;
+  --accent-light: #EFF6FF;
+  --accent-hover: #2563EB;
+  --primary: #111827;
+  --primary-hover: #020617;
+  --text-secondary: var(--ink-2);
+  --text-muted: var(--ink-muted);
+}
+
+/* ==========================================================================
+   DARK MODE — secondary, opt-in. Token-level only: any component built on the
+   design tokens inherits this automatically. Applied via [data-theme="dark"]
+   on <html> by the theme store / FOUC script.
+   ========================================================================== */
+[data-theme="dark"] {
+  --canvas: #0B0F14;
+  --surface: #11161D;
+  --surface-soft: #161C24;
+  --elevated: #1A212B;
+  --ink: #E6EAF0;
+  --ink-2: #A6B0BE;
+  --ink-muted: #6B7686;
+
+  --ai: #2DD4BF;
+  --ai-soft: #0E2B29;
+  --human: #8B7DFF;
+  --human-soft: #221F3D;
+
+  --success: #22C55E;
+  --warning: #F59E0B;
+  --danger: #F87171;
+  --info: #60A5FA;
+
+  --border: #232B36;
+  --border-strong: #313B49;
+
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --elev-2: 0 4px 12px -2px rgba(0, 0, 0, 0.5);
+  --elev-3: 0 12px 32px -8px rgba(0, 0, 0, 0.6);
+  --elev-4: 0 24px 64px -16px rgba(0, 0, 0, 0.7);
+
+  /* legacy aliases follow the primitives */
+  --background: var(--canvas);
+  --foreground: var(--ink);
+  --accent: #38BDF8;
+  --accent-light: #0E2A3A;
+  --accent-hover: #0EA5E9;
+  --primary: #E6EAF0;
+  --primary-hover: #FFFFFF;
+  --text-secondary: var(--ink-2);
+  --text-muted: var(--ink-muted);
 }
 
 @theme inline {
+  /* primitives */
+  --color-canvas: var(--canvas);
+  --color-elevated: var(--elevated);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-muted: var(--ink-muted);
+  --color-ai: var(--ai);
+  --color-ai-soft: var(--ai-soft);
+  --color-human: var(--human);
+  --color-human-soft: var(--human-soft);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-border-strong: var(--border-strong);
+
+  /* legacy mappings (unchanged public names) */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
@@ -32,12 +160,17 @@
   --color-text-muted: var(--text-muted);
   --color-editor-bg: var(--editor-bg);
   --color-editor-border: var(--editor-border);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 * {
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-timing-function: var(--ease-canvas);
 }
 
 body {
@@ -283,3 +416,57 @@ body {
 .stagger-6 { animation-delay: 0.3s; }
 .stagger-7 { animation-delay: 0.35s; }
 .stagger-8 { animation-delay: 0.4s; }
+
+/* ===== LIVING CANVAS — AI PRESENCE ===== */
+
+/* Breathing aura: wrap any region an agent is actively working in.
+   Reserved for AI activity (teal). */
+@keyframes breathe {
+  0%, 100% { opacity: 0.45; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.01); }
+}
+
+.ai-breathe {
+  animation: breathe var(--dur-breathe) ease-in-out infinite;
+}
+
+.ai-aura {
+  position: relative;
+}
+
+.ai-aura::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(120deg, var(--ai), transparent 60%, var(--ai));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: breathe var(--dur-breathe) ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Thinking dots */
+@keyframes thinking-dot {
+  0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-2px); }
+}
+
+.thinking-dot {
+  animation: thinking-dot 1.2s ease-in-out infinite;
+}
+
+/* ===== ACCESSIBILITY — REDUCED MOTION ===== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
