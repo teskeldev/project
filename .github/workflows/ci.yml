@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  DATABASE_URL: 'postgresql://teskel:teskel@localhost:5433/teskel?schema=public'
+  AUTH_SECRET: 'ci-test-secret-not-for-production'
+  NEXTAUTH_SECRET: 'ci-test-secret-not-for-production'
+  NEXTAUTH_URL: 'http://localhost:3000'
+  ENCRYPTION_KEY: 'ci-test-encryption-key-32chars!!'
+
+jobs:
+  lint-and-typecheck:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Security audit
+        run: npm audit --audit-level=moderate
+      - run: npm run lint
+      - run: npm run typecheck
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run test -- --coverage
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/
+
+  build:
+    name: Production Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [lint-and-typecheck, test]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: teskel
+          POSTGRES_PASSWORD: teskel
+          POSTGRES_DB: teskel
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U teskel -d teskel"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx prisma migrate deploy
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: |
+            .next/
+            !.next/cache/
+          retention-days: 1
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: teskel
+          POSTGRES_PASSWORD: teskel
+          POSTGRES_DB: teskel
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U teskel -d teskel"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx prisma migrate deploy
+      - run: npx prisma db seed
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: .next/
+      - run: npx playwright install --with-deps chromium
+      - name: Start server and run e2e
+        run: |
+          npm run start &
+          npx wait-on http://localhost:3000 --timeout 30000
+          npm run test:e2e
+        env:
+          PORT: 3000

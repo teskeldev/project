@@ -11,6 +11,7 @@
  *   - Each encryption uses a fresh random 12-byte IV (GCM nonce).
  *   - The GCM auth tag guarantees integrity/authenticity on decrypt.
  *   - We NEVER log the key, the plaintext, or the derived key material.
+ *   - The derived key is cached in module scope to avoid re-hashing on every call.
  *
  * Wire format (base64):  [ 12-byte IV | 16-byte authTag | ciphertext ]
  */
@@ -26,11 +27,17 @@ const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12; // 96-bit nonce, the recommended size for GCM.
 const AUTH_TAG_LENGTH = 16; // 128-bit GCM tag.
 
+/** Cached derived key — computed once on first use. */
+let cachedKey: Buffer | null = null;
+
 /**
  * Derive a stable 32-byte key from ENCRYPTION_KEY.
+ * Caches the result in module scope after first derivation.
  * Throws ApiError(500) if the env var is missing/empty so callers fail safe.
  */
 function deriveKey(): Buffer {
+  if (cachedKey) return cachedKey;
+
   const secret = process.env.ENCRYPTION_KEY;
   if (!secret || secret.trim().length === 0) {
     // Do NOT include any key material in the error.
@@ -41,7 +48,8 @@ function deriveKey(): Buffer {
     );
   }
   // SHA-256 yields exactly 32 bytes, suitable for AES-256.
-  return createHash("sha256").update(secret, "utf8").digest();
+  cachedKey = createHash("sha256").update(secret, "utf8").digest();
+  return cachedKey;
 }
 
 /**

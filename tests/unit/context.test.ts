@@ -22,6 +22,10 @@ vi.mock("@/lib/db", () => ({
 vi.mock("@/lib/storage", () => ({
   readFile: (...a: unknown[]) => readFileMock(...a),
 }));
+const loadActiveSkillsMock = vi.fn();
+vi.mock("@/lib/skills", () => ({
+  loadActiveSkills: (...a: unknown[]) => loadActiveSkillsMock(...a),
+}));
 
 import { buildProjectContext, TESKEL_PERSONA } from "@/lib/ai/context";
 
@@ -31,6 +35,8 @@ beforeEach(() => {
   knowledgeFindMany.mockReset();
   fileNodeFindMany.mockReset();
   readFileMock.mockReset();
+  loadActiveSkillsMock.mockReset();
+  loadActiveSkillsMock.mockResolvedValue("");
 });
 
 describe("buildProjectContext", () => {

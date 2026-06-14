@@ -1,11 +1,12 @@
-﻿/**
+/**
  * Typed client helpers for Phase 6 background agents.
  *
- * REST calls go through a small JSON-envelope fetch (mirrors terminal.ts). The
- * events endpoint is SSE-over-GET; since it lives in an HTTP request we read it
- * with fetch + ReadableStream rather than EventSource so we can attach an
+ * REST calls use `apiFetch` from the shared API client. The events endpoint is
+ * SSE-over-GET; we read it with the shared SSE reader so we can attach an
  * AbortController for clean teardown.
  */
+import { apiFetch, ApiClientError } from "@/lib/client/api";
+import { readSSEStream } from "@/lib/client/sse";
 import type {
   AgentRunSummaryDTO,
   AgentRunDetailDTO,
@@ -30,30 +31,16 @@ export class AgentClientError extends Error {
   }
 }
 
-type Envelope<T> =
-  | { success: true; data: T }
-  | { success: false; error: { message: string; code?: string } };
-
-async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-  });
-  let body: Envelope<T> | null = null;
+/** Wrap apiFetch with agent-specific error class. */
+async function agentFetch<T>(url: string, opts?: RequestInit): Promise<T> {
   try {
-    body = (await res.json()) as Envelope<T>;
-  } catch {
-    /* no/invalid JSON */
+    return await apiFetch<T>(url, opts);
+  } catch (err) {
+    if (err instanceof ApiClientError) {
+      throw new AgentClientError(err.message, err.status, err.code);
+    }
+    throw err;
   }
-  if (!res.ok || !body || body.success === false) {
-    const message =
-      body && body.success === false
-        ? body.error.message
-        : `Request failed with status ${res.status}`;
-    const code = body && body.success === false ? body.error.code : undefined;
-    throw new AgentClientError(message, res.status, code);
-  }
-  return body.data;
 }
 
 /* ------------------------------- REST API -------------------------------- */
@@ -61,14 +48,14 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
 export function listAgentRuns(
   projectId: string
 ): Promise<{ runs: AgentRunSummaryDTO[] }> {
-  return jsonFetch(`/api/projects/${projectId}/agents`);
+  return agentFetch(`/api/projects/${projectId}/agents`);
 }
 
 export function createAgentRun(
   projectId: string,
   input: { goal: string; threadId?: string }
 ): Promise<{ run: AgentRunSummaryDTO }> {
-  return jsonFetch(`/api/projects/${projectId}/agents`, {
+  return agentFetch(`/api/projects/${projectId}/agents`, {
     method: "POST",
     body: JSON.stringify(input),
   });
@@ -77,13 +64,13 @@ export function createAgentRun(
 export function getAgentRun(
   agentRunId: string
 ): Promise<{ run: AgentRunDetailDTO }> {
-  return jsonFetch(`/api/agents/${agentRunId}`);
+  return agentFetch(`/api/agents/${agentRunId}`);
 }
 
 export function cancelAgentRun(
   agentRunId: string
 ): Promise<{ cancelled: boolean }> {
-  return jsonFetch(`/api/agents/${agentRunId}/cancel`, { method: "POST" });
+  return agentFetch(`/api/agents/${agentRunId}/cancel`, { method: "POST" });
 }
 
 /* ----------------------------- SSE event reader -------------------------- */
@@ -113,6 +100,10 @@ export type AgentStreamHandlers = {
   onEvent: (event: AgentStreamEvent) => void;
   onError?: (message: string) => void;
 };
+
+type Envelope<T> =
+  | { success: true; data: T }
+  | { success: false; error: { message: string; code?: string } };
 
 /**
  * Open the SSE events stream for a run. Opening the stream triggers execution
@@ -159,48 +150,22 @@ export function streamAgentEvents(
       return;
     }
 
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    const dispatch = (raw: string) => {
-      let event = "message";
-      const dataLines: string[] = [];
-      for (const line of raw.split("\n")) {
-        if (line.startsWith("event:")) event = line.slice(6).trim();
-        else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
-      }
-      if (dataLines.length === 0) return;
-      let payload: Record<string, unknown> = {};
-      try {
-        payload = JSON.parse(dataLines.join("\n")) as Record<string, unknown>;
-      } catch {
-        return;
-      }
-      handlers.onEvent({ type: event, ...payload } as AgentStreamEvent);
-    };
-
     try {
-      for (;;) {
-        const { done: streamDone, value } = await reader.read();
-        if (streamDone) break;
-        buffer += decoder.decode(value, { stream: true });
-        let idx: number;
-        while ((idx = buffer.indexOf("\n\n")) !== -1) {
-          const block = buffer.slice(0, idx);
-          buffer = buffer.slice(idx + 2);
-          if (block.trim()) dispatch(block);
+      for await (const frame of readSSEStream(res)) {
+        let payload: Record<string, unknown> = {};
+        try {
+          payload = JSON.parse(frame.data) as Record<string, unknown>;
+        } catch {
+          continue;
         }
+        handlers.onEvent({ type: frame.event, ...payload } as AgentStreamEvent);
       }
-      if (buffer.trim()) dispatch(buffer);
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
         handlers.onError?.(
           err instanceof Error ? err.message : "Stream read failed"
         );
       }
-    } finally {
-      reader.releaseLock();
     }
   })();
 

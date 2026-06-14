@@ -115,7 +115,7 @@ export type FileContent = {
   size: number;
 };
 
-export type ProjectTemplate = "blank" | "node";
+export type ProjectTemplate = "blank" | "node" | "react" | "python";
 
 /* -------------------------------------------------------------------------- */
 /* Endpoint helpers                                                           */
@@ -286,7 +286,7 @@ export function generateChangeSet(input: {
 /* ChangeSets / review (Phase 4)                                              */
 /* -------------------------------------------------------------------------- */
 
-export type ChangeSetStatus = "DRAFT" | "PENDING_REVIEW" | "APPLIED" | "REJECTED";
+export type ChangeSetStatus = "DRAFT" | "PENDING_REVIEW" | "APPLIED" | "REJECTED" | "REVERTED";
 export type FileChangeType = "CREATE" | "UPDATE" | "DELETE" | "RENAME";
 export type FileChangeStatus = "PENDING" | "ACCEPTED" | "REJECTED";
 
@@ -383,4 +383,27 @@ export function rejectChangeSet(
   return apiFetch(`/api/changesets/${changeSetId}/reject`, {
     method: "POST",
   });
+}
+/* -------------------------------------------------------------------------- */
+/* Chat thread forking (Feature 4)                                            */
+/* -------------------------------------------------------------------------- */
+
+export function forkThread(
+  threadId: string,
+  messageId?: string
+): Promise<{ thread: ChatThread }> {
+  return apiFetch(`/api/chat/threads/${threadId}/fork`, {
+    method: "POST",
+    body: JSON.stringify({ messageId }),
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/* Changeset revert (Feature F: Undo/Redo)                                    */
+/* -------------------------------------------------------------------------- */
+
+export function revertChangeSet(
+  changeSetId: string
+): Promise<{ reverted: boolean; revertedFiles: Array<{ fileChangeId: string; filePath: string; changeType: string }>; failures: Array<{ fileChangeId: string; filePath: string; error: string }> }> {
+  return apiFetch(`/api/changesets/${changeSetId}/revert`, { method: "POST" });
 }

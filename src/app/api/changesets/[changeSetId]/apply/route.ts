@@ -1,4 +1,5 @@
-﻿import { prisma } from "@/lib/db";
+import { prisma } from "@/lib/db";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import {
   apiSuccess,
   handleApiError,
@@ -16,6 +17,9 @@ import {
   normalizeRelPath,
   detectLanguage,
 } from "@/lib/storage";
+import { checkPermission } from "@/lib/ai/permissions";
+import { stage, commit, isRepo } from "@/lib/git/service";
+import { logger } from "@/lib/logger";
 import type { FileChange, FileChangeType, ChangeSetStatus } from "@prisma/client";
 
 type RouteContext = { params: Promise<{ changeSetId: string }> };
@@ -27,6 +31,7 @@ type Outcome = {
 };
 type ConflictOutcome = Outcome & { reason: string };
 type FailureOutcome = Outcome & { error: string };
+type DeniedOutcome = Outcome & { reason: string };
 
 /**
  * Resolve (or create) the parent FileNode chain for `relPath`, returning the
@@ -161,19 +166,25 @@ async function applyOne(
           ...(node.type === "FILE" ? { language: detectLanguage(newName) } : {}),
         },
       });
-      // Re-prefix descendant paths for folder renames.
+      // Re-prefix descendant paths for folder renames. The previous code
+      // did this in a serial `for await` loop, which was N+1 round-trips
+      // for folders with many descendants. We now fetch the descendants
+      // once, compute the new path in memory, and `Promise.all` the
+      // updates so they run concurrently (still multiple round-trips,
+      // but parallelized).
       if (node.type === "FOLDER") {
         const descendants = await prisma.fileNode.findMany({
           where: { projectId, path: { startsWith: `${oldPath}/` } },
           select: { id: true, path: true },
         });
-        for (const d of descendants) {
-          const suffix = d.path.slice(oldPath.length);
-          await prisma.fileNode.update({
-            where: { id: d.id },
-            data: { path: `${filePath}${suffix}` },
-          });
-        }
+        await Promise.all(
+          descendants.map((d) =>
+            prisma.fileNode.update({
+              where: { id: d.id },
+              data: { path: `${filePath}${d.path.slice(oldPath.length)}` },
+            })
+          )
+        );
       }
     }
 
@@ -238,8 +249,26 @@ async function detectConflict(
   return null;
 }
 
+/**
+ * Map a FileChangeType to the corresponding AI permission tool.
+ */
+function changeTypeToPermissionTool(
+  changeType: FileChangeType
+): "file_edit" | "file_delete" | "file_create" {
+  switch (changeType) {
+    case "CREATE":
+      return "file_create";
+    case "DELETE":
+      return "file_delete";
+    case "UPDATE":
+    case "RENAME":
+      return "file_edit";
+  }
+}
+
 // POST /api/changesets/:changeSetId/apply
 // Body: { applyAll?: boolean }
+// Query: ?autoCommit=true (optional) – auto-commit changes after successful apply
 // Applies ACCEPTED file changes (plus PENDING when applyAll) to disk + DB,
 // skipping REJECTED and any change that conflicts with the current on-disk
 // state. Disk and DB are kept in sync per-file; per-file failures are recorded
@@ -250,6 +279,10 @@ export async function POST(req: Request, ctx: RouteContext) {
     const body = await validateBody(req, applyChangeSetSchema);
     const applyAll = body?.applyAll ?? false;
 
+    // Parse autoCommit from query params
+    const url = new URL(req.url);
+    const autoCommit = url.searchParams.get("autoCommit") === "true";
+
     const changeSet = await prisma.changeSet.findUnique({
       where: { id: changeSetId },
       include: { fileChanges: true },
@@ -258,8 +291,12 @@ export async function POST(req: Request, ctx: RouteContext) {
       throw new ApiError("Changeset not found", 404, "NOT_FOUND");
     }
 
-    const { project } = await requireProjectAccess(changeSet.projectId);
+    const { project, user } = await requireProjectAccess(changeSet.projectId);
+
+    // Rate limit: 10 per minute
+    await enforceRateLimit(`changesets:apply:${user.id}`, 10, 60_000);
     const storageKey = project!.storageKey;
+    const workspaceId = project!.workspaceId;
 
     if (changeSet.status === "APPLIED") {
       throw new ApiError(
@@ -276,6 +313,44 @@ export async function POST(req: Request, ctx: RouteContext) {
       );
     }
 
+    // The status check above is read-then-act over several awaits. To make
+    // the read-and-act atomic, the terminal status flip (handled later when
+    // we compute `fullyApplied`) is done inside a transaction with a
+    // re-read-after (see "fullyApplied" branch below). This way, two
+    // concurrent applies that both pass the initial check will only have
+    // one win the APPLIED transition; the loser's transaction sees the
+    // updated status and short-circuits.
+
+    // Check changeset_apply permission at the top level
+    const applyPermission = await checkPermission(workspaceId, {
+      tool: "changeset_apply",
+    });
+    if (applyPermission.action === "DENY") {
+      throw new ApiError(
+        "Changeset apply is denied by permission rules",
+        403,
+        "PERMISSION_DENIED"
+      );
+    }
+    if (applyPermission.action === "ASK") {
+      // Return a response indicating user confirmation is needed
+      // The client should prompt the user and re-submit with confirmation
+      const hasConfirmation = req.headers.get("X-Permission-Confirmed") === "true";
+      if (!hasConfirmation) {
+        return Response.json(
+          {
+            success: false,
+            error: {
+              message: "Permission confirmation required to apply changeset",
+              code: "PERMISSION_ASK",
+              details: { tool: "changeset_apply", rule: applyPermission.rule },
+            },
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     // Decide which changes are candidates. Never apply REJECTED.
     const candidates = changeSet.fileChanges.filter((fc) => {
       if (fc.status === "REJECTED") return false;
@@ -286,6 +361,7 @@ export async function POST(req: Request, ctx: RouteContext) {
     const applied: Outcome[] = [];
     const conflicts: ConflictOutcome[] = [];
     const failures: FailureOutcome[] = [];
+    const denied: DeniedOutcome[] = [];
 
     for (const fc of candidates) {
       const base: Outcome = {
@@ -293,6 +369,20 @@ export async function POST(req: Request, ctx: RouteContext) {
         filePath: fc.filePath,
         changeType: fc.changeType,
       };
+
+      // 0) Permission check per file operation
+      const fileTool = changeTypeToPermissionTool(fc.changeType);
+      const filePermission = await checkPermission(workspaceId, {
+        tool: fileTool,
+        pattern: fc.filePath,
+      });
+      if (filePermission.action === "DENY") {
+        denied.push({
+          ...base,
+          reason: `Permission denied for ${fileTool} on ${fc.filePath}`,
+        });
+        continue;
+      }
 
       // 1) Conflict detection against current disk state.
       let conflictReason: string | null = null;
@@ -335,23 +425,74 @@ export async function POST(req: Request, ctx: RouteContext) {
     });
     const allNonRejected = currentChanges.filter(fc => fc.status !== "REJECTED");
     const allAccepted = allNonRejected.every(fc => fc.status === "ACCEPTED");
-    const fullyApplied = allAccepted && allNonRejected.length > 0 && conflicts.length === 0 && failures.length === 0;
+    const fullyApplied = allAccepted && allNonRejected.length > 0 && conflicts.length === 0 && failures.length === 0 && denied.length === 0;
 
     let changeSetStatus: ChangeSetStatus = changeSet.status;
     if (fullyApplied) {
-      const updated = await prisma.changeSet.update({
-        where: { id: changeSetId },
-        data: { status: "APPLIED" },
-        select: { status: true },
+      // Atomically flip status to APPLIED only if it's still in a
+      // non-terminal state. The re-read inside the transaction prevents a
+      // race where two concurrent applies both pass the initial status
+      // check above and both try to write APPLIED (or where a concurrent
+      // revert has already moved the changeset to REVERTED).
+      const updated = await prisma.$transaction(async (tx) => {
+        const fresh = await tx.changeSet.findUnique({
+          where: { id: changeSetId },
+          select: { status: true },
+        });
+        if (!fresh) {
+          throw new ApiError("Changeset not found", 404, "NOT_FOUND");
+        }
+        if (fresh.status === "APPLIED" || fresh.status === "REJECTED" || fresh.status === "REVERTED") {
+          throw new ApiError(
+            "This changeset has already been finalized",
+            409,
+            "CONFLICT"
+          );
+        }
+        return tx.changeSet.update({
+          where: { id: changeSetId },
+          data: { status: "APPLIED" },
+          select: { status: true },
+        });
       });
       changeSetStatus = updated.status;
+    }
+
+    // Auto-commit: if requested and the apply was fully successful, stage and commit
+    let commitResult: { hash: string; branch: string } | null = null;
+    if (autoCommit && fullyApplied && applied.length > 0) {
+      try {
+        const repoExists = await isRepo(storageKey);
+        if (repoExists) {
+          // Stage all applied file paths
+          const appliedPaths = applied.map((a) => a.filePath);
+          await stage(storageKey, appliedPaths);
+
+          // Commit with the changeset title as the message
+          const commitMessage = changeSet.title || `Apply changeset ${changeSetId.slice(0, 8)}`;
+          const result = await commit(
+            storageKey,
+            commitMessage,
+            undefined,
+            changeSet.projectId
+          );
+          if (result.isRepo) {
+            commitResult = { hash: result.hash, branch: result.branch };
+          }
+        }
+      } catch (err) {
+        // Auto-commit is best-effort; don't fail the apply response
+        logger.error("Auto-commit failed", { changeSetId, err: String(err) });
+      }
     }
 
     return apiSuccess({
       applied,
       conflicts,
       failures,
+      denied,
       changeSetStatus,
+      ...(commitResult ? { commit: commitResult } : {}),
     });
   } catch (err) {
     return handleApiError(err);

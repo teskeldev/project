@@ -5,6 +5,7 @@ import {
   requireUser,
   ApiError,
 } from "@/lib/api";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { decryptJson } from "@/lib/crypto";
 import {
   isSupportedProvider,
@@ -21,6 +22,9 @@ export async function POST(_req: Request, ctx: RouteContext) {
   try {
     const user = await requireUser();
     const { id } = await ctx.params;
+
+    // Rate limit: 5 per minute
+    await enforceRateLimit(`integrations:test:${user.id}`, 5, 60_000);
 
     const integration = await prisma.integration.findUnique({
       where: { id },

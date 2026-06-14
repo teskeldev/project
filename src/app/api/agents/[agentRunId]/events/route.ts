@@ -5,6 +5,7 @@ import {
   subscribe,
   type AgentEvent,
 } from "@/lib/agents/runner";
+import { isQueueEnabled } from "@/lib/queue/connection";
 
 type RouteContext = { params: Promise<{ agentRunId: string }> };
 
@@ -134,11 +135,16 @@ export async function GET(req: Request, ctx: RouteContext) {
         // process; a reconnect will replay current status).
         upstreamSignal.addEventListener("abort", () => finish());
 
-        // Trigger execution. driveAgentRun() is a no-op if already running or
-        // terminal, so concurrent stream opens are safe.
-        void driveAgentRun(agentRunId).catch(() => {
-          // Failures are surfaced via the failed event; nothing to do here.
-        });
+        // In QUEUE MODE a BullMQ worker drives the run in a separate process;
+        // here we only stream the events it publishes over the bus. In FALLBACK
+        // MODE (no Redis) drive the run in-process on first connect. The atomic
+        // QUEUED->RUNNING claim inside driveAgentRun makes concurrent opens
+        // (and a worker racing this path) safe either way.
+        if (!isQueueEnabled()) {
+          void driveAgentRun(agentRunId).catch(() => {
+            // Failures are surfaced via the failed event; nothing to do here.
+          });
+        }
       },
       cancel() {
         // Reader cancelled (client disconnected). The abort listener handles

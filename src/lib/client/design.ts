@@ -4,6 +4,7 @@
  */
 
 import { apiFetch } from "@/lib/client/api";
+import { readSSEStream, type SSEFrame } from "@/lib/client/sse";
 
 /* -------------------------------------------------------------------------- */
 /* Types                                                                      */
@@ -72,22 +73,30 @@ export type DesignStreamCallbacks = {
   onError: (message: string, code?: string) => void;
 };
 
-/** Parse one SSE block into { event, data }. */
-function parseFrame(block: string): { event: string; data: string } | null {
-  let event = "message";
-  const dataLines: string[] = [];
-
-  for (const rawLine of block.split("\n")) {
-    const line = rawLine.replace(/\r$/, "");
-    if (line.startsWith("event:")) {
-      event = line.slice("event:".length).trim();
-    } else if (line.startsWith("data:")) {
-      dataLines.push(line.slice("data:".length).replace(/^\s/, ""));
-    }
+function toDesignEvent(frame: SSEFrame): { event: DesignStreamEvent; terminal: boolean } | null {
+  let payload: Record<string, unknown> = {};
+  try {
+    payload = frame.data ? (JSON.parse(frame.data) as Record<string, unknown>) : {};
+  } catch {
+    payload = {};
   }
 
-  if (dataLines.length === 0) return null;
-  return { event, data: dataLines.join("\n") };
+  switch (frame.event) {
+    case "delta":
+      return { event: { type: "delta", content: String(payload.content ?? "") }, terminal: false };
+    case "done":
+      return { event: { type: "done", versionId: String(payload.versionId ?? "") }, terminal: true };
+    case "error":
+      return {
+        event: {
+          type: "error",
+          message: typeof payload.message === "string" ? payload.message : "Generation failed",
+        },
+        terminal: true,
+      };
+    default:
+      return null;
+  }
 }
 
 /**
@@ -144,66 +153,22 @@ export async function streamDesignGeneration(
     return;
   }
 
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  const processFrame = (block: string): boolean => {
-    const trimmed = block.trim();
-    if (!trimmed) return false;
-    const raw = parseFrame(block);
-    if (!raw) return false;
-
-    let payload: Record<string, unknown> = {};
-    try {
-      payload = raw.data ? (JSON.parse(raw.data) as Record<string, unknown>) : {};
-    } catch {
-      payload = {};
-    }
-
-    switch (raw.event) {
-      case "delta":
-        callbacks.onDelta(String(payload.content ?? ""));
-        break;
-      case "done":
-        callbacks.onDone(String(payload.versionId ?? ""));
-        return true;
-      case "error":
-        callbacks.onError(
-          typeof payload.message === "string"
-            ? payload.message
-            : "Generation failed"
-        );
-        return true;
-    }
-    return false;
-  };
-
   try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    for await (const frame of readSSEStream(res)) {
+      const parsed = toDesignEvent(frame);
+      if (!parsed) continue;
 
-      buffer += decoder.decode(value, { stream: true });
-
-      let sepIndex: number;
-      while ((sepIndex = buffer.indexOf("\n\n")) !== -1) {
-        const block = buffer.slice(0, sepIndex);
-        buffer = buffer.slice(sepIndex + 2);
-        const finished = processFrame(block);
-        if (finished) {
-          try {
-            await reader.cancel();
-          } catch {
-            // ignore
-          }
-          return;
-        }
+      const { event, terminal } = parsed;
+      if (event.type === "delta") {
+        callbacks.onDelta(event.content);
+      } else if (event.type === "done") {
+        callbacks.onDone(event.versionId);
+      } else if (event.type === "error") {
+        callbacks.onError(event.message);
       }
-    }
 
-    // Drain trailing frame
-    if (buffer.trim()) processFrame(buffer);
+      if (terminal) return;
+    }
   } catch (err) {
     if (signal?.aborted || (err instanceof Error && err.name === "AbortError")) {
       return;

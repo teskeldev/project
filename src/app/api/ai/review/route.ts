@@ -1,40 +1,34 @@
-﻿import { prisma } from "@/lib/db";
+import { z } from "zod";
+import { prisma } from "@/lib/db";
 import {
   apiSuccess,
   handleApiError,
   requireUser,
   requireProjectAccess,
+  validateBody,
   ApiError,
 } from "@/lib/api";
-import { chat, isAIConfigured } from "@/lib/ai/provider";
+import { enforceRateLimit } from "@/lib/rate-limit";
+import { checkQuota, recordUsage } from "@/lib/quota";
+import { chat, isAIConfiguredAsync } from "@/lib/ai/provider";
 import type { AIMessage } from "@/lib/ai/provider";
+
+const reviewRequestSchema = z.object({
+  changeSetId: z.string(),
+  instructions: z.string().max(8000).optional(),
+});
 
 // POST /api/ai/review
 // Body: { changeSetId }
 // Reads the changeset file changes, asks AI to review, persists ReviewComment rows.
 export async function POST(req: Request) {
   try {
-    await requireUser();
+    const user = await requireUser();
 
-    let body: { changeSetId?: string };
-    try {
-      body = (await req.json()) as { changeSetId?: string };
-    } catch {
-      throw new ApiError("Invalid JSON body", 400, "INVALID_JSON");
-    }
+    // Rate limit: 10 per user per minute
+    await enforceRateLimit(`ai:review:${user.id}`, 10, 60_000);
 
-    const { changeSetId } = body;
-    if (!changeSetId) {
-      throw new ApiError("changeSetId is required", 400, "MISSING_FIELD");
-    }
-
-    if (!isAIConfigured()) {
-      throw new ApiError(
-        "AI is not configured. Add an OpenAI API key to enable reviews.",
-        503,
-        "AI_NOT_CONFIGURED"
-      );
-    }
+    const { changeSetId, instructions } = await validateBody(req, reviewRequestSchema);
 
     const changeSet = await prisma.changeSet.findUnique({
       where: { id: changeSetId },
@@ -49,7 +43,18 @@ export async function POST(req: Request) {
       throw new ApiError("Changeset not found", 404, "NOT_FOUND");
     }
 
-    await requireProjectAccess(changeSet.projectId);
+    const { member } = await requireProjectAccess(changeSet.projectId);
+
+    // Quota check: reserve ~1500 tokens for a code review.
+    await checkQuota(member.workspaceId, "ai_tokens", 1500);
+
+    if (!await isAIConfiguredAsync(undefined, member.workspaceId)) {
+      throw new ApiError(
+        "AI is not configured. Add an OpenAI API key to enable reviews.",
+        503,
+        "AI_NOT_CONFIGURED"
+      );
+    }
 
     // Build context for AI
     const diffContext = changeSet.fileChanges
@@ -75,10 +80,18 @@ If there are no issues, return an empty array []. Do not include any text outsid
 
     const messages: AIMessage[] = [
       { role: "system", content: systemPrompt },
-      { role: "user", content: `Please review the following changes:\n\n${diffContext}` },
+      { role: "user", content: `Please review the following changes:\n\n${diffContext}${instructions ? `\n\nAdditional instructions: ${instructions}` : ""}` },
     ];
 
     const response = await chat(messages, { temperature: 0.3 });
+
+    // Record AI token usage for the review.
+    const inputChars = messages.reduce((s, m) => s + m.content.length, 0);
+    const actualTokens = Math.max(1, Math.ceil((inputChars + response.length) / 4));
+    await recordUsage(member.workspaceId, "ai_tokens", actualTokens, {
+      source: "ai/review",
+      changeSetId,
+    });
 
     // Parse AI response
     let reviewItems: Array<{

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   Suspense,
@@ -9,6 +9,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   Sparkles,
   ArrowLeft,
@@ -32,8 +33,26 @@ import {
   Square,
   Wand2,
   AlertTriangle,
+  Minimize2,
+  GitBranch,
+  MessageSquare,
+  Zap,
+  Rocket,
+  Brain,
+  ChevronRight,
 } from "lucide-react";
 import { useProject } from "@/lib/store/project";
+import { MentionPicker, MentionChips, type MentionChip } from "@/components/dashboard/MentionPicker";
+import {
+  type AutonomyMode,
+  AUTONOMY_MODES,
+  loadAutonomyMode,
+  saveAutonomyMode,
+} from "@/lib/ai/autonomy";
+
+const PreviewPanel = dynamic(() => import("@/components/dashboard/PreviewPanel"), {
+  ssr: false,
+});
 import {
   ApiClientError,
   createThread,
@@ -41,8 +60,11 @@ import {
   listMessages,
   listThreads,
   type ChatMessage,
+  forkThread,
 } from "@/lib/client/api";
 import { streamChatCompletion } from "@/lib/client/chatStream";
+import { listProviders, type AIProviderInfo } from "@/lib/client/providers";
+import { listCommands as listSlashCommands, resolveCommandTemplate, type SlashCommand } from "@/lib/client/commands";
 
 /* -------------------------------------------------------------------------- */
 /* Local view model                                                           */
@@ -51,7 +73,7 @@ import { streamChatCompletion } from "@/lib/client/chatStream";
 /* ones. Streaming assistant messages get a synthetic id until persisted.     */
 /* -------------------------------------------------------------------------- */
 
-type ViewRole = "user" | "assistant";
+type ViewRole = "user" | "assistant" | "system";
 
 interface ViewMessage {
   id: string;
@@ -63,19 +85,41 @@ interface ViewMessage {
   error?: boolean;
   errorCode?: string;
   timestamp?: string;
+  // compaction metadata
+  isCompaction?: boolean;
+  compactedCount?: number;
+  // extended thinking content
+  thinking?: string;
+  thinkingStreaming?: boolean;
 }
 
 function toViewMessage(m: ChatMessage): ViewMessage | null {
-  // We only render USER + ASSISTANT in the conversation surface. SYSTEM/TOOL
-  // messages are internal and not shown here.
-  // TODO(Phase 6): render structured agent actions from TOOL message metadata.
-  if (m.role !== "USER" && m.role !== "ASSISTANT") return null;
-  return {
-    id: m.id,
-    role: m.role === "USER" ? "user" : "assistant",
-    content: m.content,
-    timestamp: formatTime(m.createdAt),
-  };
+  // Render USER + ASSISTANT + compaction SYSTEM messages
+  if (m.role === "USER" || m.role === "ASSISTANT") {
+    const meta = m.metadata as Record<string, unknown> | null;
+    return {
+      id: m.id,
+      role: m.role === "USER" ? "user" : "assistant",
+      content: m.content,
+      timestamp: formatTime(m.createdAt),
+      thinking: meta?.thinking as string | undefined,
+    };
+  }
+  // Show compaction system messages
+  if (m.role === "SYSTEM" && m.metadata && typeof m.metadata === "object") {
+    const meta = m.metadata as Record<string, unknown>;
+    if (meta.type === "compaction") {
+      return {
+        id: m.id,
+        role: "system",
+        content: m.content,
+        timestamp: formatTime(m.createdAt),
+        isCompaction: true,
+        compactedCount: typeof meta.compactedCount === "number" ? meta.compactedCount : 0,
+      };
+    }
+  }
+  return null;
 }
 
 function formatTime(iso: string): string {
@@ -142,22 +186,22 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
   };
 
   return (
-    <div className="my-3 overflow-hidden rounded-xl border border-gray-200">
-      <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-2">
-        <span className="text-xs font-medium text-gray-500">{language}</span>
+    <div className="my-3 overflow-hidden rounded-xl border border-border">
+      <div className="flex items-center justify-between border-b border-border bg-surface-soft px-4 py-2">
+        <span className="text-xs font-medium text-text-secondary">{language}</span>
         <button
           onClick={copy}
-          className="text-gray-400 hover:text-gray-600"
+          className="text-text-muted hover:text-text-secondary"
           title="Copy code"
         >
           <Copy size={12} />
         </button>
       </div>
-      <pre className="overflow-x-auto bg-gray-900 p-4 text-[13px] leading-relaxed text-gray-300">
+      <pre className="overflow-x-auto bg-primary p-4 text-[13px] leading-relaxed text-text-muted">
         <code>{code}</code>
       </pre>
       {copied && (
-        <span className="block bg-gray-900 px-4 pb-2 text-[10px] text-green-400">
+        <span className="block bg-primary px-4 pb-2 text-[10px] text-green-400">
           Copied
         </span>
       )}
@@ -175,7 +219,7 @@ function AssistantContent({ content }: { content: string }) {
         ) : seg.text.trim() ? (
           <p
             key={i}
-            className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700"
+            className="whitespace-pre-wrap text-sm leading-relaxed text-text-secondary"
           >
             {seg.text.trim()}
           </p>
@@ -186,19 +230,119 @@ function AssistantContent({ content }: { content: string }) {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Extended Thinking display                                                  */
+/* -------------------------------------------------------------------------- */
+
+function ThinkingBlock({ content, streaming }: { content: string; streaming?: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!content && !streaming) return null;
+
+  return (
+    <div className="mb-3">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-text-secondary hover:bg-surface-soft transition-colors"
+      >
+        <Brain size={12} className={streaming ? "animate-pulse text-purple-500" : "text-text-muted"} />
+        <span className="font-medium">
+          {streaming ? "Thinking..." : "Thought process"}
+        </span>
+        <ChevronRight
+          size={12}
+          className={`transition-transform ${expanded ? "rotate-90" : ""}`}
+        />
+      </button>
+      {(expanded || streaming) && (
+        <div className="mt-1 ml-2 border-l-2 border-purple-100 pl-3 animate-in fade-in slide-in-from-top-1 duration-200">
+          <p className="whitespace-pre-wrap text-xs italic leading-relaxed text-text-secondary">
+            {content}
+            {streaming && (
+              <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-purple-300 align-middle" />
+            )}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Autonomy Mode Selector                                                     */
+/* -------------------------------------------------------------------------- */
+
+const AUTONOMY_ICONS = {
+  suggest: MessageSquare,
+  "auto-edit": Zap,
+  "full-auto": Rocket,
+} as const;
+
+function AutonomySelector({
+  mode,
+  onChange,
+}: {
+  mode: AutonomyMode;
+  onChange: (mode: AutonomyMode) => void;
+}) {
+  return (
+    <div className="flex items-center rounded-lg border border-border bg-surface-soft p-0.5">
+      {(Object.keys(AUTONOMY_MODES) as AutonomyMode[]).map((m) => {
+        const Icon = AUTONOMY_ICONS[m];
+        const config = AUTONOMY_MODES[m];
+        const active = mode === m;
+        return (
+          <button
+            key={m}
+            type="button"
+            onClick={() => onChange(m)}
+            title={config.description}
+            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+              active
+                ? "bg-surface text-foreground shadow-sm"
+                : "text-text-secondary hover:text-foreground"
+            }`}
+          >
+            <Icon size={12} />
+            <span className="hidden sm:inline">{config.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Compaction message component                                               */
+/* -------------------------------------------------------------------------- */
+
+function CompactionMessage({ compactedCount }: { compactedCount: number }) {
+  return (
+    <div className="my-4 flex items-center justify-center">
+      <div className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 dark:bg-amber-950 px-4 py-2">
+        <Minimize2 size={14} className="text-amber-600 dark:text-amber-400" />
+        <span className="text-xs font-medium text-amber-700">
+          {compactedCount} messages summarized to save context
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* Empty / loading states                                                     */
 /* -------------------------------------------------------------------------- */
 
 function NoProjectState() {
   return (
     <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-950">
         <Sparkles size={22} className="text-blue-500" />
       </div>
-      <h2 className="text-base font-semibold text-gray-900">
+      <h2 className="text-base font-semibold text-foreground">
         Select or create a project to chat
       </h2>
-      <p className="mt-1 max-w-sm text-sm text-gray-500">
+      <p className="mt-1 max-w-sm text-sm text-text-secondary">
         Teskel chat works in the context of a project. Pick one from the
         sidebar, or create a new project to get started.
       </p>
@@ -210,16 +354,16 @@ function MessageSkeleton() {
   return (
     <div className="mx-auto max-w-3xl animate-pulse px-6 py-6">
       <div className="mb-6 flex justify-end">
-        <div className="h-12 w-2/3 rounded-2xl bg-gray-100" />
+        <div className="h-12 w-2/3 rounded-2xl bg-surface-soft" />
       </div>
       <div className="mb-2 flex items-center gap-2">
-        <div className="h-6 w-6 rounded-full bg-gray-200" />
-        <div className="h-3 w-24 rounded bg-gray-100" />
+        <div className="h-6 w-6 rounded-full bg-border" />
+        <div className="h-3 w-24 rounded bg-surface-soft" />
       </div>
       <div className="space-y-2 pl-8">
-        <div className="h-3 w-full rounded bg-gray-100" />
-        <div className="h-3 w-5/6 rounded bg-gray-100" />
-        <div className="h-3 w-2/3 rounded bg-gray-100" />
+        <div className="h-3 w-full rounded bg-surface-soft" />
+        <div className="h-3 w-5/6 rounded bg-surface-soft" />
+        <div className="h-3 w-2/3 rounded bg-surface-soft" />
       </div>
     </div>
   );
@@ -239,12 +383,20 @@ function ChatSurface() {
 
   const [threadId, setThreadId] = useState<string | null>(threadParam);
   const [messages, setMessages] = useState<ViewMessage[]>([]);
+  const messagesRef = useRef<ViewMessage[]>([]);
+
+  // Keep messagesRef in sync with latest messages state
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [inputValue, setInputValue] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [creatingThread, setCreatingThread] = useState(false);
+  const [forking, setForking] = useState(false);
+  const [compacting, setCompacting] = useState(false);
 
   const [changesetState, setChangesetState] = useState<
     | { status: "idle" }
@@ -253,10 +405,79 @@ function ChatSurface() {
     | { status: "error"; message: string }
   >({ status: "idle" });
 
+  // Auto-edit confirmation state
+  const [autoEditPending, setAutoEditPending] = useState<{
+    changeSetId: string;
+    projectId: string;
+    instruction: string;
+    selectedPaths?: string[];
+    assistantId: string;
+  } | null>(null);
+  const [autoEditNotification, setAutoEditNotification] = useState<string | null>(null);
+
   const [rightPanel, setRightPanel] = useState<"none" | "browser" | "terminal">(
     "none"
   );
-  const model = "Auto";
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [providers, setProviders] = useState<AIProviderInfo[]>([]);
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
+
+  // Slash commands state
+  const [slashCommands, setSlashCommands] = useState<SlashCommand[]>([]);
+  const [showCommandDropdown, setShowCommandDropdown] = useState(false);
+  const [commandFilter, setCommandFilter] = useState("");
+  const [selectedCommand, setSelectedCommand] = useState<SlashCommand | null>(null);
+  const [commandValues, setCommandValues] = useState<Record<string, string>>({});
+  const [actionMsg, setActionMsg] = useState<string | null>(null);
+
+  // Feature A: @-Mentions state
+  const [mentionChips, setMentionChips] = useState<MentionChip[]>([]);
+  const [showMentionPicker, setShowMentionPicker] = useState(false);
+  const [mentionFilter, setMentionFilter] = useState("");
+
+  // Feature B: Autonomy mode state
+  const [autonomyMode, setAutonomyMode] = useState<AutonomyMode>("suggest");
+
+  // Load autonomy mode from localStorage on mount
+  useEffect(() => {
+    setAutonomyMode(loadAutonomyMode());
+  }, []);
+
+  const handleAutonomyChange = useCallback((mode: AutonomyMode) => {
+    setAutonomyMode(mode);
+    saveAutonomyMode(mode);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { providers: p } = await listProviders();
+        if (!cancelled) setProviders(p);
+      } catch {
+        // Non-fatal: model selector will just show "Auto"
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+
+  // Load slash commands
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { commands } = await listSlashCommands();
+        if (!cancelled) setSlashCommands(commands);
+      } catch {
+        // Non-fatal: command dropdown will be empty
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  const modelLabel = selectedModel
+    ? providers.flatMap((p) => p.models).find((m) => m.id === selectedModel)?.name ?? selectedModel
+    : "Auto";
 
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -351,6 +572,39 @@ function ChatSurface() {
     }
   }, [threadId, projectId, router]);
 
+  const handleCompactNow = useCallback(async () => {
+    if (!threadId || compacting) return;
+    setCompacting(true);
+    try {
+      const res = await fetch(`/api/chat/threads/${threadId}/compact`, {
+        method: "POST",
+      });
+      const body = await res.json();
+      if (body.success && body.data.compacted) {
+        // Reload messages to reflect compaction
+        const { messages: raw } = await listMessages(threadId);
+        setMessages(
+          raw.map(toViewMessage).filter((m): m is ViewMessage => m !== null)
+        );
+      }
+    } catch {
+      // Non-fatal
+    } finally {
+      setCompacting(false);
+    }
+  }, [threadId, compacting]);
+
+  // Feature A: Handle mention chip addition
+  const handleMentionSelect = useCallback((chip: MentionChip) => {
+    setMentionChips((prev) => [...prev, chip]);
+    setShowMentionPicker(false);
+    setMentionFilter("");
+  }, []);
+
+  const handleMentionRemove = useCallback((id: string) => {
+    setMentionChips((prev) => prev.filter((c) => c.id !== id));
+  }, []);
+
   const send = useCallback(async () => {
     const content = inputValue.trim();
     if (!content || streaming || !projectId) return;
@@ -369,6 +623,14 @@ function ChatSurface() {
 
     setInputValue("");
 
+    // Collect selectedPaths from mention chips
+    const selectedPaths = mentionChips
+      .filter((c) => c.type === "file" || c.type === "folder")
+      .map((c) => c.path);
+
+    // Clear chips after sending
+    setMentionChips([]);
+
     const userMsg: ViewMessage = {
       id: `local-user-${Date.now()}`,
       role: "user",
@@ -381,6 +643,8 @@ function ChatSurface() {
       role: "assistant",
       content: "",
       streaming: true,
+      thinking: "",
+      thinkingStreaming: true,
     };
     setMessages((prev) => [...prev, userMsg, assistantMsg]);
     setStreaming(true);
@@ -394,40 +658,106 @@ function ChatSurface() {
       );
 
     await streamChatCompletion(
-      { threadId: activeThreadId, content, signal: controller.signal },
       {
+        threadId: activeThreadId,
+        content,
+        selectedPaths: selectedPaths.length > 0 ? selectedPaths : undefined,
+        signal: controller.signal,
+        model: selectedModel ?? undefined,
+      },
+      {
+        onThinking: (delta) =>
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? { ...m, thinking: (m.thinking ?? "") + delta }
+                : m
+            )
+          ),
         onDelta: (delta) =>
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId
-                ? { ...m, content: m.content + delta }
+                ? { ...m, content: m.content + delta, thinkingStreaming: false }
                 : m
             )
           ),
         onDone: () => {
-          patchAssistant({ streaming: false });
+          patchAssistant({ streaming: false, thinkingStreaming: false });
         },
         onError: (message, code) => {
           patchAssistant({
             streaming: false,
+            thinkingStreaming: false,
             error: true,
             errorCode: code,
             content: message,
           });
+        },
+        onCompaction: async () => {
+          // Reload messages from the server to reflect compaction accurately,
+          // preserving any in-flight streaming assistant message.
+          try {
+            const { messages: raw } = await listMessages(activeThreadId);
+            const reloaded = raw
+              .map(toViewMessage)
+              .filter((m): m is ViewMessage => m !== null);
+            setMessages((prev) => {
+              // Preserve the current streaming assistant message if still active
+              const streamingMsg = prev.find(
+                (m) => m.id === assistantId && m.streaming
+              );
+              if (streamingMsg) {
+                return [...reloaded, streamingMsg];
+              }
+              return reloaded;
+            });
+          } catch {
+            // Non-fatal: messages will be stale until next reload
+          }
         },
       }
     );
 
     setStreaming(false);
     abortRef.current = null;
-  }, [inputValue, streaming, projectId, ensureThread]);
+
+    // Feature B: Auto-edit mode — generate changeset and prompt for confirmation
+    if (autonomyMode === "auto-edit" || autonomyMode === "full-auto") {
+      // Trigger changeset generation from the user's instruction
+      try {
+        setChangesetState({ status: "loading" });
+        const { changeSet } = await generateChangeSet({
+          projectId,
+          instruction: content,
+          selectedPaths: selectedPaths.length > 0 ? selectedPaths : undefined,
+        });
+        if (AUTONOMY_MODES[autonomyMode].canAutoEdit) {
+          // Instead of silently auto-applying, show a confirmation prompt
+          setAutoEditPending({
+            changeSetId: changeSet.id,
+            projectId,
+            instruction: content,
+            selectedPaths: selectedPaths.length > 0 ? selectedPaths : undefined,
+            assistantId,
+          });
+          setChangesetState({ status: "ready", id: changeSet.id });
+        } else {
+          setChangesetState({ status: "ready", id: changeSet.id });
+        }
+      } catch {
+        // Non-fatal: auto-edit failed, user can still manually review
+        setChangesetState({ status: "idle" });
+      }
+    }
+  }, [inputValue, streaming, projectId, ensureThread, selectedModel, mentionChips, autonomyMode]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
     setStreaming(false);
     setMessages((prev) =>
-      prev.map((m) => (m.streaming ? { ...m, streaming: false } : m))
+      prev.map((m) => (m.streaming ? { ...m, streaming: false, thinkingStreaming: false } : m))
     );
   }, []);
 
@@ -443,6 +773,61 @@ function ChatSurface() {
       );
     }
   }, [projectId, creatingThread, router]);
+  const handleFork = useCallback(async (messageId?: string) => {
+    if (!threadId || forking) return;
+    setForking(true);
+    try {
+      const { thread } = await forkThread(threadId, messageId);
+      setActionMsg("Conversation forked");
+      router.replace(`/dashboard/chat?thread=${thread.id}`);
+    } catch (err) {
+      setLoadError(
+        err instanceof ApiClientError ? err.message : "Failed to fork conversation"
+      );
+    } finally {
+      setForking(false);
+    }
+  }, [threadId, forking, router]);
+
+
+
+  // Auto-edit confirmation: apply pending changeset
+  const handleAutoEditConfirm = useCallback(async () => {
+    if (!autoEditPending) return;
+    const { changeSetId, projectId: pid, assistantId: aId } = autoEditPending;
+    try {
+      await fetch(`/api/projects/${pid}/changesets/${changeSetId}/apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applyAll: true }),
+      });
+      setChangesetState({ status: "idle" });
+      // Use messagesRef to get latest content (avoids stale closure)
+      const currentContent =
+        messagesRef.current.find((m) => m.id === aId)?.content ?? "";
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === aId
+            ? { ...m, content: currentContent + "\n\n✅ Changes applied." }
+            : m
+        )
+      );
+      setAutoEditNotification("Changes have been applied successfully.");
+      setTimeout(() => setAutoEditNotification(null), 4000);
+    } catch {
+      setChangesetState({ status: "error", message: "Failed to apply changes" });
+    } finally {
+      setAutoEditPending(null);
+    }
+  }, [autoEditPending]);
+
+  // Auto-edit rejection: dismiss pending changeset
+  const handleAutoEditReject = useCallback(() => {
+    setAutoEditPending(null);
+    setChangesetState({ status: "idle" });
+    setAutoEditNotification("Auto-edit cancelled. Changes were not applied.");
+    setTimeout(() => setAutoEditNotification(null), 4000);
+  }, []);
 
   const proposeChanges = useCallback(async () => {
     const instruction = inputValue.trim();
@@ -465,6 +850,33 @@ function ChatSurface() {
     }
   }, [inputValue, projectId]);
 
+  // Handle input changes — detect @ mentions and / commands
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInputValue(val);
+
+    // Detect @ mention trigger
+    const lastAtIndex = val.lastIndexOf("@");
+    if (lastAtIndex >= 0 && (lastAtIndex === 0 || val[lastAtIndex - 1] === " ")) {
+      const afterAt = val.slice(lastAtIndex);
+      if (!afterAt.includes(" ") || afterAt.length <= 12) {
+        setShowMentionPicker(true);
+        setMentionFilter(afterAt);
+        setShowCommandDropdown(false);
+        return;
+      }
+    }
+    setShowMentionPicker(false);
+
+    // Detect / command trigger
+    if (val.startsWith("/") && !val.includes(" ")) {
+      setShowCommandDropdown(true);
+      setCommandFilter(val.slice(1));
+    } else {
+      setShowCommandDropdown(false);
+    }
+  }, []);
+
   if (!activeProject) {
     return <NoProjectState />;
   }
@@ -474,6 +886,10 @@ function ChatSurface() {
       e.preventDefault();
       void send();
     }
+    if (e.key === "Escape") {
+      setShowMentionPicker(false);
+      setShowCommandDropdown(false);
+    }
   };
 
   const hasMessages = messages.length > 0;
@@ -481,29 +897,59 @@ function ChatSurface() {
   return (
     <div className="flex h-full flex-col">
       {/* Top bar */}
-      <div className="flex h-11 items-center justify-between border-b border-gray-200 bg-white px-3">
+      <div className="flex h-11 items-center justify-between border-b border-border bg-surface px-3">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-900">
+          <span className="text-sm font-medium text-foreground">
             {activeProject.name}
           </span>
           {streaming && (
-            <span className="flex items-center gap-1 rounded bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-600">
+            <span className="flex items-center gap-1 rounded bg-green-50 dark:bg-green-950 px-1.5 py-0.5 text-[10px] font-medium text-green-600 dark:text-green-400">
               <Loader2 size={10} className="animate-spin" />
               Streaming
             </span>
           )}
+          {actionMsg && (
+            <span className="flex items-center gap-1 rounded bg-blue-50 dark:bg-blue-950 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+              <GitBranch size={10} />
+              {actionMsg}
+              <button onClick={() => setActionMsg(null)} className="ml-1 text-blue-400 hover:text-blue-600 dark:hover:text-blue-400"><X size={8} /></button>
+            </span>
+          )}
+          {/* Feature B: Autonomy Mode Selector */}
+          <AutonomySelector mode={autonomyMode} onChange={handleAutonomyChange} />
         </div>
         <div className="flex items-center gap-1">
           <button
+            onClick={handleCompactNow}
+            disabled={!threadId || compacting || streaming}
+            className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-soft hover:text-foreground disabled:opacity-50"
+            title="Compact conversation to save context"
+          >
+            {compacting ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <Minimize2 size={12} />
+            )}
+            Compact
+          </button>
+          <button
             onClick={startNewThread}
             disabled={creatingThread}
-            className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+            className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-soft hover:text-foreground disabled:opacity-50"
             title="New chat"
           >
             <Plus size={12} /> New chat
           </button>
-          <div className="ml-2 flex items-center rounded-lg border border-gray-200">
-            <button className="rounded-l-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+          <button
+            onClick={() => void handleFork()}
+            disabled={forking || !threadId || messages.length === 0}
+            className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs text-text-secondary hover:bg-surface-soft hover:text-foreground disabled:opacity-50"
+            title="Fork conversation"
+          >
+            {forking ? <Loader2 size={12} className="animate-spin" /> : <GitBranch size={12} />} Fork
+          </button>
+          <div className="ml-2 flex items-center rounded-lg border border-border">
+            <button className="rounded-l-lg p-1.5 text-text-muted hover:bg-surface-soft hover:text-text-secondary">
               <Code size={14} />
             </button>
             <button
@@ -512,8 +958,8 @@ function ChatSurface() {
               }
               className={`p-1.5 ${
                 rightPanel === "browser"
-                  ? "bg-gray-100 text-gray-900"
-                  : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  ? "bg-surface-soft text-foreground"
+                  : "text-text-muted hover:bg-surface-soft hover:text-text-secondary"
               }`}
             >
               <Globe size={14} />
@@ -524,14 +970,14 @@ function ChatSurface() {
               }
               className={`rounded-r-lg p-1.5 ${
                 rightPanel === "terminal"
-                  ? "bg-gray-100 text-gray-900"
-                  : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  ? "bg-surface-soft text-foreground"
+                  : "text-text-muted hover:bg-surface-soft hover:text-text-secondary"
               }`}
             >
               <Terminal size={14} />
             </button>
           </div>
-          <button className="ml-1 rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+          <button className="ml-1 rounded p-1.5 text-text-muted hover:bg-surface-soft hover:text-text-secondary">
             <MoreHorizontal size={14} />
           </button>
         </div>
@@ -545,93 +991,121 @@ function ChatSurface() {
               <MessageSkeleton />
             ) : loadError ? (
               <div className="mx-auto max-w-3xl px-6 py-6">
-                <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 dark:bg-red-950 px-4 py-3">
                   <AlertTriangle size={16} className="mt-0.5 text-red-500" />
                   <div>
                     <p className="text-sm font-medium text-red-700">
                       Couldn&apos;t load this conversation
                     </p>
-                    <p className="text-xs text-red-600">{loadError}</p>
+                    <p className="text-xs text-red-600 dark:text-red-400">{loadError}</p>
                   </div>
                 </div>
               </div>
             ) : !hasMessages ? (
               <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-900">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary">
                   <Sparkles size={20} className="text-white" />
                 </div>
-                <h2 className="text-base font-semibold text-gray-900">
+                <h2 className="text-base font-semibold text-foreground">
                   Start a new chat
                 </h2>
-                <p className="mt-1 max-w-sm text-sm text-gray-500">
+                <p className="mt-1 max-w-sm text-sm text-text-secondary">
                   Ask Teskel to build a feature, fix a bug, or explain code in{" "}
                   <span className="font-medium">{activeProject.name}</span>.
+                </p>
+                <p className="mt-2 text-xs text-text-muted">
+                  Tip: Type <span className="font-mono text-text-secondary">@</span> to mention files or folders as context
                 </p>
               </div>
             ) : (
               <div className="mx-auto max-w-3xl px-6 py-6">
                 {messages.map((msg) => (
                   <div key={msg.id} className="mb-6">
-                    {msg.role === "user" ? (
-                      <div className="flex justify-end">
+                    {msg.role === "system" && msg.isCompaction ? (
+                      <CompactionMessage compactedCount={msg.compactedCount ?? 0} />
+                    ) : msg.role === "user" ? (
+                      <div className="group/user flex justify-end">
                         <div className="max-w-[80%]">
-                          <div className="rounded-2xl bg-gray-100 px-4 py-3">
-                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-900">
+                          <div className="rounded-2xl bg-surface-soft px-4 py-3">
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
                               {msg.content}
                             </p>
                           </div>
                           {msg.timestamp && (
-                            <p className="mt-1 text-right text-[10px] text-gray-400">
+                            <p className="mt-1 text-right text-[10px] text-text-muted">
                               {msg.timestamp}
                             </p>
                           )}
+                          <div className="mt-1 flex justify-end opacity-0 group-hover/user:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => void handleFork(msg.id)}
+                              className="rounded p-1 text-text-muted hover:bg-surface-soft hover:text-text-secondary"
+                              title="Fork conversation from here"
+                            >
+                              <GitBranch size={14} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ) : (
                       <div>
                         <div className="mb-2 flex items-center gap-2">
-                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-900">
+                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary">
                             <Sparkles size={12} className="text-white" />
                           </div>
-                          <span className="text-xs font-medium text-gray-500">
+                          <span className="text-xs font-medium text-text-secondary">
                             Teskel Agent
                           </span>
                           {msg.timestamp && (
-                            <span className="text-[10px] text-gray-400">
+                            <span className="text-[10px] text-text-muted">
                               {msg.timestamp}
                             </span>
                           )}
                         </div>
                         <div className="pl-8">
+                          {/* Feature C: Extended Thinking Display */}
+                          {(msg.thinking || msg.thinkingStreaming) && (
+                            <ThinkingBlock
+                              content={msg.thinking ?? ""}
+                              streaming={msg.thinkingStreaming}
+                            />
+                          )}
                           {msg.error ? (
                             <AssistantError
                               message={msg.content}
                               code={msg.errorCode}
                             />
-                          ) : msg.streaming && msg.content.length === 0 ? (
-                            <div className="flex items-center gap-2 text-sm text-gray-400">
+                          ) : msg.streaming && msg.content.length === 0 && !msg.thinkingStreaming ? (
+                            <div className="flex items-center gap-2 text-sm text-text-muted">
                               <Loader2 size={14} className="animate-spin" />
-                              Thinking...
+                              Generating response...
                             </div>
                           ) : (
                             <>
                               <AssistantContent content={msg.content} />
                               {msg.streaming && (
-                                <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-gray-400 align-middle" />
+                                <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-text-muted align-middle" />
                               )}
-                              {!msg.streaming && (
+                              {!msg.streaming && msg.content.length > 0 && (
                                 <div className="mt-2 flex items-center gap-1">
-                                  <button className="rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-gray-500">
+                                  <button className="rounded p-1 text-text-muted hover:bg-surface-soft hover:text-text-secondary">
                                     <Copy size={14} />
                                   </button>
-                                  <button className="rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-gray-500">
+                                  <button className="rounded p-1 text-text-muted hover:bg-surface-soft hover:text-text-secondary">
                                     <RotateCcw size={14} />
                                   </button>
-                                  <button className="rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-gray-500">
+                                  <button className="rounded p-1 text-text-muted hover:bg-surface-soft hover:text-text-secondary">
                                     <ThumbsUp size={14} />
                                   </button>
-                                  <button className="rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-gray-500">
+                                  <button className="rounded p-1 text-text-muted hover:bg-surface-soft hover:text-text-secondary">
                                     <ThumbsDown size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => void handleFork(msg.id)}
+                                    className="rounded p-1 text-text-muted hover:bg-surface-soft hover:text-text-secondary"
+                                    title="Fork conversation from here"
+                                  >
+                                    <GitBranch size={14} />
                                   </button>
                                 </div>
                               )}
@@ -647,43 +1121,150 @@ function ChatSurface() {
           </div>
 
           {/* Input */}
-          <div className="border-t border-gray-100 bg-white px-6 py-4">
+          <div className="border-t border-border bg-surface px-6 py-4">
             <div className="mx-auto max-w-3xl">
               {/* Changeset confirmation / error */}
               {changesetState.status === "ready" && (
-                <div className="mb-2 flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+                <div className="mb-2 flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950 px-3 py-2">
                   <span className="text-xs text-blue-700">
                     Proposed changes ready
                   </span>
                   <Link
                     href="/dashboard/composer"
-                    className="text-xs font-medium text-blue-600 underline hover:text-blue-800"
+                    className="text-xs font-medium text-blue-600 dark:text-blue-400 underline hover:text-blue-800"
                   >
                     Review in Composer
                   </Link>
                 </div>
               )}
               {changesetState.status === "error" && (
-                <div className="mb-2 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                <div className="mb-2 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 dark:bg-red-950 px-3 py-2">
                   <AlertTriangle size={12} className="text-red-500" />
-                  <span className="text-xs text-red-600">
+                  <span className="text-xs text-red-600 dark:text-red-400">
                     {changesetState.message}
                   </span>
                 </div>
               )}
 
-              <div className="flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm focus-within:border-gray-300 focus-within:shadow-md">
-                <Plus size={18} className="shrink-0 text-gray-400" />
+              {/* Auto-edit confirmation banner */}
+              {autoEditPending && (
+                <div className="mb-2 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950 px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <Zap size={12} className="text-amber-600 dark:text-amber-400" />
+                    <span className="text-xs text-amber-700">
+                      Auto-edit generated changes ready to apply
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href="/dashboard/composer"
+                      className="text-xs font-medium text-amber-600 dark:text-amber-400 underline hover:text-amber-800"
+                    >
+                      Review
+                    </Link>
+                    <button
+                      onClick={() => void handleAutoEditConfirm()}
+                      className="rounded bg-amber-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-amber-700"
+                    >
+                      Apply
+                    </button>
+                    <button
+                      onClick={handleAutoEditReject}
+                      className="rounded border border-amber-300 px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-100"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Auto-edit notification */}
+              {autoEditNotification && (
+                <div className="mb-2 flex items-center justify-between rounded-lg border border-green-200 bg-green-50 dark:bg-green-950 px-3 py-2">
+                  <span className="text-xs text-green-700">{autoEditNotification}</span>
+                  <button
+                    onClick={() => setAutoEditNotification(null)}
+                    className="text-green-400 hover:text-green-600 dark:hover:text-green-400"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
+
+              {/* Feature A: Mention chips display */}
+              <MentionChips chips={mentionChips} onRemove={handleMentionRemove} />
+
+              <div className="relative flex items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3 shadow-sm focus-within:border-border focus-within:shadow-md">
+                <Plus size={18} className="shrink-0 text-text-muted" />
+                <label htmlFor="chat-input" className="sr-only">
+                  Message
+                </label>
                 <input
+                  id="chat-input"
                   type="text"
                   value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
+                  onChange={handleInputChange}
                   onKeyDown={onKeyDown}
                   placeholder={
-                    hasMessages ? "Send a follow-up..." : "Ask Teskel anything..."
+                    hasMessages ? "Send a follow-up... (@ to mention)" : "Ask Teskel anything... (@ to mention files)"
                   }
-                  className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
+                  className="flex-1 bg-transparent text-sm text-foreground placeholder:text-text-muted focus:outline-none"
                 />
+                {/* Feature A: Mention picker dropdown */}
+                {showMentionPicker && projectId && (
+                  <MentionPicker
+                    projectId={projectId}
+                    visible={showMentionPicker}
+                    filter={mentionFilter}
+                    onSelect={(chip) => {
+                      handleMentionSelect(chip);
+                      // Remove the @... text from input
+                      const lastAt = inputValue.lastIndexOf("@");
+                      if (lastAt >= 0) {
+                        setInputValue(inputValue.slice(0, lastAt));
+                      }
+                    }}
+                    onClose={() => setShowMentionPicker(false)}
+                  />
+                )}
+                {/* Slash command dropdown */}
+                {showCommandDropdown && slashCommands.length > 0 && (
+                  <div className="absolute bottom-full left-0 mb-2 w-full max-h-48 overflow-y-auto rounded-lg border border-border bg-surface py-1 shadow-lg z-50">
+                    {slashCommands
+                      .filter((c) => c.name.includes(commandFilter))
+                      .slice(0, 8)
+                      .map((cmd) => (
+                        <button
+                          key={cmd.id}
+                          type="button"
+                          onClick={() => { setSelectedCommand(cmd); setShowCommandDropdown(false); setInputValue(""); const defaults: Record<string, string> = {}; for (const v of cmd.variables) { defaults[v.name] = v.defaultValue ?? ""; } setCommandValues(defaults); }}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-soft"
+                        >
+                          <span className="font-mono text-xs text-blue-600 dark:text-blue-400">/{cmd.name}</span>
+                          <span className="text-xs text-text-secondary">{cmd.description}</span>
+                        </button>
+                      ))}
+                    {slashCommands.filter((c) => c.name.includes(commandFilter)).length === 0 && (
+                      <p className="px-3 py-2 text-xs text-text-muted">No matching commands</p>
+                    )}
+                  </div>
+                )}
+                {/* Selected command variable form */}
+                {selectedCommand && (
+                  <div className="absolute bottom-full left-0 mb-2 w-full rounded-lg border border-border bg-surface p-3 shadow-lg z-50">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-xs font-medium text-text-secondary">/{selectedCommand.name}</span>
+                      <button type="button" onClick={() => setSelectedCommand(null)} className="text-text-muted hover:text-text-secondary"><X size={12} /></button>
+                    </div>
+                    {selectedCommand.variables.map((v) => (
+                      <div key={v.name} className="mb-2">
+                        <label className="mb-0.5 block text-[10px] text-text-secondary">{v.name}{v.required && <span className="text-red-400">*</span>}: {v.description}</label>
+                        <input value={commandValues[v.name] ?? ""} onChange={(e) => setCommandValues((prev) => ({ ...prev, [v.name]: e.target.value }))} className="w-full rounded border border-border px-2 py-1 text-xs focus:border-blue-400 focus:outline-none" placeholder={v.defaultValue ?? v.description} />
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => { const resolved = resolveCommandTemplate(selectedCommand.template, commandValues); setInputValue(resolved); setSelectedCommand(null); }} className="mt-1 rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700">Fill Template</button>
+                  </div>
+                )}
                 <div className="flex items-center gap-2">
                   <button
                     onClick={proposeChanges}
@@ -692,7 +1273,7 @@ function ChatSurface() {
                       changesetState.status === "loading" ||
                       streaming
                     }
-                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-40"
+                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-text-secondary hover:bg-surface-soft disabled:opacity-40"
                     title="Generate proposed code changes from this instruction"
                   >
                     {changesetState.status === "loading" ? (
@@ -702,17 +1283,51 @@ function ChatSurface() {
                     )}
                     Generate changes
                   </button>
-                  <button className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-gray-500 hover:bg-gray-100">
-                    {model}
-                    <ChevronDown size={12} />
-                  </button>
-                  <button className="text-gray-400 hover:text-gray-600">
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowModelDropdown(!showModelDropdown)}
+                      className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-text-secondary hover:bg-surface-soft"
+                    >
+                      {modelLabel}
+                      <ChevronDown size={12} />
+                    </button>
+                    {showModelDropdown && (
+                      <div className="absolute bottom-full right-0 mb-1 w-56 rounded-lg border border-border bg-surface py-1 shadow-lg z-50 max-h-64 overflow-y-auto">
+                        <button
+                          onClick={() => { setSelectedModel(null); setShowModelDropdown(false); }}
+                          className={`flex w-full items-center px-3 py-1.5 text-left text-xs hover:bg-surface-soft ${!selectedModel ? "text-blue-600 dark:text-blue-400 font-medium" : "text-text-secondary"}`}
+                        >
+                          Auto (default)
+                        </button>
+                        {providers.map((provider) => (
+                          <div key={provider.id}>
+                            <div className="px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-text-muted mt-1">
+                              {provider.name}
+                            </div>
+                            {provider.models.map((m) => (
+                              <button
+                                key={m.id}
+                                onClick={() => { setSelectedModel(m.id); setShowModelDropdown(false); }}
+                                className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-xs hover:bg-surface-soft ${selectedModel === m.id ? "text-blue-600 dark:text-blue-400 font-medium" : "text-text-secondary"}`}
+                              >
+                                <span>{m.name}</span>
+                                {m.pricing && (
+                                  <span className="text-[10px] text-text-muted">${m.pricing.input}/{m.pricing.output}</span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button className="text-text-muted hover:text-text-secondary">
                     <Mic size={16} />
                   </button>
                   {streaming ? (
                     <button
                       onClick={stop}
-                      className="flex items-center gap-1 rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-gray-700"
+                      className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-white hover:bg-primary/80"
                       title="Stop generating"
                     >
                       <Square size={12} /> Stop
@@ -735,22 +1350,28 @@ function ChatSurface() {
                 </div>
               </div>
               <div className="mt-2 flex items-center justify-between px-1">
-                {/* TODO: Web/Code/Terminal/Docs context chips are visual no-ops for now. */}
                 <div className="flex items-center gap-2">
-                  <button className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                  <button className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-text-muted hover:bg-surface-soft hover:text-text-secondary">
                     <Globe size={12} /> Web
                   </button>
-                  <button className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                  <button className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-text-muted hover:bg-surface-soft hover:text-text-secondary">
                     <Code size={12} /> Code
                   </button>
-                  <button className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                  <button className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-text-muted hover:bg-surface-soft hover:text-text-secondary">
                     <Terminal size={12} /> Terminal
                   </button>
-                  <button className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                  <button className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-text-muted hover:bg-surface-soft hover:text-text-secondary">
                     <FileText size={12} /> Docs
                   </button>
                 </div>
-                <span className="text-[11px] text-gray-400">Local</span>
+                <span className="text-[11px] text-text-muted">
+                  {autonomyMode !== "suggest" && (
+                    <span className="mr-2 text-amber-500">
+                      {AUTONOMY_MODES[autonomyMode].label} mode
+                    </span>
+                  )}
+                  Local
+                </span>
               </div>
             </div>
           </div>
@@ -758,56 +1379,54 @@ function ChatSurface() {
 
         {/* Right panel (visual placeholder). TODO(Phase 4+): live preview/terminal. */}
         {rightPanel !== "none" && (
-          <div className="flex w-[45%] flex-col border-l border-gray-200 bg-white">
-            <div className="flex h-11 items-center justify-between border-b border-gray-200 px-3">
+          <div className="flex w-[45%] flex-col border-l border-border bg-surface">
+            <div className="flex h-11 items-center justify-between border-b border-border px-3">
               <div className="flex items-center gap-2">
                 {rightPanel === "browser" && (
                   <>
-                    <button className="rounded p-1 text-gray-400 hover:text-gray-600">
+                    <button className="rounded p-1 text-text-muted hover:text-text-secondary">
                       <ArrowLeft size={14} />
                     </button>
-                    <button className="rounded p-1 text-gray-400 hover:text-gray-600">
+                    <button className="rounded p-1 text-text-muted hover:text-text-secondary">
                       <ArrowRight size={14} />
                     </button>
-                    <div className="ml-2 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1">
-                      <Globe size={12} className="text-gray-400" />
-                      <span className="text-xs text-gray-500">
+                    <div className="ml-2 flex items-center gap-2 rounded-lg border border-border bg-surface-soft px-3 py-1">
+                      <Globe size={12} className="text-text-muted" />
+                      <span className="text-xs text-text-secondary">
                         localhost:3000
                       </span>
                     </div>
                   </>
                 )}
                 {rightPanel === "terminal" && (
-                  <span className="text-xs font-medium text-gray-700">
+                  <span className="text-xs font-medium text-text-secondary">
                     Terminal
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-1">
-                <button className="rounded p-1 text-gray-400 hover:text-gray-600">
+                <button className="rounded p-1 text-text-muted hover:text-text-secondary">
                   <Maximize2 size={14} />
                 </button>
                 <button
                   onClick={() => setRightPanel("none")}
-                  className="rounded p-1 text-gray-400 hover:text-gray-600"
+                  className="rounded p-1 text-text-muted hover:text-text-secondary"
                 >
                   <X size={14} />
                 </button>
               </div>
             </div>
-            <div className="flex flex-1 items-center justify-center bg-white">
-              <div className="text-center">
-                {rightPanel === "browser" ? (
-                  <Globe size={48} className="mx-auto mb-3 text-gray-200" />
-                ) : (
-                  <Terminal size={48} className="mx-auto mb-3 text-gray-200" />
-                )}
-                <p className="text-sm font-medium text-gray-400">
-                  {rightPanel === "browser" ? "Preview" : "Terminal"}
-                </p>
-                <p className="mt-1 text-xs text-gray-300">Coming soon</p>
+            {rightPanel === "browser" ? (
+              <PreviewPanel defaultUrl="http://localhost:3000" onClose={() => setRightPanel("none")} />
+            ) : (
+              <div className="flex flex-1 items-center justify-center bg-surface">
+                <div className="text-center">
+                  <Terminal size={48} className="mx-auto mb-3 text-text-muted" />
+                  <p className="text-sm font-medium text-text-muted">Terminal</p>
+                  <p className="mt-1 text-xs text-text-muted">Coming soon</p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>
@@ -824,7 +1443,7 @@ function AssistantError({
 }) {
   const notConfigured = code === "AI_NOT_CONFIGURED";
   return (
-    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+    <div className="rounded-xl border border-red-200 bg-red-50 dark:bg-red-950 px-4 py-3">
       <div className="flex items-start gap-2">
         <AlertTriangle size={16} className="mt-0.5 text-red-500" />
         <div>
@@ -832,7 +1451,7 @@ function AssistantError({
           {notConfigured && (
             <Link
               href="/dashboard/integrations"
-              className="mt-1 inline-block text-xs font-medium text-blue-600 underline hover:text-blue-800"
+              className="mt-1 inline-block text-xs font-medium text-blue-600 dark:text-blue-400 underline hover:text-blue-800"
             >
               Add an OpenAI API key in Integrations
             </Link>
@@ -848,7 +1467,7 @@ export default function ChatPage() {
     <Suspense
       fallback={
         <div className="flex h-full items-center justify-center">
-          <Loader2 size={20} className="animate-spin text-gray-400" />
+          <Loader2 size={20} className="animate-spin text-text-muted" />
         </div>
       }
     >

@@ -1,5 +1,3 @@
-"use client";
-
 const testimonials = [
   {
     quote: "It was night and day from one batch to another, adoption went from single digits to over 80%. It just spread like wildfire, all the best builders were using Teskel.",
@@ -43,7 +41,7 @@ export default function Testimonials() {
   return (
     <section className="px-6 py-20 md:py-28">
       <div className="mx-auto max-w-[1100px]">
-        <h2 className="text-center text-[1.75rem] font-medium tracking-tight text-[#0F172A] md:text-[2.25rem]">
+        <h2 className="text-center text-[1.75rem] font-medium tracking-tight text-foreground md:text-[2.25rem]">
           The new way to build software.
         </h2>
 
@@ -51,18 +49,18 @@ export default function Testimonials() {
           {testimonials.map((t) => (
             <div
               key={t.name}
-              className="rounded-xl border border-[#E5E7EB] bg-white p-6 transition-shadow hover:shadow-md"
+              className="rounded-xl border border-border bg-surface p-6 transition-shadow hover:shadow-md dark:hover:shadow-border/20"
             >
-              <blockquote className="text-[14px] leading-relaxed text-[#64748B]">
+              <blockquote className="text-[14px] leading-relaxed text-text-secondary">
                 &ldquo;{t.quote}&rdquo;
               </blockquote>
               <div className="mt-5 flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-[12px] font-semibold text-gray-600">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-soft text-[12px] font-semibold text-text-secondary">
                   {t.initials}
                 </div>
                 <div>
-                  <p className="text-[13px] font-semibold text-[#0F172A]">{t.name}</p>
-                  <p className="text-[12px] text-[#94A3B8]">{t.title}</p>
+                  <p className="text-[13px] font-semibold text-foreground">{t.name}</p>
+                  <p className="text-[12px] text-text-muted">{t.title}</p>
                 </div>
               </div>
             </div>

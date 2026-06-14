@@ -131,10 +131,11 @@ export default function ProjectsPage() {
             </div>
             <div className="flex items-end gap-3">
               <div className="flex-1">
-                <label className="mb-1 block text-xs font-medium text-gray-600">
+                <label htmlFor="new-project-name" className="mb-1 block text-xs font-medium text-gray-600">
                   Project name
                 </label>
                 <input
+                  id="new-project-name"
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
@@ -144,10 +145,11 @@ export default function ProjectsPage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">
+                <label htmlFor="new-project-template" className="mb-1 block text-xs font-medium text-gray-600">
                   Template
                 </label>
                 <select
+                  id="new-project-template"
                   value={newTemplate}
                   onChange={(e) => setNewTemplate(e.target.value as "blank" | "node")}
                   className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-gray-400 focus:outline-none"

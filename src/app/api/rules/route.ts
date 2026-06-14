@@ -6,10 +6,12 @@ import {
   requireProjectAccess,
   validateBody,
   ApiError,
+  NO_STORE_HEADERS,
   type SessionUser,
 } from "@/lib/api";
 import { createRuleSchema, ruleScopeSchema } from "@/lib/schemas/rulesKnowledge";
-import { Prisma, type RuleScope } from "@prisma/client";
+import { Prisma, type Role, type RuleScope } from "@prisma/client";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 /** Workspace ids the user is a member of. */
 async function userWorkspaceIds(userId: string): Promise<string[]> {
@@ -20,10 +22,19 @@ async function userWorkspaceIds(userId: string): Promise<string[]> {
   return memberships.map((m) => m.workspaceId);
 }
 
+/** True if the user holds ADMIN or OWNER in at least one of their workspaces. */
+async function userIsAdminAnywhere(userId: string): Promise<boolean> {
+  const adminMembership = await prisma.workspaceMember.findFirst({
+    where: { userId, role: { in: ["ADMIN", "OWNER"] } },
+    select: { id: true },
+  });
+  return adminMembership !== null;
+}
+
 async function assertWorkspaceMember(
   user: SessionUser,
   workspaceId: string
-): Promise<void> {
+): Promise<{ role: Role }> {
   const member = await prisma.workspaceMember.findUnique({
     where: { workspaceId_userId: { workspaceId, userId: user.id } },
   });
@@ -34,6 +45,7 @@ async function assertWorkspaceMember(
       "FORBIDDEN"
     );
   }
+  return { role: member.role };
 }
 
 // GET /api/rules?projectId=&scope=
@@ -86,7 +98,7 @@ export async function GET(req: Request) {
       orderBy: [{ scope: "asc" }, { createdAt: "asc" }],
     });
 
-    return apiSuccess({ rules });
+    return apiSuccess({ rules }, { headers: NO_STORE_HEADERS });
   } catch (err) {
     return handleApiError(err);
   }
@@ -104,17 +116,49 @@ export async function POST(req: Request) {
     const user = await requireUser();
     const body = await validateBody(req, createRuleSchema);
 
+    const rulesWorkspaceId = body.workspaceId ?? "global";
+    await enforceRateLimit(`rules:create:${rulesWorkspaceId}`, 30, 60_000);
+
     // Authorize the target of the rule.
-    if (body.scope === "PROJECT" || body.scope === "FILE") {
-      if (body.projectId) {
-        await requireProjectAccess(body.projectId);
+    const memberRoles: Role[] = ["MEMBER", "ADMIN", "OWNER"];
+
+    if (body.scope === "GLOBAL") {
+      if (!(await userIsAdminAnywhere(user.id))) {
+        throw new ApiError(
+          "Only admins and owners can create global rules",
+          403,
+          "FORBIDDEN"
+        );
       }
-    }
-    if (
-      (body.scope === "WORKSPACE" || body.scope === "FILE") &&
-      body.workspaceId
-    ) {
-      await assertWorkspaceMember(user, body.workspaceId);
+    } else if (body.scope === "PROJECT" && body.projectId) {
+      const { role } = await requireProjectAccess(body.projectId);
+      if (!memberRoles.includes(role)) {
+        throw new ApiError("Insufficient permissions", 403, "FORBIDDEN");
+      }
+    } else if (body.scope === "WORKSPACE" && body.workspaceId) {
+      const { role } = await assertWorkspaceMember(user, body.workspaceId);
+      if (!memberRoles.includes(role)) {
+        throw new ApiError("Insufficient permissions", 403, "FORBIDDEN");
+      }
+    } else if (body.scope === "FILE") {
+      // FILE rules require a workspaceId; projectId is optional.
+      if (!body.workspaceId) {
+        throw new ApiError(
+          "FILE-scoped rules require a workspaceId",
+          422,
+          "VALIDATION_ERROR"
+        );
+      }
+      const { role } = await assertWorkspaceMember(user, body.workspaceId);
+      if (!memberRoles.includes(role)) {
+        throw new ApiError("Insufficient permissions", 403, "FORBIDDEN");
+      }
+      if (body.projectId) {
+        const access = await requireProjectAccess(body.projectId);
+        if (!memberRoles.includes(access.role)) {
+          throw new ApiError("Insufficient permissions", 403, "FORBIDDEN");
+        }
+      }
     }
 
     const rule = await prisma.rule.create({

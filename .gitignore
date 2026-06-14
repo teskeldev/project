@@ -48,3 +48,12 @@ build_out.txt
 build_success.txt
 lint_out.txt
 lint_out2.txt
+
+# vendored reference material (third-party, not part of this project)
+/reference
+# kilo tooling workspace
+/.kilo
+# staging validation artifacts
+/.teskel-staging-storage
+/test-results
+/playwright-report

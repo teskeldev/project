@@ -1,15 +1,17 @@
-﻿/**
+/**
  * Teskel project context builder.
  *
  * SERVER-ONLY: reads from the database and the filesystem storage layer.
  *
  * Produces the SYSTEM message used to prime the AI for a project: the Teskel
  * persona, project metadata, a capped file tree, the contents of any selected
- * files, applicable Rules, and relevant KnowledgeItems. A total character
- * budget is enforced, preferring rules + selected files over the raw tree.
+ * files, applicable Rules, active Skills, and relevant KnowledgeItems. A total
+ * character budget is enforced, preferring rules + skills + selected files over
+ * the raw tree.
  */
 import { prisma } from "@/lib/db";
 import { readFile } from "@/lib/storage";
+import { loadActiveSkills } from "@/lib/skills";
 
 /** The fixed Teskel persona prepended to every system prompt. */
 export const TESKEL_PERSONA = [
@@ -50,9 +52,9 @@ function clip(text: string, max: number): string {
 /**
  * Build the project context system prompt.
  *
- * Budget strategy (highest priority first): persona -> rules -> selected file
- * contents -> knowledge -> file tree. Lower-priority sections are dropped or
- * truncated when the remaining budget runs out.
+ * Budget strategy (highest priority first): persona -> rules -> skills ->
+ * selected file contents -> knowledge -> file tree. Lower-priority sections
+ * are dropped or truncated when the remaining budget runs out.
  */
 export async function buildProjectContext(
   projectId: string,
@@ -76,7 +78,7 @@ export async function buildProjectContext(
     return { system: TESKEL_PERSONA, contextBlocks: [] };
   }
 
-  const [rules, knowledge, fileNodes] = await Promise.all([
+  const [rules, skills, knowledge, fileNodes] = await Promise.all([
     prisma.rule.findMany({
       where: {
         enabled: true,
@@ -89,6 +91,7 @@ export async function buildProjectContext(
       select: { scope: true, title: true, content: true, filePattern: true },
       orderBy: { createdAt: "asc" },
     }),
+    loadActiveSkills(project.workspaceId, projectId),
     prisma.knowledgeItem.findMany({
       where: {
         OR: [
@@ -143,7 +146,12 @@ export async function buildProjectContext(
     pushBlock("RULES", rulesText);
   }
 
-  // 3) Selected file contents (high priority).
+  // 3) Skills (between rules and knowledge in priority).
+  if (skills) {
+    pushBlock("SKILLS", skills);
+  }
+
+  // 4) Selected file contents (high priority).
   if (selectedPaths.length > 0) {
     const fileSections: string[] = [];
     for (const p of selectedPaths) {
@@ -160,7 +168,7 @@ export async function buildProjectContext(
     pushBlock("SELECTED FILES", fileSections.join("\n\n"));
   }
 
-  // 4) Knowledge (medium priority).
+  // 5) Knowledge (medium priority).
   if (knowledge.length > 0) {
     const kText = knowledge
       .map((k) => `- ${k.title} (${k.type})\n${k.content}`)
@@ -168,7 +176,7 @@ export async function buildProjectContext(
     pushBlock("KNOWLEDGE", kText);
   }
 
-  // 5) File tree (lowest priority; paths only, capped).
+  // 6) File tree (lowest priority; paths only, capped).
   if (fileNodes.length > 0) {
     const capped = fileNodes.slice(0, MAX_TREE_PATHS);
     const treeText = capped

@@ -7,6 +7,7 @@ import {
   ApiError,
 } from "@/lib/api";
 import { createMessageSchema } from "@/lib/validators";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 type RouteContext = { params: Promise<{ threadId: string }> };
 
@@ -54,7 +55,9 @@ export async function POST(req: Request, ctx: RouteContext) {
   try {
     const { threadId } = await ctx.params;
     const thread = await loadThread(threadId);
-    await requireProjectAccess(thread.projectId);
+    const { user } = await requireProjectAccess(thread.projectId);
+
+    enforceRateLimit(`chat:messages:create:${user.id}`, 60, 60_000);
 
     const { content } = await validateBody(req, createMessageSchema);
 

@@ -29,78 +29,42 @@ import { chat, isAIConfigured, type AIMessage } from "@/lib/ai/provider";
 import { generateChangeSet } from "@/lib/ai/changeset";
 import { status as gitStatus } from "@/lib/git/service";
 import type { AgentPlan, AgentRunResult } from "@/lib/agents/schemas";
+import { runSearch } from "@/lib/search/engine";
+import type { AgentEvent } from "@/lib/agents/events";
+import {
+  publishEvent,
+  subscribeEvents,
+  publishCancel,
+  subscribeCancel,
+} from "@/lib/queue/event-bus";
+import { enqueueAgentRun } from "@/lib/queue/agent-queue";
 
 /* ----------------------------- event protocol ---------------------------- */
 
-export type AgentEvent =
-  | { type: "queued" }
-  | { type: "planning" }
-  | { type: "step_started"; step: AgentStepEvent }
-  | { type: "step_completed"; step: AgentStepEvent }
-  | { type: "generating_diff" }
-  | { type: "waiting_approval"; changeSetId: string }
-  | { type: "completed" }
-  | { type: "failed"; error: string }
-  | { type: "cancelled" };
-
-export type AgentStepEvent = {
-  id: string;
-  type: AgentStepType;
-  title: string;
-  status: "RUNNING" | "COMPLETED" | "FAILED";
-  output?: unknown;
-};
-
-type Listener = (event: AgentEvent) => void;
-
-type RunController = {
-  abort: AbortController;
-  /** True once execution has begun (prevents double-drive). */
-  started: boolean;
-  /** Live subscribers for SSE fan-out. */
-  listeners: Set<Listener>;
-};
+export type { AgentEvent, AgentStepEvent } from "@/lib/agents/events";
 
 /**
- * In-memory registry of in-flight runs, keyed by agentRunId. Mirrors how the
- * terminal runner tracks live child processes. NOT shared across instances --
- * see the production TODO at the top of this file.
+ * AbortControllers for runs executing IN THIS process (the worker, or the web
+ * process in the no-Redis fallback). Cross-instance cancellation arrives over
+ * the event bus and aborts the matching controller via `subscribeCancel`.
  */
-const registry = new Map<string, RunController>();
-
-function getOrCreateController(agentRunId: string): RunController {
-  let ctrl = registry.get(agentRunId);
-  if (!ctrl) {
-    ctrl = { abort: new AbortController(), started: false, listeners: new Set() };
-    registry.set(agentRunId, ctrl);
-  }
-  return ctrl;
-}
+const localAbort = new Map<string, AbortController>();
 
 /** Subscribe to live events for a run. Returns an unsubscribe fn. */
-export function subscribe(agentRunId: string, listener: Listener): () => void {
-  const ctrl = getOrCreateController(agentRunId);
-  ctrl.listeners.add(listener);
-  return () => {
-    ctrl.listeners.delete(listener);
-  };
+export function subscribe(
+  agentRunId: string,
+  listener: (event: AgentEvent) => void
+): () => void {
+  return subscribeEvents(agentRunId, listener);
 }
 
 function emit(agentRunId: string, event: AgentEvent): void {
-  const ctrl = registry.get(agentRunId);
-  if (!ctrl) return;
-  for (const listener of ctrl.listeners) {
-    try {
-      listener(event);
-    } catch {
-      /* a misbehaving listener must not break the run */
-    }
-  }
+  publishEvent(agentRunId, event);
 }
 
 /** Whether the run is currently being driven in this process. */
 export function isRunning(agentRunId: string): boolean {
-  return registry.get(agentRunId)?.started ?? false;
+  return localAbort.has(agentRunId);
 }
 
 /* ------------------------------- creation -------------------------------- */
@@ -127,8 +91,14 @@ export async function startAgentRun(input: StartAgentRunInput) {
       status: "QUEUED",
     },
   });
-  // Pre-create the controller so an immediate cancel before drive works.
-  getOrCreateController(run.id);
+  // Durable path: enqueue a BullMQ job so a worker drives the run independently
+  // of any HTTP connection. Returns false when no queue is configured, in which
+  // case the SSE events endpoint drives the run in-process on first connect.
+  await enqueueAgentRun({
+    agentRunId: run.id,
+    projectId: run.projectId,
+    userId: run.userId,
+  });
   return run;
 }
 
@@ -151,9 +121,6 @@ export async function cancel(agentRunId: string): Promise<boolean> {
     run.status === "CANCELLED";
   if (terminal) return false;
 
-  const ctrl = registry.get(agentRunId);
-  ctrl?.abort.abort();
-
   await prisma.agentRun.update({
     where: { id: agentRunId },
     data: { status: "CANCELLED", error: "Cancelled by user" },
@@ -164,6 +131,9 @@ export async function cancel(agentRunId: string): Promise<boolean> {
     data: { status: "FAILED" },
   });
 
+  // Deliver the cancel to whichever process is executing the run (this one or a
+  // remote worker) so it aborts in-flight AI calls; then notify SSE clients.
+  publishCancel(agentRunId);
   emit(agentRunId, { type: "cancelled" });
   return true;
 }
@@ -251,38 +221,29 @@ async function listFiles(projectId: string): Promise<string[]> {
   return nodes.map((n) => n.path);
 }
 
-/** A naive keyword search over file paths + mirrored content. */
+/** Search project files using the proper search engine. */
 async function searchCode(
   projectId: string,
+  storageKey: string,
   query: string
 ): Promise<{ path: string; score: number }[]> {
-  const terms = query
-    .toLowerCase()
-    .split(/[^a-z0-9_]+/i)
-    .filter((t) => t.length > 2);
-  if (terms.length === 0) return [];
-
-  const nodes = await prisma.fileNode.findMany({
-    where: { projectId, type: "FILE" },
-    select: { path: true, content: true },
-    take: 1000,
+  const response = await runSearch(projectId, storageKey, {
+    q: query,
+    type: "all",
+    caseSensitive: false,
+    regex: false,
+    maxResults: MAX_SEARCH_FILES,
   });
-
-  const scored = nodes.map((n) => {
-    const hayPath = n.path.toLowerCase();
-    const hayContent = (n.content ?? "").toLowerCase();
-    let score = 0;
-    for (const t of terms) {
-      if (hayPath.includes(t)) score += 3;
-      if (hayContent.includes(t)) score += 1;
+  // Deduplicate by file path and assign a simple descending score.
+  const seen = new Set<string>();
+  const results: { path: string; score: number }[] = [];
+  for (const match of response.results) {
+    if (!seen.has(match.file)) {
+      seen.add(match.file);
+      results.push({ path: match.file, score: MAX_SEARCH_FILES - results.length });
     }
-    return { path: n.path, score };
-  });
-
-  return scored
-    .filter((s) => s.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, MAX_SEARCH_FILES);
+  }
+  return results;
 }
 
 /** Read a small snippet of a file via the safe storage layer. */
@@ -361,18 +322,39 @@ async function generatePlan(
  * caller just streams current DB state). Guards against double execution via
  * the in-memory `started` flag.
  */
-export async function driveAgentRun(agentRunId: string): Promise<void> {
+export type DriveOptions = {
+  /**
+   * True when the caller (the BullMQ worker) still has retry attempts left for
+   * this job. On a retryable failure the run is reverted to QUEUED so the next
+   * attempt can re-claim it, rather than being marked FAILED permanently.
+   */
+  willRetry?: boolean;
+};
+
+export async function driveAgentRun(
+  agentRunId: string,
+  opts: DriveOptions = {}
+): Promise<void> {
+  // Atomically claim the run by transitioning QUEUED -> RUNNING. Only the
+  // process whose update matches (count === 1) proceeds; this is the
+  // cross-instance guard against two workers (or a worker + an SSE fallback)
+  // driving the same run.
+  const claim = await prisma.agentRun.updateMany({
+    where: { id: agentRunId, status: "QUEUED" },
+    data: { status: "RUNNING" },
+  });
+  if (claim.count === 0) return; // already running / terminal / missing
+
   const run = await prisma.agentRun.findUnique({
     where: { id: agentRunId },
     select: { id: true, projectId: true, goal: true, status: true },
   });
   if (!run) return;
-  if (run.status !== "QUEUED") return; // already running / terminal
 
-  const ctrl = getOrCreateController(agentRunId);
-  if (ctrl.started) return;
-  ctrl.started = true;
-  const signal = ctrl.abort.signal;
+  const abort = new AbortController();
+  localAbort.set(agentRunId, abort);
+  const unsubscribeCancel = subscribeCancel(agentRunId, () => abort.abort());
+  const signal = abort.signal;
 
   const project = await prisma.project.findUnique({
     where: { id: run.projectId },
@@ -389,10 +371,7 @@ export async function driveAgentRun(agentRunId: string): Promise<void> {
       );
     }
 
-    await prisma.agentRun.update({
-      where: { id: agentRunId },
-      data: { status: "RUNNING" },
-    });
+    // Status is already RUNNING (set atomically by the claim above).
 
     /* 1. THINK / plan ----------------------------------------------------- */
     emit(agentRunId, { type: "planning" });
@@ -422,7 +401,7 @@ export async function driveAgentRun(agentRunId: string): Promise<void> {
       );
       currentStepId = step.id;
       assertNotAborted(signal);
-      const hits = await searchCode(run.projectId, run.goal);
+      const hits = await searchCode(run.projectId, storageKey, run.goal);
       relevantPaths = hits.map((h) => h.path);
       if (relevantPaths.length === 0) {
         // Fall back to the first few files so the agent has some grounding.
@@ -572,6 +551,19 @@ export async function driveAgentRun(agentRunId: string): Promise<void> {
     }
 
     const message = err instanceof Error ? err.message : "Agent run failed";
+
+    if (opts.willRetry) {
+      // Hand the run back to the queue: revert the claim so the next attempt
+      // can re-acquire it. Do NOT emit a terminal event yet.
+      await prisma.agentRun
+        .updateMany({
+          where: { id: agentRunId, status: "RUNNING" },
+          data: { status: "QUEUED", error: message },
+        })
+        .catch(() => undefined);
+      throw err; // BullMQ schedules the retry with backoff.
+    }
+
     await prisma.agentRun
       .update({
         where: { id: agentRunId },
@@ -579,10 +571,11 @@ export async function driveAgentRun(agentRunId: string): Promise<void> {
       })
       .catch(() => undefined);
     emit(agentRunId, { type: "failed", error: message });
+    // Re-throw so the BullMQ worker can route the job to the dead-letter queue.
+    // The in-process (no-queue) caller catches and ignores this.
+    throw err;
   } finally {
-    // The run has reached a terminal/waiting state; allow registry cleanup once
-    // listeners drain. We keep the controller so late subscribers still resolve.
-    const c = registry.get(agentRunId);
-    if (c) c.started = true;
+    unsubscribeCancel();
+    localAbort.delete(agentRunId);
   }
 }

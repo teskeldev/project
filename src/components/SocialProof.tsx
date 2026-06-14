@@ -2,7 +2,7 @@ export default function SocialProof() {
   return (
     <section className="px-6 py-16">
       <div className="mx-auto max-w-[1100px]">
-        <p className="text-center text-[15px] font-medium text-[#64748B]">
+        <p className="text-center text-[15px] font-medium text-text-secondary">
           Trusted every day by teams that build world-class software
         </p>
 
@@ -10,7 +10,7 @@ export default function SocialProof() {
           {["OpenAI", "Stripe", "NVIDIA", "Shopify", "Datadog", "Linear", "Vercel", "Figma"].map((name) => (
             <span
               key={name}
-              className="text-[18px] font-semibold tracking-tight text-gray-400/80 transition-colors hover:text-gray-600"
+              className="text-[18px] font-semibold tracking-tight text-text-muted/80 transition-colors hover:text-text-secondary"
             >
               {name}
             </span>

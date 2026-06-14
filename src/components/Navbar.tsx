@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
+import { Button } from "@/components/ui";
 
 const navLinks = [
   { label: "Product", href: "/#product" },
@@ -15,15 +16,15 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-[#E5E7EB]/60 bg-white/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-surface/80 backdrop-blur-xl dark:bg-surface/80">
       <nav className="mx-auto flex h-14 max-w-[1100px] items-center justify-between px-6">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <svg width="24" height="24" viewBox="0 0 28 28" fill="none" className="text-[#0F172A]">
+          <svg width="24" height="24" viewBox="0 0 28 28" fill="none" className="text-foreground">
             <rect width="28" height="28" rx="6" fill="currentColor" />
-            <path d="M8 8h4v12H8V8zm8 0h4v12h-4V8z" fill="white" />
+            <path d="M8 8h4v12H8V8zm8 0h4v12h-4V8z" fill="white" className="dark:fill-[#0B0F19]" />
           </svg>
-          <span className="text-[16px] font-bold tracking-tight text-[#0F172A]">Teskel</span>
+          <span className="text-[16px] font-bold tracking-tight text-foreground">Teskel</span>
         </Link>
 
         {/* Desktop links */}
@@ -32,7 +33,7 @@ export default function Navbar() {
             <Link
               key={link.label}
               href={link.href}
-              className="text-[14px] text-[#64748B] transition-colors hover:text-[#0F172A]"
+              className="text-[14px] text-text-secondary transition-colors hover:text-foreground"
             >
               {link.label}
             </Link>
@@ -41,25 +42,23 @@ export default function Navbar() {
 
         {/* Desktop CTA */}
         <div className="hidden items-center gap-4 md:flex">
-          <Link href="/login" className="text-[14px] text-[#64748B] transition-colors hover:text-[#0F172A]">
+          <Link href="/login" className="text-[14px] text-text-secondary transition-colors hover:text-foreground">
             Sign in
           </Link>
-          <Link
-            href="/enterprise"
-            className="rounded-full border border-[#E5E7EB] px-4 py-1.5 text-[13px] font-medium text-[#0F172A] transition-all hover:border-[#D1D5DB] hover:shadow-sm"
-          >
-            Contact sales
-          </Link>
-          <Link
-            href="/download"
-            className="rounded-full bg-[#0F172A] px-4 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-[#1E293B]"
-          >
-            Download
-          </Link>
+          <Button asChild variant="outline" size="sm" className="rounded-full px-4 py-1.5 text-[13px]">
+            <Link href="/enterprise">
+              Contact sales
+            </Link>
+          </Button>
+          <Button asChild size="sm" className="rounded-full px-4 py-1.5 text-[13px]">
+            <Link href="/download">
+              Download
+            </Link>
+          </Button>
         </div>
 
         {/* Mobile toggle */}
-        <button className="md:hidden" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Toggle menu">
+        <button className="text-foreground md:hidden" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Toggle menu">
           {mobileOpen ? (
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 6L6 18M6 6l12 12" />
@@ -80,27 +79,31 @@ export default function Navbar() {
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="overflow-hidden border-t border-[#E5E7EB]/60 bg-white md:hidden"
+            className="overflow-hidden border-t border-border/60 bg-surface md:hidden dark:bg-surface"
           >
             <div className="flex flex-col gap-3 px-6 py-4">
               {navLinks.map((link) => (
                 <Link
                   key={link.label}
                   href={link.href}
-                  className="text-[14px] text-[#64748B] hover:text-[#0F172A]"
+                  className="text-[14px] text-text-secondary hover:text-foreground"
                   onClick={() => setMobileOpen(false)}
                 >
                   {link.label}
                 </Link>
               ))}
-              <hr className="border-[#E5E7EB]" />
-              <Link href="/login" className="text-[14px] text-[#64748B]">Sign in</Link>
-              <Link href="/enterprise" className="rounded-full border border-[#E5E7EB] px-4 py-2 text-center text-[13px] font-medium text-[#0F172A]">
-                Contact sales
-              </Link>
-              <Link href="/download" className="rounded-full bg-[#0F172A] px-4 py-2 text-center text-[13px] font-medium text-white">
-                Download
-              </Link>
+              <hr className="border-border" />
+              <Link href="/login" className="text-[14px] text-text-secondary">Sign in</Link>
+              <Button asChild variant="outline" className="rounded-full text-center text-[13px]">
+                <Link href="/enterprise">
+                  Contact sales
+                </Link>
+              </Button>
+              <Button asChild className="rounded-full text-center text-[13px]">
+                <Link href="/download">
+                  Download
+                </Link>
+              </Button>
             </div>
           </motion.div>
         )}

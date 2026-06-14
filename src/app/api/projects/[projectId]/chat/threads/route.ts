@@ -6,6 +6,7 @@ import {
   validateBody,
 } from "@/lib/api";
 import { createThreadSchema } from "@/lib/validators";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 type RouteContext = { params: Promise<{ projectId: string }> };
 
@@ -39,6 +40,7 @@ export async function POST(req: Request, ctx: RouteContext) {
   try {
     const { projectId } = await ctx.params;
     const { user } = await requireProjectAccess(projectId);
+    await enforceRateLimit(`chat:threads:create:${user.id}`, 30, 60_000);
     const { title } = await validateBody(req, createThreadSchema);
 
     const thread = await prisma.chatThread.create({

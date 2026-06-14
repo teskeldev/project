@@ -107,23 +107,75 @@ async function testGitHub(config: Record<string, unknown>): Promise<TestResult> 
   return { ok: false, message: `GitHub returned HTTP ${res.status}.` };
 }
 
-function testAnthropic(config: Record<string, unknown>): TestResult {
-  // TODO(phase-future): perform a real Anthropic API call (e.g. GET /v1/models
-  // with the x-api-key + anthropic-version headers). For this phase we only
-  // validate that a plausibly-formatted key is present.
+async function testAnthropic(config: Record<string, unknown>): Promise<TestResult> {
   const apiKey = typeof config.apiKey === "string" ? config.apiKey.trim() : "";
   if (!apiKey) {
     return { ok: false, message: "API key is missing." };
   }
-  if (!apiKey.startsWith("sk-")) {
+
+  const baseUrl = stripTrailingSlash(
+    typeof config.baseUrl === "string" && config.baseUrl.trim().length > 0
+      ? config.baseUrl.trim()
+      : "https://api.anthropic.com"
+  );
+
+  // Make a real API call: send a minimal completion request to verify credentials.
+  const result = await safeFetch(`${baseUrl}/v1/messages`, {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "claude-3-haiku-20240307",
+      max_tokens: 1,
+      messages: [{ role: "user", content: "hi" }],
+    }),
+  });
+
+  if ("error" in result) {
+    // Network unavailable: fall back to format validation.
+    if (!apiKey.startsWith("sk-")) {
+      return {
+        ok: false,
+        message: "Key format looks unexpected (expected an 'sk-' prefix).",
+      };
+    }
     return {
-      ok: false,
-      message: "Key format looks unexpected (expected an 'sk-' prefix).",
+      ok: true,
+      message: "Key saved. Could not verify against Anthropic (network unavailable).",
     };
   }
+
+  const { res } = result;
+  if (res.ok) {
+    return { ok: true, message: "Connected to Anthropic. Credentials are valid." };
+  }
+  if (res.status === 401) {
+    return { ok: false, message: "Authentication failed. Check the API key." };
+  }
+  if (res.status === 403) {
+    return { ok: false, message: "Access denied. The API key may lack permissions." };
+  }
+  // 400 with an "invalid_api_key" error also indicates bad credentials
+  if (res.status === 400) {
+    try {
+      const body = await res.json();
+      if (body?.error?.type === "invalid_api_key") {
+        return { ok: false, message: "Invalid API key." };
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }
+  // A 429 (rate limit) or 529 (overloaded) still means the key is valid
+  if (res.status === 429 || res.status === 529) {
+    return { ok: true, message: "Connected to Anthropic (rate limited, but credentials are valid)." };
+  }
   return {
-    ok: true,
-    message: "Key saved (format looks valid). Live test not yet implemented.",
+    ok: false,
+    message: `Anthropic returned HTTP ${res.status}.`,
   };
 }
 

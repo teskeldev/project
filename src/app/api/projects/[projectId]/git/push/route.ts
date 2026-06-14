@@ -1,4 +1,5 @@
-﻿import { apiSuccess, handleApiError, requireProjectAccess } from "@/lib/api";
+import { apiSuccess, handleApiError, requireProjectAccess, ApiError } from "@/lib/api";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { push } from "@/lib/git/service";
 
 type RouteContext = { params: Promise<{ projectId: string }> };
@@ -7,7 +8,16 @@ type RouteContext = { params: Promise<{ projectId: string }> };
 export async function POST(_req: Request, ctx: RouteContext) {
   try {
     const { projectId } = await ctx.params;
-    const { project } = await requireProjectAccess(projectId);
+    const { project, user, member } = await requireProjectAccess(projectId);
+
+    // Role check: viewers cannot push
+    if (member.role === "VIEWER") {
+      throw new ApiError("Insufficient permissions", 403, "FORBIDDEN");
+    }
+
+    // Rate limit: 10 per minute
+    await enforceRateLimit(`git:push:${user.id}`, 10, 60_000);
+
     const result = await push(project!.storageKey);
     return apiSuccess(result);
   } catch (err) {

@@ -7,6 +7,8 @@ import {
   requireUser,
   validateBody,
 } from "@/lib/api";
+import { sendTeamInviteEmail } from "@/lib/email";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const inviteMemberSchema = z.object({
   email: z.string().email("Valid email is required"),
@@ -67,6 +69,8 @@ export async function POST(
     const { workspaceId } = await params;
     const { email, role } = await validateBody(req, inviteMemberSchema);
 
+    await enforceRateLimit(`invite:workspace:${workspaceId}`, 20, 60_000);
+
     // Verify the current user is OWNER or ADMIN
     const membership = await prisma.workspaceMember.findUnique({
       where: { workspaceId_userId: { workspaceId, userId: user.id } },
@@ -106,14 +110,31 @@ export async function POST(
       data: {
         workspaceId,
         userId: targetUser.id,
-        role,
+        role: role || "MEMBER",
       },
       include: {
         user: { select: { id: true, name: true, email: true, image: true } },
       },
     });
 
-    // TODO: Send email invite notification to the user
+    // Send email invite notification to the user
+    const workspace = await prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { name: true },
+    });
+    const inviter = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { name: true },
+    });
+
+    // Fire-and-forget: don't block the response on email delivery
+    sendTeamInviteEmail(email.toLowerCase(), {
+      workspaceName: workspace?.name || "a workspace",
+      inviterName: inviter?.name ?? null,
+      role: role || "MEMBER",
+    }).catch((err) => {
+      console.error("[workspace-members] Failed to send invite email:", err);
+    });
 
     return apiSuccess(
       {

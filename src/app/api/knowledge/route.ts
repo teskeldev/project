@@ -6,10 +6,12 @@ import {
   requireProjectAccess,
   validateBody,
   ApiError,
+  NO_STORE_HEADERS,
   type SessionUser,
 } from "@/lib/api";
 import { createKnowledgeSchema } from "@/lib/schemas/rulesKnowledge";
-import { Prisma, type KnowledgeType } from "@prisma/client";
+import { Prisma, type KnowledgeType, type Role } from "@prisma/client";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 async function userWorkspaceIds(userId: string): Promise<string[]> {
   const memberships = await prisma.workspaceMember.findMany({
@@ -22,7 +24,7 @@ async function userWorkspaceIds(userId: string): Promise<string[]> {
 async function assertWorkspaceMember(
   user: SessionUser,
   workspaceId: string
-): Promise<void> {
+): Promise<{ role: Role }> {
   const member = await prisma.workspaceMember.findUnique({
     where: { workspaceId_userId: { workspaceId, userId: user.id } },
   });
@@ -33,6 +35,7 @@ async function assertWorkspaceMember(
       "FORBIDDEN"
     );
   }
+  return { role: member.role };
 }
 
 // GET /api/knowledge?projectId=
@@ -66,7 +69,7 @@ export async function GET(req: Request) {
       orderBy: { updatedAt: "desc" },
     });
 
-    return apiSuccess({ items });
+    return apiSuccess({ items }, { headers: NO_STORE_HEADERS });
   } catch (err) {
     return handleApiError(err);
   }
@@ -86,7 +89,14 @@ export async function POST(req: Request) {
     const user = await requireUser();
     const body = await validateBody(req, createKnowledgeSchema);
 
-    await assertWorkspaceMember(user, body.workspaceId);
+    await enforceRateLimit(`knowledge:create:${body.workspaceId}`, 30, 60_000);
+
+    const { role } = await assertWorkspaceMember(user, body.workspaceId);
+
+    const allowedRoles: Role[] = ["MEMBER", "ADMIN", "OWNER"];
+    if (!allowedRoles.includes(role)) {
+      throw new ApiError("Insufficient permissions", 403, "FORBIDDEN");
+    }
 
     if (body.projectId) {
       const { project } = await requireProjectAccess(body.projectId);

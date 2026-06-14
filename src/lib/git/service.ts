@@ -241,13 +241,36 @@ async function ensureLocalIdentity(git: SimpleGit): Promise<void> {
 
 /* ------------------------------- staging --------------------------------- */
 
+/**
+ * Validates user-supplied paths before passing them to `git`. Rejects anything
+ * that would be interpreted as a CLI flag (leading `-`) or that tries to escape
+ * the repository root (`..` segment or absolute path). Throws a clear error.
+ */
+function assertSafePaths(paths: string[] | undefined): void {
+  if (!paths) return;
+  for (const p of paths) {
+    if (typeof p !== "string" || p.length === 0) {
+      throw new Error(`Invalid git path: ${JSON.stringify(p)}`);
+    }
+    if (p.startsWith("-")) {
+      throw new Error(
+        `Invalid git path (must not start with '-' to avoid flag injection): ${p}`
+      );
+    }
+    if (p.includes("..") || p.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(p)) {
+      throw new Error(`Invalid git path (escape attempt): ${p}`);
+    }
+  }
+}
+
 export async function stage(
   storageKey: string,
   paths: string[]
 ): Promise<GitStatusResult> {
   if (!(await isRepo(storageKey))) return { isRepo: false };
+  assertSafePaths(paths);
   const git = getGit(storageKey);
-  await git.add(paths.length ? paths : ["-A"]);
+  await git.raw(paths.length ? ["add", "--", ...paths] : ["add", "-A"]);
   return mapStatus(await git.status());
 }
 
@@ -256,6 +279,7 @@ export async function unstage(
   paths: string[]
 ): Promise<GitStatusResult> {
   if (!(await isRepo(storageKey))) return { isRepo: false };
+  assertSafePaths(paths);
   const git = getGit(storageKey);
   // `git reset HEAD -- <paths>`. Works even before the first commit when HEAD
   // is unborn (git falls back to clearing the index entry).
@@ -278,16 +302,17 @@ export async function commit(
   projectId?: string
 ): Promise<GitCommitResult> {
   if (!(await isRepo(storageKey))) return { isRepo: false };
+  assertSafePaths(paths);
   const git = getGit(storageKey);
   await ensureLocalIdentity(git);
 
   const res =
     paths && paths.length
-      ? await git.commit(message, paths)
+      ? await git.raw(["commit", "-m", message, "--", ...paths])
       : await git.commit(message);
 
   const mapped = mapStatus(await git.status());
-  const hash = res.commit || (await git.revparse(["HEAD"])).trim();
+  const hash = (res && typeof res === "object" && "commit" in res ? res.commit : null) || (await git.revparse(["HEAD"])).trim();
   if (projectId) {
     await upsertGitState(
       projectId,

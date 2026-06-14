@@ -35,7 +35,15 @@ export type ProposedChange = z.infer<typeof ProposedChangeSchema>;
  * Minimal unified-diff generator (LCS-based). Avoids adding a dependency.
  * Produces a `diff --git`-free, `---`/`+++` headed hunk-less line diff that is
  * good enough for review display; Phase 4 can swap in a richer differ.
+ *
+ * To avoid runaway memory from very large inputs (the LCS table is O(m*n)
+ * 32-bit ints), we cap each input at 10_000 lines. The 2000-line cap used
+ * by `src/lib/diff.ts` for the side-by-side view is meant for interactive
+ * display; the changeset diff is a different use case (a record persisted
+ * with the proposal) and is allowed up to 5x that size.
  */
+const MAX_UNIFIED_DIFF_LINES = 10_000;
+
 export function unifiedDiff(
   oldText: string,
   newText: string,
@@ -43,6 +51,15 @@ export function unifiedDiff(
 ): string {
   const a = oldText.split("\n");
   const b = newText.split("\n");
+
+  // Size guard: refuse to allocate an O(m*n) LCS table for huge inputs.
+  if (a.length > MAX_UNIFIED_DIFF_LINES || b.length > MAX_UNIFIED_DIFF_LINES) {
+    throw new ApiError(
+      `unifiedDiff input too large (${a.length} vs ${b.length} lines, max ${MAX_UNIFIED_DIFF_LINES})`,
+      413,
+      "DIFF_TOO_LARGE"
+    );
+  }
 
   // LCS table.
   const m = a.length;

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -25,6 +25,9 @@ import {
   type KnowledgeItem,
   type KnowledgeType,
 } from "@/lib/client/knowledge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
 type TypeFilter = "all" | "starred" | KnowledgeType;
 
@@ -32,10 +35,10 @@ const TYPE_META: Record<
   KnowledgeType,
   { label: string; icon: typeof FileText; cls: string }
 > = {
-  TEXT: { label: "Text", icon: Book, cls: "bg-blue-50 text-blue-600" },
-  NOTE: { label: "Note", icon: FileText, cls: "bg-purple-50 text-purple-600" },
-  FILE: { label: "File", icon: Folder, cls: "bg-gray-100 text-gray-600" },
-  URL: { label: "URL", icon: Link2, cls: "bg-emerald-50 text-emerald-600" },
+  TEXT: { label: "Text", icon: Book, cls: "bg-accent-light text-accent dark:bg-blue-900/30 dark:text-blue-400" },
+  NOTE: { label: "Note", icon: FileText, cls: "bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400" },
+  FILE: { label: "File", icon: Folder, cls: "bg-surface-soft text-text-secondary" },
+  URL: { label: "URL", icon: Link2, cls: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400" },
 };
 
 function isStarred(item: KnowledgeItem): boolean {
@@ -244,44 +247,45 @@ export default function KnowledgePage() {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-[22px] font-semibold text-gray-900">
+            <h1 className="text-[22px] font-semibold text-foreground">
               Projects &amp; Knowledge
             </h1>
-            <p className="mt-1 text-[14px] text-gray-500">
+            <p className="mt-1 text-[14px] text-text-secondary">
               Custom instructions and context for your AI agents
             </p>
           </div>
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-[13px] font-medium text-white hover:bg-gray-800"
-          >
+          <Button onClick={openCreate} className="gap-2">
             <Plus size={14} />
             Add Knowledge
-          </button>
+          </Button>
         </div>
 
-        <p className="mb-6 rounded-lg bg-blue-50 px-3 py-2 text-[12px] text-blue-700">
-          Knowledge is available to AI as project context.
-        </p>
+        <Card className="mb-6 border-accent/20 bg-accent-light">
+          <CardContent className="px-3 py-2">
+            <p className="text-[12px] text-accent">
+              Knowledge is available to AI as project context.
+            </p>
+          </CardContent>
+        </Card>
 
         {/* Search */}
         <div className="relative mb-6">
           {searching ? (
             <Loader2
               size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400"
+              className="absolute left-3 top-1/2 -translate-y-1/2 animate-spin text-text-muted"
             />
           ) : (
             <Search
               size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
             />
           )}
-          <input
+          <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search knowledge base..."
-            className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-[13px] text-gray-900 placeholder-gray-400 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50"
+            className="w-full py-2.5 pl-10 pr-4 text-[13px]"
           />
         </div>
 
@@ -297,55 +301,54 @@ export default function KnowledgePage() {
               { key: "URL", label: "URLs", icon: Link2 },
             ] as { key: TypeFilter; label: string; icon: typeof Folder }[]
           ).map((f) => (
-            <button
+            <Button
               key={f.key}
+              variant={activeFilter === f.key ? "default" : "secondary"}
+              size="sm"
               onClick={() => setActiveFilter(f.key)}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors ${
-                activeFilter === f.key
-                  ? "bg-gray-900 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
+              className="gap-1.5 text-[12px]"
             >
               <f.icon size={12} />
               {f.label}
-            </button>
+            </Button>
           ))}
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-600">
-            {error}
-          </div>
+          <Card className="mb-4 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/50">
+            <CardContent className="px-3 py-2">
+              <p className="text-[13px] text-red-600 dark:text-red-400">{error}</p>
+            </CardContent>
+          </Card>
         )}
 
         {/* States */}
         {loading ? (
-          <div className="flex items-center justify-center gap-2 py-16 text-gray-400">
+          <div className="flex items-center justify-center gap-2 py-16 text-text-muted">
             <Loader2 size={18} className="animate-spin" />
             <span className="text-[13px]">Loading knowledge...</span>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-gray-200 bg-white py-16 text-center">
-            <p className="text-[14px] font-medium text-gray-700">
-              {searchResults !== null
-                ? "No matching knowledge"
-                : "No knowledge yet"}
-            </p>
-            <p className="mt-1 text-[13px] text-gray-500">
-              {searchResults !== null
-                ? "Try a different search term."
-                : "Add documents, notes, or context to feed your AI agents."}
-            </p>
-            {searchResults === null && (
-              <button
-                onClick={openCreate}
-                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-[13px] font-medium text-white hover:bg-gray-800"
-              >
-                <Plus size={14} />
-                Add Knowledge
-              </button>
-            )}
-          </div>
+          <Card className="border-dashed py-16 text-center">
+            <CardContent>
+              <p className="text-[14px] font-medium text-foreground">
+                {searchResults !== null
+                  ? "No matching knowledge"
+                  : "No knowledge yet"}
+              </p>
+              <p className="mt-1 text-[13px] text-text-secondary">
+                {searchResults !== null
+                  ? "Try a different search term."
+                  : "Add documents, notes, or context to feed your AI agents."}
+              </p>
+              {searchResults === null && (
+                <Button onClick={openCreate} className="mt-4 gap-2">
+                  <Plus size={14} />
+                  Add Knowledge
+                </Button>
+              )}
+            </CardContent>
+          </Card>
         ) : (
           <div className="space-y-3">
             {filtered.map((item) => {
@@ -353,9 +356,9 @@ export default function KnowledgePage() {
               const Icon = meta.icon;
               const starred = isStarred(item);
               return (
-                <div
+                <Card
                   key={item.id}
-                  className="rounded-xl border border-gray-200 bg-white p-5 transition-shadow hover:shadow-sm"
+                  className="p-5 transition-shadow hover:shadow-sm"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-3">
@@ -364,7 +367,7 @@ export default function KnowledgePage() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="text-[14px] font-semibold text-gray-900">
+                          <h3 className="text-[14px] font-semibold text-foreground">
                             {item.title}
                           </h3>
                           {starred && (
@@ -380,23 +383,25 @@ export default function KnowledgePage() {
                           </span>
                         </div>
                         {item.projectId === null && (
-                          <span className="mt-0.5 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+                          <span className="mt-0.5 inline-block rounded bg-surface-soft px-1.5 py-0.5 text-[10px] font-medium text-text-secondary">
                             workspace
                           </span>
                         )}
-                        <p className="mt-2 whitespace-pre-wrap text-[13px] leading-relaxed text-gray-500">
+                        <p className="mt-2 whitespace-pre-wrap text-[13px] leading-relaxed text-text-secondary">
                           {item.content}
                         </p>
                       </div>
                     </div>
                     <div className="ml-4 flex items-center gap-1">
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => handleToggleStar(item)}
                         disabled={busyId === item.id}
-                        className={`rounded p-1.5 hover:bg-gray-100 disabled:opacity-50 ${
+                        className={`h-7 w-7 ${
                           starred
                             ? "text-yellow-500"
-                            : "text-gray-400 hover:text-gray-600"
+                            : "text-text-muted hover:text-text-secondary"
                         }`}
                         aria-label={starred ? "Unstar" : "Star"}
                       >
@@ -404,26 +409,30 @@ export default function KnowledgePage() {
                           size={14}
                           className={starred ? "fill-yellow-400" : ""}
                         />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => openEdit(item)}
                         disabled={busyId === item.id}
-                        className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+                        className="h-7 w-7 text-text-muted hover:text-text-secondary"
                         aria-label="Edit"
                       >
                         <Edit3 size={14} />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => handleDelete(item)}
                         disabled={busyId === item.id}
-                        className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-red-500 disabled:opacity-50"
+                        className="h-7 w-7 text-text-muted hover:text-destructive"
                         aria-label="Delete"
                       >
                         <Trash2 size={14} />
-                      </button>
+                      </Button>
                     </div>
                   </div>
-                </div>
+                </Card>
               );
             })}
           </div>
@@ -433,55 +442,55 @@ export default function KnowledgePage() {
       {/* Create / edit modal */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+          <Card className="w-full max-w-lg p-6 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-[16px] font-semibold text-gray-900">
+              <h2 className="text-[16px] font-semibold text-foreground">
                 {editingId ? "Edit Knowledge" : "Add Knowledge"}
               </h2>
-              <button
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={closeForm}
-                className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                className="h-7 w-7 text-text-muted hover:text-text-secondary"
                 aria-label="Close"
               >
                 <X size={16} />
-              </button>
+              </Button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="mb-1 block text-[12px] font-medium text-gray-700">
+                <label className="mb-1 block text-[12px] font-medium text-foreground">
                   Type
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {(
                     Object.keys(TYPE_META) as KnowledgeType[]
                   ).map((t) => {
-                    const Icon = TYPE_META[t].icon;
+                    const TypeIcon = TYPE_META[t].icon;
                     return (
-                      <button
+                      <Button
                         key={t}
                         type="button"
+                        variant={form.type === t ? "default" : "secondary"}
+                        size="sm"
                         onClick={() => setForm((f) => ({ ...f, type: t }))}
-                        className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-medium ${
-                          form.type === t
-                            ? "bg-gray-900 text-white"
-                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                        }`}
+                        className="gap-1.5 text-[12px]"
                       >
-                        <Icon size={12} />
+                        <TypeIcon size={12} />
                         {TYPE_META[t].label}
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
                 {form.type === "FILE" && (
-                  <p className="mt-1 text-[11px] text-gray-500">
+                  <p className="mt-1 text-[11px] text-text-secondary">
                     Paste text content (markdown / txt / json). Binary upload is
                     not yet supported.
                   </p>
                 )}
                 {form.type === "URL" && (
-                  <p className="mt-1 text-[11px] text-gray-500">
+                  <p className="mt-1 text-[11px] text-text-secondary">
                     Stores the URL as context. Automatic fetching is future
                     work.
                   </p>
@@ -489,21 +498,21 @@ export default function KnowledgePage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-[12px] font-medium text-gray-700">
+                <label className="mb-1 block text-[12px] font-medium text-foreground">
                   Title
                 </label>
-                <input
+                <Input
                   value={form.title}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, title: e.target.value }))
                   }
                   placeholder="e.g. Project Architecture"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-[13px] text-gray-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50"
+                  className="text-[13px]"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-[12px] font-medium text-gray-700">
+                <label className="mb-1 block text-[12px] font-medium text-foreground">
                   {form.type === "URL" ? "URL" : "Content"}
                 </label>
                 <textarea
@@ -517,12 +526,12 @@ export default function KnowledgePage() {
                       ? "https://example.com/docs"
                       : "Paste content the AI should know about..."
                   }
-                  className="w-full resize-y rounded-lg border border-gray-200 px-3 py-2 text-[13px] text-gray-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50"
+                  className="flex min-h-[80px] w-full resize-y rounded-lg border border-border bg-surface px-3 py-2 text-[13px] text-foreground shadow-sm transition-colors placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </div>
 
               {!editingId && (
-                <p className="text-[11px] text-gray-500">
+                <p className="text-[11px] text-text-secondary">
                   Saved to{" "}
                   {activeProject
                     ? `project "${activeProject.name}"`
@@ -532,28 +541,28 @@ export default function KnowledgePage() {
               )}
 
               {formError && (
-                <p className="text-[12px] text-red-600">{formError}</p>
+                <p className="text-[12px] text-destructive">{formError}</p>
               )}
 
               <div className="flex justify-end gap-2 pt-2">
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={closeForm}
-                  className="rounded-lg px-4 py-2 text-[13px] font-medium text-gray-600 hover:bg-gray-100"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
                   disabled={saving}
-                  className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-[13px] font-medium text-white hover:bg-gray-800 disabled:opacity-60"
+                  className="gap-2"
                 >
                   {saving && <Loader2 size={14} className="animate-spin" />}
                   {editingId ? "Save changes" : "Create"}
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
+          </Card>
         </div>
       )}
     </div>

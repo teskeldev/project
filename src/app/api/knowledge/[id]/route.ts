@@ -9,13 +9,14 @@ import {
   type SessionUser,
 } from "@/lib/api";
 import { updateKnowledgeSchema } from "@/lib/schemas/rulesKnowledge";
-import { Prisma, type KnowledgeType } from "@prisma/client";
+import { Prisma, type KnowledgeType, type Role } from "@prisma/client";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 /**
- * Loads a knowledge item and verifies the user is a member of its workspace.
- * Users can never read/edit knowledge from workspaces they don't belong to.
+ * Loads a knowledge item and verifies the user is a member of its workspace
+ * with a role of MEMBER or higher. Users can never read/edit knowledge from
+ * workspaces they don't belong to.
  */
 async function loadManageableItem(user: SessionUser, id: string) {
   const item = await prisma.knowledgeItem.findUnique({ where: { id } });
@@ -29,6 +30,10 @@ async function loadManageableItem(user: SessionUser, id: string) {
   });
   if (!member) {
     throw new ApiError("You cannot manage this item", 403, "FORBIDDEN");
+  }
+  const allowedRoles: Role[] = ["MEMBER", "ADMIN", "OWNER"];
+  if (!allowedRoles.includes(member.role)) {
+    throw new ApiError("Insufficient permissions", 403, "FORBIDDEN");
   }
   return item;
 }

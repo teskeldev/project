@@ -1,0 +1,75 @@
+# Prometheus alerting rules for Teskel.
+# Load via prometheus.yml: rule_files: [ "alerts.yml" ]
+# Thresholds are starting points — tune to your traffic + SLOs.
+groups:
+  - name: teskel-api
+    rules:
+      - alert: HighApiErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+            / clamp_min(sum(rate(http_requests_total[5m])), 1) > 0.02
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "API 5xx rate >2% (5m)"
+          description: "{{ $value | humanizePercentage }} of requests are 5xx."
+
+      - alert: ApiLatencyP95High
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route)) > 1
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Route p95 latency >1s"
+          description: "Route {{ $labels.route }} p95 = {{ $value }}s."
+
+      - alert: ApiDown
+        expr: up{job="teskel-web"} == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations: { summary: "Web instance down" }
+
+  - name: teskel-queue
+    rules:
+      - alert: AgentQueueBacklog
+        expr: agent_queue_depth{state="waiting"} > 100
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Agent queue backlog >100 waiting"
+          description: "Workers are under-provisioned or stuck. Scale workers."
+
+      - alert: AgentDeadLetterGrowing
+        expr: increase(agent_jobs_total{outcome="dead_letter"}[15m]) > 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Agent jobs hitting the dead-letter queue"
+          description: "{{ $value }} jobs exhausted retries in 15m. Inspect agent-runs-dlq."
+
+      - alert: AgentRunDurationP95High
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(agent_run_duration_seconds_bucket[15m])) by (le)) > 300
+        for: 15m
+        labels: { severity: warning }
+        annotations: { summary: "Agent run p95 >5m" }
+
+  - name: teskel-runtime
+    rules:
+      - alert: EventLoopLagHigh
+        expr: nodejs_eventloop_lag_seconds > 0.2
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Event-loop lag >200ms on {{ $labels.instance }}"
+
+      - alert: ProcessMemoryHigh
+        expr: |
+          process_resident_memory_bytes
+            / clamp_min(nodejs_heap_size_total_bytes, 1) > 0
+          and process_resident_memory_bytes > 1.5e9
+        for: 10m
+        labels: { severity: warning }
+        annotations: { summary: "RSS >1.5GB on {{ $labels.instance }}" }

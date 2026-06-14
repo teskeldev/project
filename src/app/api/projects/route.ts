@@ -5,6 +5,7 @@ import {
   requireUser,
   validateBody,
   ApiError,
+  NO_STORE_HEADERS,
 } from "@/lib/api";
 import { createProjectSchema } from "@/lib/validators";
 import {
@@ -12,7 +13,9 @@ import {
   writeFile,
   detectLanguage,
 } from "@/lib/storage";
-import { Prisma, type FileType } from "@prisma/client";
+import { Prisma, type FileType, type Role } from "@prisma/client";
+import { randomBytes } from "node:crypto";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 function slugify(input: string): string {
   return input
@@ -20,15 +23,6 @@ function slugify(input: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 40);
-}
-
-function shortCuid(length = 8): string {
-  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-  let out = "";
-  for (let i = 0; i < length; i += 1) {
-    out += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return out;
 }
 
 type SeedFile = { path: string; content: string };
@@ -92,7 +86,7 @@ export async function GET(req: Request) {
       orderBy: { updatedAt: "desc" },
     });
 
-    return apiSuccess({ projects });
+    return apiSuccess({ projects }, { headers: NO_STORE_HEADERS });
   } catch (err) {
     return handleApiError(err);
   }
@@ -102,6 +96,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const user = await requireUser();
+    await enforceRateLimit(`projects:create:${user.id}`, 20, 60_000);
     const { workspaceId, name, description, template } = await validateBody(
       req,
       createProjectSchema
@@ -118,22 +113,17 @@ export async function POST(req: Request) {
       );
     }
 
-    // Derive a unique slug within the workspace.
-    const baseSlug = slugify(name) || "project";
-    let slug = baseSlug;
-    let attempt = 0;
-     
-    while (
-      await prisma.project.findUnique({
-        where: { workspaceId_slug: { workspaceId, slug } },
-      })
-    ) {
-      attempt += 1;
-      slug = `${baseSlug}-${shortCuid(4)}`;
-      if (attempt > 10) break;
+    const allowedRoles: Role[] = ["MEMBER", "ADMIN", "OWNER"];
+    if (!allowedRoles.includes(member.role)) {
+      throw new ApiError("Insufficient permissions", 403, "FORBIDDEN");
     }
 
-    const storageKey = `${slug}-${shortCuid(8)}`;
+    // Derive a base slug (final uniqueness is enforced by the DB unique index
+    // on (workspaceId, slug); we retry on a P2002 unique-constraint violation
+    // to avoid the read-then-write race that a check-loop would have).
+    const baseSlug = slugify(name) || "project";
+
+    const storageKey = `${baseSlug}-${randomBytes(6).toString("hex")}`;
     const seeds = seedFilesFor(template ?? "blank", name);
 
     // Write files to disk first; if this fails we never create the DB row.
@@ -143,80 +133,107 @@ export async function POST(req: Request) {
       await writeFile(storageKey, seed.path, seed.content);
     }
 
-    const project = await prisma.$transaction(
-      async (tx: Prisma.TransactionClient) => {
-        const created = await tx.project.create({
-          data: {
-            workspaceId,
-            name,
-            slug,
-            description: description ?? null,
-            storageKey,
-          },
-        });
+    // Create the project + seed FileNodes in a single transaction. The
+    // (workspaceId, slug) unique index is the source of truth for slug
+    // uniqueness; on a P2002 violation (concurrent project create with the
+    // same slug) we regenerate the slug and retry. Capped at 5 attempts.
+    const MAX_SLUG_ATTEMPTS = 5;
+    let slug = baseSlug;
+    let attempt = 0;
+    let project;
 
-        // Build FileNode rows: create folders first (to resolve parentIds),
-        // then files.
-        const folderIds = new Map<string, string>(); // relPath -> id
-
-        const ensureFolder = async (
-          folderPath: string
-        ): Promise<string | null> => {
-          if (!folderPath) return null;
-          if (folderIds.has(folderPath)) return folderIds.get(folderPath)!;
-
-          const segments = folderPath.split("/");
-          let parentId: string | null = null;
-          let current = "";
-          for (const seg of segments) {
-            current = current ? `${current}/${seg}` : seg;
-            if (folderIds.has(current)) {
-              parentId = folderIds.get(current)!;
-              continue;
-            }
-             
-            const folder: { id: string } = await tx.fileNode.create({
+    while (true) {
+      try {
+        project = await prisma.$transaction(
+          async (tx: Prisma.TransactionClient) => {
+            const created = await tx.project.create({
               data: {
-                projectId: created.id,
-                parentId,
-                type: "FOLDER" as FileType,
-                name: seg,
-                path: current,
-                size: 0,
+                workspaceId,
+                name,
+                slug,
+                description: description ?? null,
+                storageKey,
               },
-              select: { id: true },
             });
-            folderIds.set(current, folder.id);
-            parentId = folder.id;
+
+            // Build FileNode rows: create folders first (to resolve parentIds),
+            // then files.
+            const folderIds = new Map<string, string>(); // relPath -> id
+
+            const ensureFolder = async (
+              folderPath: string
+            ): Promise<string | null> => {
+              if (!folderPath) return null;
+              if (folderIds.has(folderPath)) return folderIds.get(folderPath)!;
+
+              const segments = folderPath.split("/");
+              let parentId: string | null = null;
+              let current = "";
+              for (const seg of segments) {
+                current = current ? `${current}/${seg}` : seg;
+                if (folderIds.has(current)) {
+                  parentId = folderIds.get(current)!;
+                  continue;
+                }
+                 
+                const folder: { id: string } = await tx.fileNode.create({
+                  data: {
+                    projectId: created.id,
+                    parentId,
+                    type: "FOLDER" as FileType,
+                    name: seg,
+                    path: current,
+                    size: 0,
+                  },
+                  select: { id: true },
+                });
+                folderIds.set(current, folder.id);
+                parentId = folder.id;
+              }
+              return parentId;
+            };
+
+            for (const seed of seeds) {
+              const idx = seed.path.lastIndexOf("/");
+              const dir = idx >= 0 ? seed.path.slice(0, idx) : "";
+              const fileName = idx >= 0 ? seed.path.slice(idx + 1) : seed.path;
+               
+              const parentId = await ensureFolder(dir);
+
+               
+              await tx.fileNode.create({
+                data: {
+                  projectId: created.id,
+                  parentId,
+                  type: "FILE" as FileType,
+                  name: fileName,
+                  path: seed.path,
+                  language: detectLanguage(fileName),
+                  content: seed.content,
+                  size: Buffer.byteLength(seed.content, "utf8"),
+                },
+              });
+            }
+
+            return created;
           }
-          return parentId;
-        };
-
-        for (const seed of seeds) {
-          const idx = seed.path.lastIndexOf("/");
-          const dir = idx >= 0 ? seed.path.slice(0, idx) : "";
-          const fileName = idx >= 0 ? seed.path.slice(idx + 1) : seed.path;
-           
-          const parentId = await ensureFolder(dir);
-
-           
-          await tx.fileNode.create({
-            data: {
-              projectId: created.id,
-              parentId,
-              type: "FILE" as FileType,
-              name: fileName,
-              path: seed.path,
-              language: detectLanguage(fileName),
-              content: seed.content,
-              size: Buffer.byteLength(seed.content, "utf8"),
-            },
-          });
+        );
+        break;
+      } catch (err) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === "P2002" &&
+          attempt < MAX_SLUG_ATTEMPTS
+        ) {
+          // Slug collided with a concurrent project create. Regenerate and
+          // retry the whole project + FileNode transaction.
+          attempt += 1;
+          slug = `${baseSlug}-${randomBytes(3).toString("hex")}`;
+          continue;
         }
-
-        return created;
+        throw err;
       }
-    );
+    }
 
     return apiSuccess({ project }, { status: 201 });
   } catch (err) {

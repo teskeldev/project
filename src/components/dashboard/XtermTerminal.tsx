@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef } from "react";
 import { Terminal } from "@xterm/xterm";
@@ -73,12 +73,17 @@ export default function XtermTerminal({
     });
     const fit = new FitAddon();
     term.loadAddon(fit);
+    const tryFit = () => {
+      if (!containerRef.current || containerRef.current.clientWidth === 0) return;
+      try {
+        fit.fit();
+      } catch {
+        /* container may not be measured yet */
+      }
+    };
+
     term.open(containerRef.current);
-    try {
-      fit.fit();
-    } catch {
-      /* container may not be measured yet */
-    }
+    tryFit();
 
     termRef.current = term;
     fitRef.current = fit;
@@ -193,8 +198,8 @@ export default function XtermTerminal({
           if (c.output) term.write(normalizeOutput(c.output));
           if (c.output && !c.output.endsWith("\n")) term.write("\r\n");
         }
-      } catch {
-        /* ignore history load failures */
+      } catch (err) {
+        console.warn("[XtermTerminal] Failed to load command history:", err);
       }
       term.write(
         `${DIM}Teskel terminal — commands run safely inside the project sandbox.${PROMPT_RESET}\r\n`
@@ -212,11 +217,10 @@ export default function XtermTerminal({
     onRegister(sessionId, handle);
 
     const ro = new ResizeObserver(() => {
-      try {
-        fit.fit();
-      } catch {
-        /* ignore */
-      }
+      // Use requestAnimationFrame to let browser finish layout before fitting
+      requestAnimationFrame(() => {
+        tryFit();
+      });
     });
     ro.observe(containerRef.current);
 
@@ -236,15 +240,24 @@ export default function XtermTerminal({
   useEffect(() => {
     if (!active) return;
     const id = window.setTimeout(() => {
-      try {
-        fitRef.current?.fit();
-      } catch {
-        /* ignore */
+      if (containerRef.current && containerRef.current.clientWidth > 0) {
+        try {
+          fitRef.current?.fit();
+        } catch {
+          /* ignore */
+        }
       }
       termRef.current?.focus();
-    }, 0);
+    }, 50);
     return () => window.clearTimeout(id);
   }, [active]);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  return (
+    <div
+      ref={containerRef}
+      className="h-full w-full"
+      role="application"
+      aria-label="Terminal"
+    />
+  );
 }

@@ -1,6 +1,6 @@
-﻿"use client";
+"use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -15,7 +15,6 @@ import {
 import {
   Search,
   PenLine,
-  Calendar,
   Sliders,
   FolderOpen,
   Settings,
@@ -34,7 +33,6 @@ import {
   FileText,
   PenTool,
   SearchCode,
-  GitPullRequest,
   Sparkles,
   Palette,
   LogOut,
@@ -42,7 +40,20 @@ import {
   Check,
   Loader2,
   X,
+  Webhook,
+  Shield,
+  Zap,
+  TerminalSquare,
 } from "lucide-react";
+
+// Custom event name for opening the command palette.
+// Listeners (e.g. the CommandPalette component) should subscribe to this event.
+export const OPEN_COMMAND_PALETTE_EVENT = "app:open-command-palette";
+
+/** Dispatch a custom event to open the command palette. */
+function openCommandPalette() {
+  window.dispatchEvent(new CustomEvent(OPEN_COMMAND_PALETTE_EVENT));
+}
 
 /** Compact relative time label for thread list items. */
 function relativeTime(iso: string): string {
@@ -63,7 +74,7 @@ function relativeTime(iso: string): string {
 
 const workspaceLinks = [
   { href: "/dashboard/editor", icon: Code, label: "Editor" },
-  { href: "/dashboard/composer", icon: Layers, label: "Composer" },
+  { href: "/dashboard/composer", icon: Layers, label: "Code Review" },
   { href: "/dashboard/terminal", icon: Terminal, label: "Terminal" },
   { href: "/dashboard/git", icon: GitBranch, label: "Git" },
   { href: "/dashboard/extensions", icon: Puzzle, label: "Extensions" },
@@ -74,14 +85,17 @@ const aiLinks = [
   { href: "/dashboard/artifacts", icon: Sparkles, label: "Artifacts" },
   { href: "/dashboard/design", icon: Palette, label: "Design" },
   { href: "/dashboard/canvas", icon: PenTool, label: "Canvas" },
-  { href: "/dashboard/review", icon: GitPullRequest, label: "Diff Review" },
   { href: "/dashboard/search", icon: SearchCode, label: "Search" },
 ];
 
 const configLinks = [
   { href: "/dashboard/knowledge", icon: BookOpen, label: "Knowledge" },
   { href: "/dashboard/rules", icon: FileText, label: "Rules" },
+  { href: "/dashboard/skills", icon: Zap, label: "Skills" },
+  { href: "/dashboard/commands", icon: TerminalSquare, label: "Commands" },
   { href: "/dashboard/integrations", icon: Plug, label: "Integrations" },
+  { href: "/dashboard/webhooks", icon: Webhook, label: "Webhooks" },
+  { href: "/dashboard/permissions", icon: Shield, label: "Permissions" },
 ];
 
 function NewProjectModal({
@@ -190,7 +204,11 @@ function NewProjectModal({
   );
 }
 
-export default function Sidebar() {
+/**
+ * Inner sidebar component that uses useSearchParams().
+ * Extracted so it can be wrapped in a Suspense boundary.
+ */
+function SidebarContent() {
   const pathname = usePathname();
   const [reposOpen, setReposOpen] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
@@ -213,6 +231,7 @@ export default function Sidebar() {
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [threadsLoading, setThreadsLoading] = useState(false);
   const [creatingChat, setCreatingChat] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
 
   const loadThreads = useCallback(async () => {
     if (!activeProjectId) {
@@ -236,15 +255,28 @@ export default function Sidebar() {
     void loadThreads();
   }, [loadThreads]);
 
+  // Auto-clear chat error after a few seconds
+  useEffect(() => {
+    if (!chatError) return;
+    const timer = setTimeout(() => setChatError(null), 4000);
+    return () => clearTimeout(timer);
+  }, [chatError]);
+
   const handleNewChat = async () => {
     if (!activeProjectId || creatingChat) return;
     setCreatingChat(true);
+    setChatError(null);
     try {
       const { thread } = await createThread(activeProjectId);
       setThreads((prev) => [thread, ...prev]);
       router.push(`/dashboard/chat?thread=${thread.id}`);
-    } catch {
-      // ignore; user can retry
+    } catch (err) {
+      const message =
+        err instanceof ApiClientError
+          ? err.message
+          : "Failed to create chat. Please try again.";
+      console.warn("[Sidebar] handleNewChat failed:", message);
+      setChatError(message);
     } finally {
       setCreatingChat(false);
     }
@@ -260,41 +292,41 @@ export default function Sidebar() {
         <button
           onClick={() => setCollapsed(false)}
           className="mb-3 rounded-lg p-2 text-gray-400 transition-all duration-200 hover:bg-gray-100 hover:text-gray-600"
-          title="Expand sidebar"
+          title="Expand sidebar" aria-label="Expand sidebar"
         >
           <ChevronRight size={16} />
         </button>
-        <Link href="/dashboard" className="mb-1 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="New Agent">
+        <Link href="/dashboard" className="mb-1 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="New Agent" aria-label="New Agent">
           <PenLine size={16} />
         </Link>
-        <button className="mb-1 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="Search (Ctrl+K)">
+        <button onClick={openCommandPalette} className="mb-1 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="Search (Ctrl+K)" aria-label="Search">
           <Search size={16} />
         </button>
         {workspaceLinks.map((link) => (
-          <Link key={link.href} href={link.href} className={`mb-1 rounded-lg p-2 ${pathname === link.href ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"}`} title={link.label}>
+          <Link key={link.href} href={link.href} className={`mb-1 rounded-lg p-2 ${pathname === link.href ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"}`} title={link.label} aria-label={link.label}>
             <link.icon size={16} />
           </Link>
         ))}
         <div className="my-1 h-px w-6 bg-gray-200" />
         {aiLinks.map((link) => (
-          <Link key={link.href} href={link.href} className={`mb-1 rounded-lg p-2 ${pathname === link.href ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"}`} title={link.label}>
+          <Link key={link.href} href={link.href} className={`mb-1 rounded-lg p-2 ${pathname === link.href ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"}`} title={link.label} aria-label={link.label}>
             <link.icon size={16} />
           </Link>
         ))}
         <div className="my-1 h-px w-6 bg-gray-200" />
         {configLinks.map((link) => (
-          <Link key={link.href} href={link.href} className={`mb-1 rounded-lg p-2 ${pathname === link.href ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"}`} title={link.label}>
+          <Link key={link.href} href={link.href} className={`mb-1 rounded-lg p-2 ${pathname === link.href ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"}`} title={link.label} aria-label={link.label}>
             <link.icon size={16} />
           </Link>
         ))}
         <div className="flex-1" />
-        <Link href="/dashboard/settings" className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="Settings">
+        <Link href="/dashboard/settings" className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="Settings" aria-label="Settings">
           <Settings size={16} />
         </Link>
         <button
           onClick={() => signOut({ callbackUrl: "/" })}
           className="mt-1 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-          title="Sign out"
+          title="Sign out" aria-label="Sign out"
         >
           <LogOut size={16} />
         </button>
@@ -314,7 +346,7 @@ export default function Sidebar() {
           <span className="text-xs">Collapse</span>
         </button>
 
-        <button className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700">
+        <button onClick={openCommandPalette} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700">
           <Search size={16} />
           <span>Search</span>
           <kbd className="ml-auto rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] text-gray-400">
@@ -336,16 +368,15 @@ export default function Sidebar() {
             Ctrl+N
           </kbd>
         </Link>
+        <Link href="/dashboard/chat" className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900">
+          <MessageSquare size={16} />
+          <span>Chat</span>
+        </Link>
 
-        <button className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900">
-          <Calendar size={16} />
-          <span>Automations</span>
-        </button>
-
-        <button className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900">
+        <Link href="/dashboard/settings" className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900">
           <Sliders size={16} />
           <span>Customize</span>
-        </button>
+        </Link>
       </div>
 
       {/* Workspace tools */}
@@ -490,6 +521,12 @@ export default function Sidebar() {
           </button>
         </div>
 
+        {chatError && (
+          <p className="mx-3 mb-1 rounded bg-red-50 px-2 py-1 text-xs text-red-600">
+            {chatError}
+          </p>
+        )}
+
         {!activeProjectId ? (
           <p className="px-3 py-2 text-xs text-gray-400">
             Select a project to see chats.
@@ -584,5 +621,25 @@ export default function Sidebar() {
         />
       )}
     </aside>
+  );
+}
+
+/**
+ * Default export wraps SidebarContent in a Suspense boundary
+ * because useSearchParams() requires it in Next.js App Router.
+ */
+export default function Sidebar() {
+  return (
+    <Suspense
+      fallback={
+        <aside className="flex h-screen w-60 flex-col border-r border-[#E5E7EB]/60 bg-white/80 backdrop-blur-xl">
+          <div className="flex flex-1 items-center justify-center">
+            <Loader2 size={20} className="animate-spin text-gray-300" />
+          </div>
+        </aside>
+      }
+    >
+      <SidebarContent />
+    </Suspense>
   );
 }

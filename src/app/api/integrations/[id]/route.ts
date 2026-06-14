@@ -40,6 +40,16 @@ async function loadAuthorizedIntegration(user: SessionUser, id: string) {
       "FORBIDDEN"
     );
   }
+
+  // Role check: only ADMIN or OWNER can manage integrations
+  if (member.role !== "ADMIN" && member.role !== "OWNER") {
+    throw new ApiError(
+      "Only admins and owners can manage integrations",
+      403,
+      "FORBIDDEN"
+    );
+  }
+
   return integration;
 }
 

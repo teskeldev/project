@@ -5,6 +5,7 @@ import {
   requireUser,
   validateBody,
   ApiError,
+  NO_STORE_HEADERS,
   type SessionUser,
 } from "@/lib/api";
 import { encryptJson } from "@/lib/crypto";
@@ -16,6 +17,7 @@ import {
   createIntegrationSchema,
   toSafeIntegration,
 } from "@/lib/integrations/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 /**
  * Ensure the user is a member of the workspace. Throws 403 otherwise.
@@ -66,7 +68,10 @@ export async function GET(req: Request) {
       orderBy: { createdAt: "asc" },
     });
 
-    return apiSuccess({ integrations: rows.map(toSafeIntegration) });
+    return apiSuccess(
+      { integrations: rows.map(toSafeIntegration) },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (err) {
     return handleApiError(err);
   }
@@ -83,7 +88,18 @@ export async function POST(req: Request) {
       createIntegrationSchema
     );
 
-    await requireWorkspaceMember(user, workspaceId);
+    await enforceRateLimit(`integrations:create:${workspaceId}`, 10, 60_000);
+
+    const member = await requireWorkspaceMember(user, workspaceId);
+
+    // Role check: only ADMIN or OWNER can manage integrations
+    if (member.role !== "ADMIN" && member.role !== "OWNER") {
+      throw new ApiError(
+        "Only admins and owners can manage integrations",
+        403,
+        "FORBIDDEN"
+      );
+    }
 
     // Validate the config shape for this specific provider.
     let parsedConfig: Record<string, unknown>;

@@ -1,21 +1,62 @@
+# BACKUP STRATEGY (production):
+# - Daily pg_dump to S3: 0 3 * * * pg_dump -U teskel teskel | gzip | aws s3 cp - s3://teskel-backups/daily/$(date +%Y%m%d).sql.gz
+# - WAL archiving: enable archive_mode = on, archive_command = 'aws s3 cp %p s3://teskel-wal/%f'
+# - For managed Postgres, use built-in PITR (Neon, Supabase, RDS)
+
 services:
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: teskel-db
     restart: unless-stopped
+    shm_size: '256mb'
     environment:
-      POSTGRES_USER: teskel
-      POSTGRES_PASSWORD: teskel
-      POSTGRES_DB: teskel
+      POSTGRES_USER: ${POSTGRES_USER:-teskel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_in_production}
+      POSTGRES_DB: ${POSTGRES_DB:-teskel}
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - teskel_pgdata:/var/lib/postgresql/data
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "work_mem=16MB"
+      - "-c"
+      - "maintenance_work_mem=128MB"
+      - "-c"
+      - "effective_cache_size=512MB"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U teskel -d teskel"]
       interval: 5s
       timeout: 5s
       retries: 5
 
+  # Redis backs the BullMQ agent queue and the cross-instance SSE event bus.
+  # The app and worker connect via REDIS_URL=redis://localhost:6379.
+  redis:
+    image: redis:7-alpine
+    container_name: teskel-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    command:
+      - "redis-server"
+      - "--appendonly"
+      - "yes"
+      - "--maxmemory"
+      - "256mb"
+      - "--maxmemory-policy"
+      - "noeviction"
+    volumes:
+      - teskel_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
 volumes:
   teskel_pgdata:
+  teskel_redisdata:

@@ -25,6 +25,18 @@ import path from "node:path";
 import process from "node:process";
 import { ApiError } from "@/lib/api";
 import { getProjectRoot, resolveSafe } from "@/lib/storage";
+import { logger } from "@/lib/logger";
+import {
+  getSandboxConfig,
+  isSandboxEnabled,
+  buildSandboxArgs,
+  buildKillArgs,
+  sandboxContainerName,
+  describeSandbox,
+} from "@/lib/terminal/sandbox";
+
+/** Audit log for every command execution (sandboxed or fallback). */
+const audit = logger.child({ component: "terminal" });
 
 const isWin = process.platform === "win32";
 
@@ -177,10 +189,29 @@ const BLOCKLIST: { re: RegExp; reason: string }[] = [
 
   /* --- network exfiltration tools --- */
   { re: /\b(?:nc|ncat|netcat|socat)\b/i, reason: "network tools (nc/netcat/socat) are not allowed" },
+  { re: /\b(?:nc|ncat|netcat)\.exe\b/i, reason: "network tools (nc.exe/netcat) are not allowed" },
   { re: /\b(?:curl|wget)\b[^\n]*(?:-o\b|--output\b|>\s)/i, reason: "downloading files to disk is not allowed" },
 
   /* --- persistence via scheduling --- */
   { re: /\b(?:crontab|at)\b/i, reason: "scheduling commands (crontab/at) is not allowed" },
+
+  /* --- PowerShell .NET env access --- */
+  { re: /\[System\.Environment\]::GetEnvironmentVariable/i, reason: "PowerShell .NET environment access is not allowed" },
+
+  /* --- PowerShell variable inspection --- */
+  { re: /\bGet-Variable\b/i, reason: "Get-Variable is not allowed" },
+
+  /* --- PowerShell env: provider (alternate forms) --- */
+  { re: /Get-ChildItem\s+env:/i, reason: "dumping the environment is not allowed" },
+
+  /* --- bash here-string (<<<) --- */
+  { re: /<<<\s*['"]/, reason: "bash here-strings are not allowed" },
+
+  /* --- bash heredoc (<<EOF) --- */
+  { re: /<<\s*['"]?EOF/i, reason: "bash heredocs are not allowed" },
+
+  /* --- backtick command substitution reading sensitive env --- */
+  { re: /`\$\{?(?:HOME|USER|PATH|SECRET|KEY|TOKEN|PASSWORD)/i, reason: "backtick command substitution reading sensitive env is not allowed" },
 ];
 
 /** Commands that are allowed but worth warning the user about. */
@@ -351,12 +382,53 @@ function buildSafeEnv(): Record<string, string> {
 /** Currently-running child processes, keyed by terminal session id. */
 const running = new Map<string, ChildProcess>();
 
+/** Container name for sandboxed runs, keyed by session id (for `docker kill`). */
+const containerNames = new Map<string, string>();
+
 export function isRunning(sessionId: string): boolean {
   return running.has(sessionId);
 }
 
+/**
+ * Try to mark a session as running. Returns true if the slot was acquired
+ * (caller may proceed to spawn the child process and SHOULD later call
+ * `release` in its cleanup path), false if a command is already running
+ * for that session. This is the atomic primitive used by the run route to
+ * close the check-then-set race that existed when both the route and
+ * `runCommand` separately tested `running.has(...)`.
+ */
+export function tryAcquire(sessionId: string): boolean {
+  if (running.has(sessionId)) return false;
+  // Use a sentinel placeholder so the slot is "held" between tryAcquire and
+  // the actual spawn. The real child replaces this value.
+  running.set(sessionId, null as unknown as ChildProcess);
+  return true;
+}
+
+/**
+ * Release the running slot for a session. Safe to call even if no command
+ * is running. After release, `isRunning(sessionId)` returns false and
+ * another command can be started.
+ */
+export function release(sessionId: string): void {
+  running.delete(sessionId);
+}
+
 /** Forcefully terminate the process group for a session. */
-function killTree(child: ChildProcess): void {
+function killTree(child: ChildProcess, sessionId?: string): void {
+  // Sandboxed run: kill the container directly (killing the `docker run` client
+  // alone does NOT stop the container).
+  if (sessionId) {
+    const name = containerNames.get(sessionId);
+    if (name) {
+      const cfg = getSandboxConfig();
+      try {
+        spawn(cfg.runtime, buildKillArgs(name), { stdio: "ignore" });
+      } catch {
+        /* fall through to killing the client process */
+      }
+    }
+  }
   if (!child.pid) return;
   if (isWin) {
     try {
@@ -389,8 +461,9 @@ function killTree(child: ChildProcess): void {
 export function killSession(sessionId: string): boolean {
   const child = running.get(sessionId);
   if (!child) return false;
-  killTree(child);
+  killTree(child, sessionId);
   running.delete(sessionId);
+  containerNames.delete(sessionId);
   return true;
 }
 
@@ -411,23 +484,78 @@ export type RunOptions = {
   cwd: string;
   /** Streaming callback for stdout/stderr chunks (already utf-8 decoded). */
   onOutput?: (chunk: string) => void;
+  /** Project storage key — required for the containerized (sandboxed) path. */
+  storageKey?: string;
+  /** Project-relative cwd ("" == root) — used to set the container workdir. */
+  relCwd?: string;
+  /** Audit context (user/project) recorded with every execution. */
+  audit?: { userId?: string; projectId?: string };
 };
 
 /**
  * Spawn and run a command. Enforces the single-command-per-session rule, the
  * timeout, and the output cap. Streams output via `onOutput` and resolves with
  * the final captured result for persistence.
+ *
+ * The caller MUST have already called `tryAcquire(sessionId)` and received
+ * `true`. If the slot wasn't acquired we throw `SESSION_BUSY` so a misuse is
+ * loud rather than silent.
  */
 export function runCommand(opts: RunOptions): Promise<RunResult> {
-  const { sessionId, command, cwd, onOutput } = opts;
+  const { sessionId } = opts;
 
-  if (running.has(sessionId)) {
+  if (!running.has(sessionId)) {
     throw new ApiError(
-      "A command is already running in this session",
-      409,
-      "SESSION_BUSY"
+      "Internal: runCommand called without an acquired session slot",
+      500,
+      "INTERNAL_ERROR"
     );
   }
+
+  // Containerized execution is the PRIMARY path in production. The in-process
+  // path is an explicit fallback (dev / when no container runtime is present).
+  if (isSandboxEnabled() && opts.storageKey !== undefined) {
+    return runInSandbox(opts);
+  }
+
+  // FAIL-SAFE: never fall back to unsandboxed execution in production unless an
+  // operator has explicitly accepted the risk. This makes container isolation —
+  // not the blocklist — the security boundary that GA depends on.
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env.TERMINAL_ALLOW_UNSANDBOXED !== "1"
+  ) {
+    audit.error("terminal execution blocked: sandbox required in production", {
+      sessionId,
+      userId: opts.audit?.userId,
+      projectId: opts.audit?.projectId,
+    });
+    throw new ApiError(
+      "Terminal execution is unavailable: the server is not configured with a command sandbox. Set TERMINAL_SANDBOX=docker.",
+      503,
+      "SANDBOX_REQUIRED"
+    );
+  }
+
+  return runInProcess(opts);
+}
+
+/**
+ * In-process execution — NO container isolation. Used only when
+ * TERMINAL_SANDBOX is disabled. Protected by the blocklist + cwd jail + env
+ * scrub + timeout + output cap, but a determined command can still touch the
+ * host. Do NOT enable this in multi-tenant production; set TERMINAL_SANDBOX.
+ */
+function runInProcess(opts: RunOptions): Promise<RunResult> {
+  const { sessionId, command, cwd, onOutput } = opts;
+
+  audit.info("terminal command (in-process fallback)", {
+    sessionId,
+    userId: opts.audit?.userId,
+    projectId: opts.audit?.projectId,
+    mode: "in-process",
+    bytes: command.length,
+  });
 
   const shell = isWin ? process.env.ComSpec || "cmd.exe" : "/bin/sh";
   const args = isWin ? ["/d", "/s", "/c", command] : ["-c", command];
@@ -440,6 +568,7 @@ export function runCommand(opts: RunOptions): Promise<RunResult> {
     stdio: ["ignore", "pipe", "pipe"],
   });
 
+  // Replace the placeholder from tryAcquire with the real child.
   running.set(sessionId, child);
 
   const timeoutSec = getMaxTimeoutSeconds();
@@ -470,7 +599,7 @@ export function runCommand(opts: RunOptions): Promise<RunResult> {
     if (s) emit(s);
     if (truncated) {
       emit(`\r\n[output truncated at ${MAX_OUTPUT_BYTES} bytes]\r\n`);
-      killTree(child);
+      killTree(child, sessionId);
     }
   };
 
@@ -479,7 +608,7 @@ export function runCommand(opts: RunOptions): Promise<RunResult> {
 
   const timer = setTimeout(() => {
     timedOut = true;
-    killTree(child);
+    killTree(child, sessionId);
   }, timeoutSec * 1000);
 
   return new Promise<RunResult>((resolve) => {
@@ -501,4 +630,128 @@ export function runCommand(opts: RunOptions): Promise<RunResult> {
       resolve({ output: captured, exitCode: 127, truncated, timedOut });
     });
   });
+}
+
+/**
+ * Containerized execution — the PRIMARY production path. Runs the command in a
+ * throwaway, network-less, resource-capped, non-root container whose only host
+ * access is a bind mount of the project directory. The command is passed as a
+ * single argv element to `sh -c`, so there is no host-side shell.
+ */
+function runInSandbox(opts: RunOptions): Promise<RunResult> {
+  const { sessionId, command, onOutput } = opts;
+  const cfg = getSandboxConfig();
+  const timeoutSec = getMaxTimeoutSeconds();
+
+  // Host directory to bind-mount (the project root on the container host).
+  const hostRoot = realpathSafe(getProjectRoot(opts.storageKey ?? ""));
+  const containerName = sandboxContainerName(sessionId, Date.now());
+  containerNames.set(sessionId, containerName);
+
+  const args = buildSandboxArgs(cfg, {
+    containerName,
+    hostRoot,
+    relCwd: opts.relCwd ?? "",
+    command,
+    timeoutSec,
+  });
+
+  audit.info("terminal command (sandboxed)", {
+    sessionId,
+    userId: opts.audit?.userId,
+    projectId: opts.audit?.projectId,
+    mode: "sandbox",
+    container: containerName,
+    bytes: command.length,
+    sandbox: describeSandbox(cfg),
+  });
+
+  const child = spawn(cfg.runtime, args, {
+    windowsHide: true,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  running.set(sessionId, child);
+
+  let captured = "";
+  let totalBytes = 0;
+  let truncated = false;
+  let timedOut = false;
+
+  const emit = (chunk: string) => {
+    captured += chunk;
+    try {
+      onOutput?.(chunk);
+    } catch {
+      /* consumer errors must not crash the runner */
+    }
+  };
+
+  const handle = (buf: Buffer) => {
+    if (truncated) return;
+    let s = buf.toString("utf8");
+    if (totalBytes + Buffer.byteLength(s, "utf8") > MAX_OUTPUT_BYTES) {
+      s = s.slice(0, Math.max(0, MAX_OUTPUT_BYTES - totalBytes));
+      truncated = true;
+    }
+    totalBytes += Buffer.byteLength(s, "utf8");
+    if (s) emit(s);
+    if (truncated) {
+      emit(`\r\n[output truncated at ${MAX_OUTPUT_BYTES} bytes]\r\n`);
+      killTree(child, sessionId);
+    }
+  };
+
+  child.stdout?.on("data", handle);
+  child.stderr?.on("data", handle);
+
+  const timer = setTimeout(() => {
+    timedOut = true;
+    killTree(child, sessionId); // docker kill <container>
+  }, timeoutSec * 1000);
+
+  const cleanup = () => {
+    clearTimeout(timer);
+    running.delete(sessionId);
+    containerNames.delete(sessionId);
+  };
+
+  return new Promise<RunResult>((resolve) => {
+    child.on("close", (code) => {
+      cleanup();
+      if (timedOut) {
+        emit(`\r\n[command timed out after ${timeoutSec}s and was terminated]\r\n`);
+      }
+      audit.info("terminal command finished", {
+        sessionId,
+        mode: "sandbox",
+        exitCode: code,
+        timedOut,
+        truncated,
+        bytes: totalBytes,
+      });
+      resolve({ output: captured, exitCode: code, truncated, timedOut });
+    });
+
+    child.on("error", (err) => {
+      cleanup();
+      emit(
+        `\r\n[failed to start sandbox (${cfg.runtime}): ${err.message}]\r\n`
+      );
+      audit.error("terminal sandbox spawn failed", {
+        sessionId,
+        runtime: cfg.runtime,
+        error: err.message,
+      });
+      resolve({ output: captured, exitCode: 127, truncated, timedOut });
+    });
+  });
+}
+
+/** realpath with a graceful fallback when the path doesn't exist yet. */
+function realpathSafe(p: string): string {
+  try {
+    return realpathSync(p);
+  } catch {
+    return p;
+  }
 }

@@ -6,7 +6,9 @@ import {
   handleApiError,
   requireUser,
   validateBody,
+  NO_STORE_HEADERS,
 } from "@/lib/api";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const createKeySchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100),
@@ -38,7 +40,7 @@ export async function GET() {
       createdAt: k.createdAt,
     }));
 
-    return apiSuccess({ keys: masked });
+    return apiSuccess({ keys: masked }, { headers: NO_STORE_HEADERS });
   } catch (err) {
     return handleApiError(err);
   }
@@ -47,6 +49,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const user = await requireUser();
+    await enforceRateLimit(`keys:create:${user.id}`, 5, 60_000);
     const { name, workspaceId } = await validateBody(req, createKeySchema);
 
     // Generate a random 32-byte hex key with prefix

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -24,14 +24,19 @@ import {
   type Rule,
   type RuleScope,
 } from "@/lib/client/rules";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 type ScopeFilter = "all" | "GLOBAL" | "PROJECT" | "FILE";
 
-const SCOPE_BADGE: Record<RuleScope, string> = {
-  GLOBAL: "bg-blue-50 text-blue-600",
-  WORKSPACE: "bg-emerald-50 text-emerald-600",
-  PROJECT: "bg-purple-50 text-purple-600",
-  FILE: "bg-orange-50 text-orange-600",
+const SCOPE_BADGE_VARIANT: Record<RuleScope, "default" | "success" | "warning" | "destructive" | "outline"> = {
+  GLOBAL: "default",
+  WORKSPACE: "success",
+  PROJECT: "warning",
+  FILE: "destructive",
 };
 
 type FormState = {
@@ -238,25 +243,22 @@ export default function RulesPage() {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-[22px] font-semibold text-gray-900">
+            <h1 className="text-[22px] font-semibold text-[var(--foreground)]">
               Rules &amp; Context
             </h1>
-            <p className="mt-1 text-[14px] text-gray-500">
+            <p className="mt-1 text-[14px] text-[var(--text-secondary)]">
               Configure how Teskel writes and reviews code
             </p>
           </div>
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-[13px] font-medium text-white hover:bg-gray-800"
-          >
+          <Button onClick={openCreate}>
             <Plus size={14} />
             Add Rule
-          </button>
+          </Button>
         </div>
 
-        <p className="mb-6 rounded-lg bg-blue-50 px-3 py-2 text-[12px] text-blue-700">
+        <div className="mb-6 rounded-lg bg-blue-50 px-3 py-2 text-[12px] text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
           Enabled rules are injected into AI chat &amp; agent context.
-        </p>
+        </div>
 
         {/* Scope filters */}
         <div className="mb-6 flex gap-2">
@@ -266,102 +268,96 @@ export default function RulesPage() {
             { key: "PROJECT", label: "Project", icon: FolderOpen },
             { key: "FILE", label: "File Pattern", icon: FileCode },
           ].map((f) => (
-            <button
+            <Button
               key={f.key}
+              variant={activeScope === f.key ? "default" : "secondary"}
+              size="sm"
               onClick={() => setActiveScope(f.key as ScopeFilter)}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors ${
-                activeScope === f.key
-                  ? "bg-gray-900 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
             >
               <f.icon size={12} />
               {f.label}
-            </button>
+            </Button>
           ))}
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-600">
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-600 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400">
             {error}
           </div>
         )}
 
         {/* States */}
         {loading ? (
-          <div className="flex items-center justify-center gap-2 py-16 text-gray-400">
+          <div className="flex items-center justify-center gap-2 py-16 text-[var(--text-muted)]">
             <Loader2 size={18} className="animate-spin" />
             <span className="text-[13px]">Loading rules...</span>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-gray-200 bg-white py-16 text-center">
-            <p className="text-[14px] font-medium text-gray-700">
+          <Card className="border-dashed py-16 text-center">
+            <p className="text-[14px] font-medium text-[var(--foreground)]">
               No rules yet
             </p>
-            <p className="mt-1 text-[13px] text-gray-500">
+            <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
               Add a rule to guide how Teskel writes and reviews code.
             </p>
-            <button
-              onClick={openCreate}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-[13px] font-medium text-white hover:bg-gray-800"
-            >
+            <Button onClick={openCreate} className="mt-4">
               <Plus size={14} />
               Add Rule
-            </button>
-          </div>
+            </Button>
+          </Card>
         ) : (
           <div className="space-y-3">
             {filtered.map((rule) => (
-              <div
+              <Card
                 key={rule.id}
-                className={`rounded-xl border bg-white p-5 transition-all ${
-                  rule.enabled
-                    ? "border-gray-200"
-                    : "border-gray-100 opacity-60"
+                className={`p-5 transition-all ${
+                  rule.enabled ? "" : "opacity-60"
                 }`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex flex-wrap items-center gap-3">
-                      <h3 className="text-[14px] font-semibold text-gray-900">
+                      <h3 className="text-[14px] font-semibold text-[var(--foreground)]">
                         {rule.title}
                       </h3>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${SCOPE_BADGE[rule.scope]}`}
-                      >
+                      <Badge variant={SCOPE_BADGE_VARIANT[rule.scope]}>
                         {rule.scope.toLowerCase()}
-                      </span>
+                      </Badge>
                       {rule.filePattern && (
-                        <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] text-gray-500">
+                        <Badge variant="outline" className="font-mono text-[10px]">
                           {rule.filePattern}
-                        </span>
+                        </Badge>
                       )}
                     </div>
-                    <p className="mt-2 whitespace-pre-wrap text-[13px] leading-relaxed text-gray-500">
+                    <p className="mt-2 whitespace-pre-wrap text-[13px] leading-relaxed text-[var(--text-secondary)]">
                       {rule.content}
                     </p>
                   </div>
                   <div className="ml-4 flex items-center gap-2">
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => openEdit(rule)}
                       disabled={busyId === rule.id}
-                      className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
                       aria-label="Edit rule"
+                      className="h-7 w-7"
                     >
                       <Edit3 size={14} />
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => handleDelete(rule)}
                       disabled={busyId === rule.id}
-                      className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-red-500 disabled:opacity-50"
                       aria-label="Delete rule"
+                      className="h-7 w-7 hover:text-red-500"
                     >
                       <Trash2 size={14} />
-                    </button>
+                    </Button>
                     <button
                       onClick={() => handleToggle(rule)}
                       disabled={busyId === rule.id}
-                      className={`${rule.enabled ? "text-blue-600" : "text-gray-300"} disabled:opacity-50`}
+                      className={`${rule.enabled ? "text-[var(--accent)]" : "text-[var(--text-muted)]"} disabled:opacity-50`}
                       aria-label={rule.enabled ? "Disable rule" : "Enable rule"}
                     >
                       {rule.enabled ? (
@@ -372,7 +368,7 @@ export default function RulesPage() {
                     </button>
                   </div>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         )}
@@ -380,25 +376,27 @@ export default function RulesPage() {
 
       {/* Create / edit modal */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 dark:bg-black/50">
+          <Card className="w-full max-w-lg p-6 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-[16px] font-semibold text-gray-900">
+              <h2 className="text-[16px] font-semibold text-[var(--foreground)]">
                 {editingId ? "Edit Rule" : "Add Rule"}
               </h2>
-              <button
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={closeForm}
-                className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
                 aria-label="Close"
+                className="h-7 w-7"
               >
                 <X size={16} />
-              </button>
+              </Button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {!editingId && (
                 <div>
-                  <label className="mb-1 block text-[12px] font-medium text-gray-700">
+                  <label className="mb-1 block text-[12px] font-medium text-[var(--text-secondary)]">
                     Scope
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -418,23 +416,20 @@ export default function RulesPage() {
                         { v: "FILE", label: "File", icon: FileCode },
                       ] as { v: RuleScope; label: string; icon: typeof Globe }[]
                     ).map((s) => (
-                      <button
+                      <Button
                         key={s.v}
                         type="button"
+                        variant={form.scope === s.v ? "default" : "secondary"}
+                        size="sm"
                         onClick={() => setForm((f) => ({ ...f, scope: s.v }))}
-                        className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-medium ${
-                          form.scope === s.v
-                            ? "bg-gray-900 text-white"
-                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                        }`}
                       >
                         <s.icon size={12} />
                         {s.label}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                   {form.scope === "PROJECT" && (
-                    <p className="mt-1 text-[11px] text-gray-500">
+                    <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
                       Targets:{" "}
                       {activeProject
                         ? activeProject.name
@@ -442,7 +437,7 @@ export default function RulesPage() {
                     </p>
                   )}
                   {form.scope === "WORKSPACE" && (
-                    <p className="mt-1 text-[11px] text-gray-500">
+                    <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
                       Targets:{" "}
                       {activeWorkspace
                         ? activeWorkspace.name
@@ -453,73 +448,70 @@ export default function RulesPage() {
               )}
 
               <div>
-                <label className="mb-1 block text-[12px] font-medium text-gray-700">
+                <label className="mb-1 block text-[12px] font-medium text-[var(--text-secondary)]">
                   Title
                 </label>
-                <input
+                <Input
                   value={form.title}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, title: e.target.value }))
                   }
                   placeholder="e.g. TypeScript Strict"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-[13px] text-gray-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50"
                 />
               </div>
 
               {form.scope === "FILE" && (
                 <div>
-                  <label className="mb-1 block text-[12px] font-medium text-gray-700">
+                  <label className="mb-1 block text-[12px] font-medium text-[var(--text-secondary)]">
                     File pattern
                   </label>
-                  <input
+                  <Input
                     value={form.filePattern}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, filePattern: e.target.value }))
                     }
                     placeholder="**/*.test.{ts,tsx}"
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-[13px] text-gray-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50"
+                    className="font-mono"
                   />
                 </div>
               )}
 
               <div>
-                <label className="mb-1 block text-[12px] font-medium text-gray-700">
+                <label className="mb-1 block text-[12px] font-medium text-[var(--text-secondary)]">
                   Content
                 </label>
-                <textarea
+                <Textarea
                   value={form.content}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, content: e.target.value }))
                   }
                   rows={6}
                   placeholder="Describe the rule the AI should follow..."
-                  className="w-full resize-y rounded-lg border border-gray-200 px-3 py-2 text-[13px] text-gray-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50"
                 />
               </div>
 
               {formError && (
-                <p className="text-[12px] text-red-600">{formError}</p>
+                <p className="text-[12px] text-red-600 dark:text-red-400">{formError}</p>
               )}
 
               <div className="flex justify-end gap-2 pt-2">
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={closeForm}
-                  className="rounded-lg px-4 py-2 text-[13px] font-medium text-gray-600 hover:bg-gray-100"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
                   disabled={saving}
-                  className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-[13px] font-medium text-white hover:bg-gray-800 disabled:opacity-60"
                 >
                   {saving && <Loader2 size={14} className="animate-spin" />}
                   {editingId ? "Save changes" : "Create rule"}
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
+          </Card>
         </div>
       )}
     </div>

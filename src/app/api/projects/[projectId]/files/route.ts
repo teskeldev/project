@@ -31,7 +31,13 @@ type RouteContext = { params: Promise<{ projectId: string }> };
 export async function POST(req: Request, ctx: RouteContext) {
   try {
     const { projectId } = await ctx.params;
-    const { project } = await requireProjectAccess(projectId);
+    const { project, member } = await requireProjectAccess(projectId);
+
+    // Role check: viewers cannot create files/folders
+    if (member.role === "VIEWER") {
+      throw new ApiError("Insufficient permissions", 403, "FORBIDDEN");
+    }
+
     const storageKey = project!.storageKey;
 
     const body = await validateBody(req, createFileNodeSchema);
@@ -84,24 +90,56 @@ export async function POST(req: Request, ctx: RouteContext) {
 
     const content = body.content ?? "";
 
+    // Disk first (source of truth), then DB. The DB create is wrapped in a
+    // transaction with a re-check for an existing row at the same path; if
+    // a concurrent create inserted a row between our pre-check and now,
+    // we'll either surface a unique-violation OR (with the re-check) just
+    // see the row and roll back the disk write. This closes the
+    // check-then-insert race on the (projectId, path) unique index.
     if (type === "FOLDER") {
       await createDir(storageKey, fullPath);
     } else {
       await writeFile(storageKey, fullPath, content);
     }
 
-    const node = await prisma.fileNode.create({
-      data: {
-        projectId,
-        parentId,
-        type,
-        name: baseName,
-        path: fullPath,
-        language: type === "FILE" ? detectLanguage(baseName) : null,
-        content: type === "FILE" ? content : null,
-        size: type === "FILE" ? Buffer.byteLength(content, "utf8") : 0,
-      },
-    });
+    let node;
+    try {
+      node = await prisma.$transaction(async (tx) => {
+        // Re-check inside the transaction: a concurrent POST may have
+        // created a row at the same path while we were writing to disk.
+        const concurrent = await tx.fileNode.findUnique({
+          where: { projectId_path: { projectId, path: fullPath } },
+          select: { id: true },
+        });
+        if (concurrent) {
+          throw new ApiError(
+            "A file or folder already exists at this path",
+            409,
+            "ALREADY_EXISTS"
+          );
+        }
+        return tx.fileNode.create({
+          data: {
+            projectId,
+            parentId,
+            type,
+            name: baseName,
+            path: fullPath,
+            language: type === "FILE" ? detectLanguage(baseName) : null,
+            content: type === "FILE" ? content : null,
+            size: type === "FILE" ? Buffer.byteLength(content, "utf8") : 0,
+          },
+        });
+      });
+    } catch (err) {
+      // Compensate: roll back the disk write on DB failure.
+      try {
+        await deletePath(storageKey, fullPath);
+      } catch {
+        /* best effort */
+      }
+      throw err;
+    }
 
     return apiSuccess({ node }, { status: 201 });
   } catch (err) {
@@ -113,7 +151,13 @@ export async function POST(req: Request, ctx: RouteContext) {
 export async function PATCH(req: Request, ctx: RouteContext) {
   try {
     const { projectId } = await ctx.params;
-    const { project } = await requireProjectAccess(projectId);
+    const { project, member } = await requireProjectAccess(projectId);
+
+    // Role check: viewers cannot modify files
+    if (member.role === "VIEWER") {
+      throw new ApiError("Insufficient permissions", 403, "FORBIDDEN");
+    }
+
     const storageKey = project!.storageKey;
 
     const body = await validateBody(req, saveFileSchema);
@@ -142,14 +186,32 @@ export async function PATCH(req: Request, ctx: RouteContext) {
 
     const { size } = await writeFile(storageKey, relPath, body.content);
 
+    // NOTE: disk writes are the source of truth. The DB FileNode is just a
+    // cache / preview of what's on disk. We write to disk first and only
+    // then update the DB. The DB update is wrapped in a transaction with a
+    // re-read-after to make the size + content update atomic w.r.t. other
+    // concurrent DB writers (e.g. another PATCH racing on the same node).
+    // The disk write above is non-transactional by definition.
     try {
       const PREVIEW_LIMIT = 64 * 1024;
-      await prisma.fileNode.update({
-        where: { id: node.id },
-        data: {
-          size,
-          content: size <= PREVIEW_LIMIT ? body.content : null,
-        },
+      await prisma.$transaction(async (tx) => {
+        // Re-read inside the transaction to get a fresh row state and avoid
+        // overwriting a concurrent update that landed between the original
+        // read and now.
+        const fresh = await tx.fileNode.findUnique({
+          where: { id: node.id },
+          select: { id: true },
+        });
+        if (!fresh) {
+          throw new ApiError("File not found", 404, "NOT_FOUND");
+        }
+        await tx.fileNode.update({
+          where: { id: fresh.id },
+          data: {
+            size,
+            content: size <= PREVIEW_LIMIT ? body.content : null,
+          },
+        });
       });
     } catch (dbErr) {
       // Compensate: restore disk state on DB failure
@@ -171,7 +233,13 @@ export async function PATCH(req: Request, ctx: RouteContext) {
 export async function DELETE(req: Request, ctx: RouteContext) {
   try {
     const { projectId } = await ctx.params;
-    const { project } = await requireProjectAccess(projectId);
+    const { project, member } = await requireProjectAccess(projectId);
+
+    // Role check: viewers cannot delete files/folders
+    if (member.role === "VIEWER") {
+      throw new ApiError("Insufficient permissions", 403, "FORBIDDEN");
+    }
+
     const storageKey = project!.storageKey;
 
     // Accept path from query string or JSON body.
@@ -194,15 +262,31 @@ export async function DELETE(req: Request, ctx: RouteContext) {
     // Security checkpoint (also inside deletePath).
     resolveSafe(storageKey, relPath);
 
-    // Remove from disk (recursive, idempotent).
+    // Remove from disk first (recursive, idempotent). Disk is the source
+    // of truth; the DB FileNode rows are an index/cache.
     await deletePath(storageKey, relPath);
 
-    // Remove the node and all descendants (path == p OR startsWith p + "/").
-    await prisma.fileNode.deleteMany({
-      where: {
-        projectId,
-        OR: [{ path: relPath }, { path: { startsWith: `${relPath}/` } }],
-      },
+    // Remove the node and all descendants inside a transaction with a
+    // re-read-after, so a concurrent re-create of the same path during the
+    // delete can't be clobbered silently.
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.fileNode.findFirst({
+        where: {
+          projectId,
+          OR: [{ path: relPath }, { path: { startsWith: `${relPath}/` } }],
+        },
+        select: { id: true },
+      });
+      if (!existing) {
+        // Nothing to delete in DB; the disk op already succeeded.
+        return;
+      }
+      await tx.fileNode.deleteMany({
+        where: {
+          projectId,
+          OR: [{ path: relPath }, { path: { startsWith: `${relPath}/` } }],
+        },
+      });
     });
 
     return apiSuccess({ deleted: true, path: relPath });

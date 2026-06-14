@@ -1,4 +1,4 @@
-﻿import { prisma } from "@/lib/db";
+import { prisma } from "@/lib/db";
 import {
   apiSuccess,
   handleApiError,
@@ -7,7 +7,7 @@ import {
   apiError,
 } from "@/lib/api";
 import { enforceRateLimit } from "@/lib/rate-limit";
-import { isAIConfigured } from "@/lib/ai/provider";
+import { isAIConfiguredAsync } from "@/lib/ai/provider";
 import { createAgentRunSchema, type AgentRunSummaryDTO } from "@/lib/agents/schemas";
 import { startAgentRun } from "@/lib/agents/runner";
 
@@ -65,13 +65,13 @@ export async function GET(_req: Request, ctx: RouteContext) {
 export async function POST(req: Request, ctx: RouteContext) {
   try {
     const { projectId } = await ctx.params;
-    const { user } = await requireProjectAccess(projectId);
+    const { user, member } = await requireProjectAccess(projectId);
     const { goal, threadId } = await validateBody(req, createAgentRunSchema);
 
     // Throttle run creation per user (10/min). Production: back with Redis.
-    enforceRateLimit(`agents:create:${user.id}`, 10, 60_000);
+    await enforceRateLimit(`agents:create:${user.id}`, 10, 60_000);
 
-    if (!isAIConfigured()) {
+    if (!await isAIConfiguredAsync(undefined, member.workspaceId)) {
       return apiError(
         "AI is not configured. Add an OpenAI key in Integrations to enable agents.",
         503,

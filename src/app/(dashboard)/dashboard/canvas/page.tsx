@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -23,6 +23,8 @@ import {
   type DocumentListItem,
   type Document,
 } from "@/lib/client/canvas";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -211,8 +213,8 @@ export default function CanvasPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <FileText size={48} className="mx-auto mb-4 text-gray-300" />
-          <p className="text-gray-500">Select a project to start writing</p>
+          <FileText size={48} className="mx-auto mb-4 text-text-muted" />
+          <p className="text-text-secondary">Select a project to start writing</p>
         </div>
       </div>
     );
@@ -221,24 +223,26 @@ export default function CanvasPage() {
   return (
     <div className="flex h-full">
       {/* Sidebar - Document list */}
-      <div className="flex w-64 flex-col border-r border-gray-100 bg-gray-50/50">
-        <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-          <span className="text-sm font-medium text-gray-700">Documents</span>
-          <button
+      <div className="flex w-64 flex-col border-r border-border bg-surface-soft/50">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <span className="text-sm font-medium text-text-secondary">Documents</span>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={handleNewDocument}
-            className="rounded-md p-1.5 text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+            className="h-7 w-7"
             title="New Document"
           >
             <Plus size={16} />
-          </button>
+          </Button>
         </div>
         <div className="flex-1 overflow-y-auto p-2">
           {loading && documents.length === 0 ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 size={20} className="animate-spin text-gray-400" />
+              <Loader2 size={20} className="animate-spin text-text-muted" />
             </div>
           ) : documents.length === 0 ? (
-            <div className="px-3 py-8 text-center text-xs text-gray-400">
+            <div className="px-3 py-8 text-center text-xs text-text-muted">
               No documents yet. Create one to get started.
             </div>
           ) : (
@@ -248,12 +252,12 @@ export default function CanvasPage() {
                 onClick={() => loadDocument(doc.id)}
                 className={`mb-1 w-full rounded-lg px-3 py-2 text-left transition-colors ${
                   activeDoc?.id === doc.id
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-600 hover:bg-white/60"
+                    ? "bg-surface text-foreground shadow-sm"
+                    : "text-text-secondary hover:bg-surface/60"
                 }`}
               >
                 <div className="truncate text-sm font-medium">{doc.title}</div>
-                <div className="mt-0.5 text-[11px] text-gray-400">
+                <div className="mt-0.5 text-[11px] text-text-muted">
                   {new Date(doc.updatedAt).toLocaleDateString()}
                 </div>
               </button>
@@ -265,7 +269,7 @@ export default function CanvasPage() {
       {/* Main editor */}
       <div className="flex flex-1 flex-col">
         {/* Toolbar */}
-        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-2">
+        <div className="flex items-center justify-between border-b border-border px-6 py-2">
           <div className="flex items-center gap-1">
             <ToolbarButton
               icon={Bold}
@@ -285,65 +289,79 @@ export default function CanvasPage() {
           </div>
           <div className="flex items-center gap-2">
             {/* Save status indicator */}
-            <span className="text-[11px] text-gray-400">
+            <span className="text-[11px] text-text-muted">
               {saveStatus === "saving" && (
                 <span className="flex items-center gap-1">
                   <Loader2 size={10} className="animate-spin" /> Saving...
                 </span>
               )}
               {saveStatus === "saved" && (
-                <span className="flex items-center gap-1 text-green-600">
+                <span className="flex items-center gap-1 text-success">
                   <Check size={10} /> Saved
                 </span>
               )}
               {saveStatus === "error" && (
-                <span className="text-red-500">Save failed</span>
+                <span className="text-destructive">Save failed</span>
               )}
             </span>
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleExport}
               disabled={!activeDoc}
-              className="flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              className="gap-1.5 text-[12px]"
             >
               <Download size={12} />
               Export
-            </button>
+            </Button>
             {/* TODO: AI Assist - integrate with /api/ai/chat/stream for text improvement */}
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               disabled
-              className="flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-400 cursor-not-allowed"
+              className="gap-1.5 text-[12px] cursor-not-allowed"
               title="AI Assist (coming soon)"
             >
               <Sparkles size={12} />
               AI Assist
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleDelete}
               disabled={!activeDoc}
-              className="flex items-center gap-1.5 rounded-md border border-red-200 px-3 py-1.5 text-[12px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+              className="gap-1.5 border-red-200 text-[12px] text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
             >
               <Trash2 size={12} />
               Delete
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Document editor */}
         {activeDoc ? (
           <div className="flex-1 overflow-auto px-16 py-10">
-            <div className="mx-auto max-w-2xl">
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                onBlur={handleTitleBlur}
-                className="w-full border-none text-[28px] font-semibold text-gray-900 outline-none placeholder:text-gray-300"
-                placeholder="Untitled Document"
-              />
-              <textarea
-                ref={textareaRef}
+          <div className="mx-auto max-w-2xl">
+            <label htmlFor="canvas-title" className="sr-only">
+              Document title
+            </label>
+            <Input
+              id="canvas-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={handleTitleBlur}
+              className="w-full border-none text-[28px] font-semibold text-foreground shadow-none outline-none placeholder:text-text-muted h-auto px-0 py-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+              placeholder="Untitled Document"
+            />
+            <label htmlFor="canvas-content" className="sr-only">
+              Document content
+            </label>
+            <textarea
+              id="canvas-content"
+              ref={textareaRef}
                 value={content}
                 onChange={(e) => handleContentChange(e.target.value)}
-                className="mt-6 min-h-[60vh] w-full resize-none border-none text-[15px] leading-7 text-gray-700 outline-none placeholder:text-gray-300"
+                className="mt-6 min-h-[60vh] w-full resize-none border-none bg-transparent text-[15px] leading-7 text-foreground outline-none placeholder:text-text-muted"
                 placeholder="Start writing..."
               />
             </div>
@@ -351,19 +369,19 @@ export default function CanvasPage() {
         ) : (
           <div className="flex flex-1 items-center justify-center">
             <div className="text-center">
-              <FileText size={48} className="mx-auto mb-4 text-gray-300" />
-              <p className="text-sm text-gray-500">
+              <FileText size={48} className="mx-auto mb-4 text-text-muted" />
+              <p className="text-sm text-text-secondary">
                 {documents.length === 0
                   ? "Create your first document to get started"
                   : "Select a document from the sidebar"}
               </p>
               {documents.length === 0 && (
-                <button
+                <Button
                   onClick={handleNewDocument}
-                  className="mt-4 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+                  className="mt-4"
                 >
                   New Document
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -371,8 +389,8 @@ export default function CanvasPage() {
 
         {/* Error display */}
         {error && (
-          <div className="border-t border-red-100 bg-red-50 px-6 py-3">
-            <p className="text-sm text-red-600">{error}</p>
+          <div className="border-t border-red-200 bg-red-50 px-6 py-3 dark:border-red-800 dark:bg-red-950/50">
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
           </div>
         )}
       </div>
@@ -390,12 +408,14 @@ function ToolbarButton({
   onClick?: () => void;
 }) {
   return (
-    <button
+    <Button
+      variant="ghost"
+      size="icon"
       onClick={onClick}
-      className="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+      className="h-8 w-8 text-text-secondary hover:text-foreground"
       title={label}
     >
       <Icon size={16} />
-    </button>
+    </Button>
   );
 }
