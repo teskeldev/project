@@ -28,10 +28,16 @@ export type FusionResultPayload = {
   metrics: { tokens: number; costUsd: number; latencyMs: number; executionMs: number };
 };
 
+export type FusionProgressPayload =
+  | { type: "model_start"; ref: string; modelId: string }
+  | { type: "model_done"; ref: string; modelId: string; ok: boolean; latencyMs: number }
+  | { type: "judging" };
+
 export type ChatStreamEvent =
   | { type: "thinking"; content: string }
   | { type: "delta"; content: string }
   | { type: "compaction"; message: string; compactedCount: number; remainingCount: number }
+  | { type: "fusion-progress"; payload: FusionProgressPayload }
   | { type: "fusion-result"; payload: FusionResultPayload }
   | { type: "done" }
   | { type: "error"; message: string; code?: string };
@@ -44,6 +50,8 @@ export type ChatStreamCallbacks = {
   onThinking?: (content: string) => void;
   /** Fired once for a Fusion turn with the fused output + per-model debug info. */
   onFusionResult?: (payload: FusionResultPayload) => void;
+  /** Live per-model progress during a Fusion turn ("thinking"). */
+  onFusionProgress?: (payload: FusionProgressPayload) => void;
 };
 
 type StreamArgs = {
@@ -76,6 +84,8 @@ function toEvent(raw: SSEFrame): ChatStreamEvent | null {
         compactedCount: Number(obj.compactedCount ?? 0),
         remainingCount: Number(obj.remainingCount ?? 0),
       };
+    case "fusion-progress":
+      return { type: "fusion-progress", payload: obj as unknown as FusionProgressPayload };
     case "fusion-result":
       return {
         type: "fusion-result",
@@ -168,6 +178,8 @@ export async function streamChatCompletion(
         callbacks.onDelta(evt.content);
       } else if (evt.type === "compaction") {
         callbacks.onCompaction?.(evt.message, evt.compactedCount, evt.remainingCount);
+      } else if (evt.type === "fusion-progress") {
+        callbacks.onFusionProgress?.(evt.payload);
       } else if (evt.type === "fusion-result") {
         callbacks.onFusionResult?.(evt.payload);
         callbacks.onDelta(evt.payload.output); // render the fused text in the bubble

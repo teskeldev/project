@@ -78,6 +78,18 @@ describe("resolveFusionContext (lightweight injection)", () => {
     expect(ctx.system).toContain("Avoid any types.");
   });
 
+  it("keeps a free provider:modelId when the provider is connected (B-6)", async () => {
+    db.fusion.findFirst.mockResolvedValue(fusionRow({ modelIds: ["openai:custom-router-model"] }));
+    db.integration.findMany.mockResolvedValue([{ provider: "openai" }]); // openai connected
+    db.skill.findMany.mockResolvedValue([]);
+    db.rule.findMany.mockResolvedValue([]);
+    db.knowledgeItem.findMany.mockResolvedValue([]);
+
+    const ctx = await resolveFusionContext("f1", "ws1");
+    expect(ctx.primary).toEqual({ provider: "openai", modelId: "custom-router-model" });
+    expect(ctx.warnings).toHaveLength(0);
+  });
+
   it("returns null primary when no model is available", async () => {
     db.fusion.findFirst.mockResolvedValue(fusionRow({ modelIds: ["anthropic:claude-opus-4-8"] }));
     db.integration.findMany.mockResolvedValue([{ provider: "openai" }]);

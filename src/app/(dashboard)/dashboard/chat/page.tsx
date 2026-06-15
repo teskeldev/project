@@ -680,6 +680,7 @@ function ChatSurface() {
         prev.map((m) => (m.id === assistantId ? { ...m, ...patch } : m))
       );
 
+    if (selectedFusionId) setFusionDebug(null); // reset live panel for a fresh Fusion turn
     await streamChatCompletion(
       {
         threadId: activeThreadId,
@@ -690,6 +691,22 @@ function ChatSurface() {
         fusionId: selectedFusionId ?? undefined,
       },
       {
+        onFusionProgress: (p) =>
+          setFusionDebug((prev) => {
+            const runs = prev?.runs ? [...prev.runs] : [];
+            if (p.type === "model_done") {
+              const row = { modelId: p.modelId, provider: "", ok: p.ok, latencyMs: p.latencyMs };
+              const i = runs.findIndex((r) => r.modelId === p.modelId);
+              if (i >= 0) runs[i] = row; else runs.push(row);
+            }
+            return {
+              output: "",
+              runs,
+              judgeUsed: p.type === "judging" ? "judging…" : prev?.judgeUsed ?? "",
+              warnings: prev?.warnings ?? [],
+              metrics: prev?.metrics ?? { tokens: 0, costUsd: 0, latencyMs: 0, executionMs: 0 },
+            };
+          }),
         onFusionResult: (payload) => setFusionDebug(payload),
         onThinking: (delta) =>
           setMessages((prev) =>

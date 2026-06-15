@@ -26,10 +26,27 @@ export type FusionModelRun = {
 export type FusionRunResult = {
   runs: FusionModelRun[];
   fused: string;
+  mergeRationale?: string;
   judgeUsed: string;
   warnings: string[];
   metrics: { tokens: number; costUsd: number; latencyMs: number; executionMs: number };
 };
+
+/** Live progress events emitted during a run (for the "Thinking Fusion" view). */
+export type FusionProgress =
+  | { type: "model_start"; ref: string; modelId: string }
+  | { type: "model_done"; ref: string; modelId: string; ok: boolean; latencyMs: number }
+  | { type: "judging" };
+
+/** Split a judge response into the final answer + an optional merge rationale. */
+function splitJudge(text: string): { answer: string; rationale?: string } {
+  const m = text.match(/<<<\s*ANSWER\s*>>>([\s\S]*?)<<<\s*RATIONALE\s*>>>([\s\S]*)$/i);
+  if (m) return { answer: m[1].trim(), rationale: m[2].trim() || undefined };
+  return { answer: text.trim() };
+}
+
+const RATIONALE_INSTRUCTION =
+  "\n\nReturn EXACTLY in this format: `<<<ANSWER>>>` then the final answer, then `<<<RATIONALE>>>` then 1-3 sentences on what you took from each model and why.";
 
 async function resolveJudge(
   judge: string,
@@ -99,6 +116,7 @@ export async function runFusion(opts: {
   workspaceId: string;
   projectId?: string;
   signal?: AbortSignal;
+  onProgress?: (ev: FusionProgress) => void;
 }): Promise<FusionRunResult> {
   const start = Date.now();
   const resolved = await resolveFusion(opts.fusionId, opts.workspaceId, opts.projectId);
@@ -119,12 +137,19 @@ export async function runFusion(opts: {
   if (strategy === "single") targets = targets.slice(0, 1);
   else targets = targets.slice(0, 6); // cap fan-out
 
+  // Announce the panel, then run concurrently — emit a done event as each lands.
+  for (const m of targets) opts.onProgress?.({ type: "model_start", ref: m.ref, modelId: m.modelId });
   const runs = await Promise.all(
-    targets.map((m) => runModel(opts.workspaceId, m, system, opts.prompt, limits.maxTokens, limits.timeoutMs))
+    targets.map(async (m) => {
+      const r = await runModel(opts.workspaceId, m, system, opts.prompt, limits.maxTokens, limits.timeoutMs);
+      opts.onProgress?.({ type: "model_done", ref: m.ref, modelId: m.modelId, ok: r.ok, latencyMs: r.latencyMs });
+      return r;
+    })
   );
 
   const ok = runs.filter((r) => r.ok);
   let fused: string;
+  let mergeRationale: string | undefined;
   let judgeUsed = "none";
 
   if (ok.length === 0) {
@@ -132,18 +157,22 @@ export async function runFusion(opts: {
   } else if (ok.length === 1 || strategy === "single") {
     fused = ok[0]?.response ?? runs[0].response;
   } else {
+    opts.onProgress?.({ type: "judging" });
     const j = await resolveJudge(judge, judgeModelId, opts.workspaceId, ok[0]?.ref);
     judgeUsed = `${j.provider}:${j.modelId}`;
     const block = ok.map((r, i) => `Answer ${i + 1} (${r.modelId}):\n${r.response}`).join("\n\n---\n\n");
-    const sys = JUDGE_SYSTEM[strategy] ?? JUDGE_SYSTEM.consensus;
+    const sys = (JUDGE_SYSTEM[strategy] ?? JUDGE_SYSTEM.consensus) + RATIONALE_INSTRUCTION;
     try {
-      fused = await chat(
+      const raw = await chat(
         [
           { role: "system", content: sys },
           { role: "user", content: `Task:\n${opts.prompt}\n\nModel answers:\n${block}` },
         ],
         { model: j.modelId, provider: j.provider, baseUrl: getProviderConfig(j.provider)?.baseUrl || undefined, workspaceId: opts.workspaceId, temperature: 0.2, signal: opts.signal }
       );
+      const split = splitJudge(raw);
+      fused = split.answer;
+      mergeRationale = split.rationale;
     } catch {
       fused = ok[0].response;
       warnings.push("Judge failed; returned the first successful answer.");
@@ -157,6 +186,7 @@ export async function runFusion(opts: {
   return {
     runs,
     fused,
+    mergeRationale,
     judgeUsed,
     warnings,
     metrics: {

@@ -30,6 +30,24 @@ export async function listAvailableModels(workspaceId: string): Promise<Availabl
   });
   const connected = new Set(integrations.map((i) => i.provider));
 
+  return modelsForConnected(connected);
+}
+
+/** Provider ids connected to the workspace (Integrations) + key-less local runtimes. */
+export async function listConnectedProviders(workspaceId: string): Promise<Set<string>> {
+  const integrations = await prisma.integration.findMany({
+    where: { workspaceId, enabled: true },
+    select: { provider: true },
+  });
+  const set = new Set(integrations.map((i) => i.provider));
+  for (const p of AI_PROVIDERS) {
+    const catalog = getProviderCatalog(p.id);
+    if ((catalog?.local ?? !p.requiresApiKey)) set.add(p.id);
+  }
+  return set;
+}
+
+function modelsForConnected(connected: Set<string>): AvailableModel[] {
   const out: AvailableModel[] = [];
   for (const provider of AI_PROVIDERS) {
     const catalog = getProviderCatalog(provider.id);

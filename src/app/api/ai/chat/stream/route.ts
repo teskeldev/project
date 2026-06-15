@@ -111,47 +111,54 @@ export async function POST(req: Request) {
     // ─── Fusion path: run a saved Fusion (AI Team) for this turn ───────────────
     if (fusionId) {
       const { runFusion } = await import("@/lib/ai/fusion/runner");
-      const result = await runFusion({
-        fusionId,
-        prompt: content,
-        workspaceId,
-        projectId,
-        signal: req.signal,
-      });
-
-      await prisma.chatMessage.create({
-        data: {
-          threadId,
-          role: "ASSISTANT",
-          content: result.fused,
-          metadata: {
-            fusion: true,
-            fusionId,
-            judgeUsed: result.judgeUsed,
-            runs: result.runs.map((r) => ({ modelId: r.modelId, provider: r.provider, ok: r.ok, latencyMs: r.latencyMs })),
-            metrics: result.metrics,
-            warnings: result.warnings,
-          },
-        },
-      });
-      await prisma.chatThread.update({ where: { id: threadId }, data: { updatedAt: new Date() } });
-
       const encoder = new TextEncoder();
       const stream = new ReadableStream<Uint8Array>({
-        start(controller) {
-          controller.enqueue(
-            encoder.encode(
-              sse("fusion-result", {
-                output: result.fused,
-                runs: result.runs,
-                judgeUsed: result.judgeUsed,
-                warnings: result.warnings,
-                metrics: result.metrics,
-              })
-            )
-          );
-          controller.enqueue(encoder.encode(sse("done", { ok: true })));
-          controller.close();
+        async start(controller) {
+          const send = (event: string, data: unknown) => {
+            try { controller.enqueue(encoder.encode(sse(event, data))); } catch { /* closed */ }
+          };
+          try {
+            const result = await runFusion({
+              fusionId,
+              prompt: content,
+              workspaceId,
+              projectId,
+              signal: req.signal,
+              onProgress: (ev) => send("fusion-progress", ev), // live "thinking"
+            });
+
+            await prisma.chatMessage.create({
+              data: {
+                threadId,
+                role: "ASSISTANT",
+                content: result.fused,
+                metadata: {
+                  fusion: true,
+                  fusionId,
+                  judgeUsed: result.judgeUsed,
+                  mergeRationale: result.mergeRationale,
+                  runs: result.runs.map((r) => ({ modelId: r.modelId, provider: r.provider, ok: r.ok, latencyMs: r.latencyMs })),
+                  metrics: result.metrics,
+                  warnings: result.warnings,
+                },
+              },
+            });
+            await prisma.chatThread.update({ where: { id: threadId }, data: { updatedAt: new Date() } });
+
+            send("fusion-result", {
+              output: result.fused,
+              mergeRationale: result.mergeRationale,
+              runs: result.runs,
+              judgeUsed: result.judgeUsed,
+              warnings: result.warnings,
+              metrics: result.metrics,
+            });
+            send("done", { ok: true });
+          } catch (err) {
+            send("error", { message: err instanceof Error ? err.message : "Fusion run failed" });
+          } finally {
+            controller.close();
+          }
         },
       });
       return new Response(stream, {

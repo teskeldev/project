@@ -7,7 +7,17 @@ import { fusionApi, type Fusion } from "@/lib/client/fusion";
 import { useFusion } from "@/components/fusion/useFusion";
 import { PageHeader, LoadingState, Banner, EmptyState, PrimaryButton, GhostButton, Card } from "@/components/fusion/primitives";
 import { FusionTopTabs } from "@/components/fusion/FusionTopTabs";
-import { Plus, Copy, Pencil, Archive, Trash2, Loader2, Boxes } from "lucide-react";
+import { Plus, Copy, Pencil, Archive, Trash2, Loader2, Boxes, Play } from "lucide-react";
+
+function StatusBadge({ status }: { status: string }) {
+  const cls =
+    status === "active"
+      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+      : status === "archived"
+        ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
+        : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400";
+  return <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${cls}`}>{status}</span>;
+}
 
 export default function LibraryPage() {
   const { activeWorkspace } = useProject();
@@ -58,9 +68,7 @@ export default function LibraryPage() {
                 <div>
                   <div className="flex items-center gap-2 font-semibold">
                     {f.name}
-                    {f.status !== "active" && (
-                      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] uppercase text-slate-500 dark:bg-slate-800">{f.status}</span>
-                    )}
+                    <StatusBadge status={f.status} />
                   </div>
                   {f.description && <div className="mt-0.5 line-clamp-1 text-xs text-slate-400">{f.description}</div>}
                 </div>
@@ -69,11 +77,15 @@ export default function LibraryPage() {
                 <span>{f.modelIds.length} models</span>
                 <span>{f.skillIds.length} skills</span>
                 <span>{f.strategy}</span>
+                {f.strategy !== "single" && <span>judge: {f.judge}</span>}
                 <span>updated {new Date(f.updatedAt).toLocaleDateString()}</span>
               </div>
               <div className="mt-3 flex items-center gap-1.5">
                 <Link href={`/dashboard/fusion/builder?id=${f.id}`}>
                   <GhostButton><Pencil size={13} /> Edit</GhostButton>
+                </Link>
+                <Link href={`/dashboard/fusion/builder?id=${f.id}&tab=test`}>
+                  <GhostButton><Play size={13} /> Test</GhostButton>
                 </Link>
                 <GhostButton onClick={() => void act(f.id, () => fusionApi.duplicateFusion(ws, f.id))} disabled={busy === f.id}>
                   {busy === f.id ? <Loader2 size={13} className="animate-spin" /> : <Copy size={13} />} Duplicate

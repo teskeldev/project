@@ -5,7 +5,7 @@
  */
 import { prisma } from "@/lib/db";
 import { getFusion, type FusionData } from "./store";
-import { listAvailableModels } from "./models";
+import { listAvailableModels, listConnectedProviders } from "./models";
 
 export type ResolvedModel = { ref: string; provider: string; modelId: string; name: string };
 export type ResolvedDoc = { id: string; title: string; content: string };
@@ -29,14 +29,30 @@ export async function resolveFusion(
 
   const warnings: string[] = [];
 
-  // Models — cross with the workspace's available (Integrations-derived) registry.
-  const available = await listAvailableModels(workspaceId);
+  // Models — cross with the workspace's available registry. A ref is also kept
+  // when its provider is connected even if the specific model isn't in the static
+  // catalog (free/dynamic model ids, e.g. OpenRouter), so "use your own provider"
+  // works. Only drop a model when its provider isn't connected at all.
+  const [available, connectedProviders] = await Promise.all([
+    listAvailableModels(workspaceId),
+    listConnectedProviders(workspaceId),
+  ]);
   const byRef = new Map(available.map((m) => [m.ref, m]));
   const models: ResolvedModel[] = [];
   for (const ref of fusion.modelIds) {
     const m = byRef.get(ref);
-    if (m) models.push({ ref: m.ref, provider: m.provider, modelId: m.modelId, name: m.name });
-    else warnings.push(`Model unavailable: ${ref}`);
+    if (m) {
+      models.push({ ref: m.ref, provider: m.provider, modelId: m.modelId, name: m.name });
+      continue;
+    }
+    const sep = ref.indexOf(":");
+    const provider = sep === -1 ? "" : ref.slice(0, sep);
+    const modelId = sep === -1 ? ref : ref.slice(sep + 1);
+    if (provider && connectedProviders.has(provider)) {
+      models.push({ ref, provider, modelId, name: modelId });
+    } else {
+      warnings.push(`Model unavailable: ${ref}`);
+    }
   }
 
   const inScope = (row: { workspaceId?: string | null; projectId?: string | null }) =>

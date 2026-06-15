@@ -1,25 +1,41 @@
 "use client";
 
 import { useState } from "react";
-import { fusionApi, type FusionRunResult } from "@/lib/client/fusion";
+import { runPlaygroundStream, type FusionRunResult } from "@/lib/client/fusion";
 import { Banner, PrimaryButton, Card } from "@/components/fusion/primitives";
-import { Loader2, Play, Sparkles, AlertTriangle, FlaskConical } from "lucide-react";
+import { Loader2, Play, Sparkles, AlertTriangle, FlaskConical, ChevronDown, CheckCircle2, XCircle, Gavel } from "lucide-react";
 
-/** Contextual Playground for a single saved Fusion (used in the Builder "Test" tab). */
+type LiveModel = { modelId: string; status: "running" | "ok" | "error"; latencyMs?: number };
+
+/** Contextual Playground for a single saved Fusion (Builder "Test" tab) with live "thinking". */
 export function FusionTester({ workspaceId, fusionId }: { workspaceId: string; fusionId: string }) {
   const [prompt, setPrompt] = useState("");
   const [running, setRunning] = useState(false);
+  const [live, setLive] = useState<Record<string, LiveModel>>({});
+  const [judging, setJudging] = useState(false);
   const [result, setResult] = useState<FusionRunResult | null>(null);
+  const [showRationale, setShowRationale] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const run = async () => {
     if (!prompt.trim()) return;
-    setRunning(true); setErr(null); setResult(null);
-    try {
-      const r = await fusionApi.runPlayground(workspaceId, fusionId, prompt);
-      setResult(r.result);
-    } catch (e) { setErr(e instanceof Error ? e.message : "Failed"); } finally { setRunning(false); }
+    setRunning(true); setErr(null); setResult(null); setLive({}); setJudging(false); setShowRationale(false);
+    await runPlaygroundStream(workspaceId, fusionId, prompt, {
+      onProgress: (ev) => {
+        if (ev.type === "model_start") {
+          setLive((m) => ({ ...m, [ev.ref]: { modelId: ev.modelId, status: "running" } }));
+        } else if (ev.type === "model_done") {
+          setLive((m) => ({ ...m, [ev.ref]: { modelId: ev.modelId, status: ev.ok ? "ok" : "error", latencyMs: ev.latencyMs } }));
+        } else if (ev.type === "judging") {
+          setJudging(true);
+        }
+      },
+      onResult: (r) => { setResult(r); setRunning(false); setJudging(false); },
+      onError: (m) => { setErr(m); setRunning(false); setJudging(false); },
+    });
   };
+
+  const liveList = Object.values(live);
 
   return (
     <div>
@@ -40,7 +56,39 @@ export function FusionTester({ workspaceId, fusionId }: { workspaceId: string; f
 
       {err && <Banner kind="error">{err}</Banner>}
 
-      {!result && !err && (
+      {/* Live "thinking" panel */}
+      {(running || liveList.length > 0) && !result && (
+        <Card className="mb-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
+            <Sparkles size={15} className="text-accent" /> Thinking…
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {liveList.map((m) => (
+              <span
+                key={m.modelId}
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+                  m.status === "ok"
+                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                    : m.status === "error"
+                      ? "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400"
+                      : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                }`}
+              >
+                {m.status === "running" ? <Loader2 size={12} className="animate-spin" /> : m.status === "ok" ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
+                {m.modelId}
+                {m.latencyMs != null && <span className="opacity-70">{m.latencyMs}ms</span>}
+              </span>
+            ))}
+          </div>
+          {judging && (
+            <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-slate-500">
+              <Gavel size={12} /> Judge synthesizing…
+            </div>
+          )}
+        </Card>
+      )}
+
+      {!result && !err && !running && liveList.length === 0 && (
         <div className="flex flex-col items-center justify-center py-10 text-center text-slate-400">
           <FlaskConical size={28} className="mb-2" />
           <p className="text-sm">Run a prompt to test this Fusion.</p>
@@ -64,6 +112,14 @@ export function FusionTester({ workspaceId, fusionId }: { workspaceId: string; f
               </span>
             </div>
             <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-950 p-3 text-xs text-slate-100">{result.fused}</pre>
+            {result.mergeRationale && (
+              <div className="mt-3">
+                <button onClick={() => setShowRationale((v) => !v)} className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-accent">
+                  <ChevronDown size={13} className={showRationale ? "rotate-180 transition-transform" : "transition-transform"} /> Merge rationale
+                </button>
+                {showRationale && <p className="mt-1 whitespace-pre-wrap text-xs text-slate-600 dark:text-slate-400">{result.mergeRationale}</p>}
+              </div>
+            )}
           </Card>
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             {result.runs.map((r) => (
