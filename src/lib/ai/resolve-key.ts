@@ -24,6 +24,8 @@ const ENV_KEY_MAP: Record<string, string> = {
   together: "TOGETHER_API_KEY",
   fireworks: "FIREWORKS_API_KEY",
   xai: "XAI_API_KEY",
+  mistral: "MISTRAL_API_KEY",
+  cohere: "COHERE_API_KEY",
   "azure-openai": "AZURE_OPENAI_API_KEY",
 };
 
@@ -54,22 +56,24 @@ export async function resolveApiKey(
   if (!workspaceId) return null;
 
   try {
-    const integration = await prisma.integration.findFirst({
-      where: {
-        workspaceId,
-        provider: providerId,
-        enabled: true,
-      },
+    // Multiple connections may exist per provider — try them in priority order
+    // (lowest priority first), returning the first one that yields a usable key.
+    const integrations = await prisma.integration.findMany({
+      where: { workspaceId, provider: providerId, enabled: true },
+      orderBy: [{ priority: "asc" }, { createdAt: "asc" }],
       select: { encryptedConfig: true },
     });
 
-    if (!integration) return null;
-
-    const config = decryptJson<Record<string, string>>(integration.encryptedConfig);
-    const apiKey = config.apiKey || config.api_key || config.token;
-
-    if (apiKey && apiKey.trim().length > 0) {
-      return { apiKey: apiKey.trim(), source: "db" };
+    for (const integration of integrations) {
+      try {
+        const config = decryptJson<Record<string, string>>(integration.encryptedConfig);
+        const apiKey = config.apiKey || config.api_key || config.token;
+        if (apiKey && apiKey.trim().length > 0) {
+          return { apiKey: apiKey.trim(), source: "db" };
+        }
+      } catch {
+        // Skip a corrupt row and try the next connection.
+      }
     }
   } catch {
     // Decryption failure or DB error — fall through

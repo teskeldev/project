@@ -83,7 +83,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const user = await requireUser();
-    const { workspaceId, provider, name, config } = await validateBody(
+    const { workspaceId, provider, name, config, priority } = await validateBody(
       req,
       createIntegrationSchema
     );
@@ -116,7 +116,7 @@ export async function POST(req: Request) {
     const encryptedConfig = encryptJson(parsedConfig);
 
     const created = await prisma.integration.create({
-      data: { workspaceId, provider, name, encryptedConfig, enabled: true },
+      data: { workspaceId, provider, name, encryptedConfig, enabled: true, ...(priority !== undefined ? { priority } : {}) },
     });
 
     return apiSuccess(

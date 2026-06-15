@@ -18,6 +18,7 @@ export type SafeIntegration = {
   provider: string;
   name: string;
   enabled: boolean;
+  priority: number;
   createdAt: string;
   updatedAt: string;
   configHints: Record<string, string>;
@@ -41,6 +42,7 @@ export function createIntegration(input: {
   provider: ProviderId;
   name: string;
   config: Record<string, unknown>;
+  priority?: number;
 }): Promise<{ integration: SafeIntegration }> {
   return apiFetch("/api/integrations", {
     method: "POST",

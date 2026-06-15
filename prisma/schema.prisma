@@ -494,6 +494,9 @@ model Integration {
   name            String
   encryptedConfig String   @db.Text
   enabled         Boolean  @default(true)
+  // Lower = higher priority when multiple connections exist for one provider
+  // (key pool / failover). Resolution picks the lowest-priority enabled row.
+  priority        Int      @default(100)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

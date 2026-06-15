@@ -59,6 +59,7 @@ function ProviderForm({
 }) {
   const { activeWorkspace } = useProject();
   const [name, setName] = useState(existing?.name ?? meta.name);
+  const [priority, setPriority] = useState<number>(existing?.priority ?? 100);
   const [values, setValues] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
     for (const field of meta.fields) {
@@ -103,6 +104,7 @@ function ProviderForm({
           provider: meta.id,
           name: name.trim() || meta.name,
           config,
+          priority,
         });
       }
       onSaved();
@@ -114,14 +116,17 @@ function ProviderForm({
     } finally {
       setSaving(false);
     }
-  }, [activeWorkspace, meta, values, name, isEdit, existing, onSaved, onClose]);
+  }, [activeWorkspace, meta, values, name, priority, isEdit, existing, onSaved, onClose]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-md rounded-xl border border-border bg-surface shadow-xl">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-soft text-[12px] font-bold text-text-secondary">
+            <div
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-[12px] font-bold text-white"
+              style={{ backgroundColor: meta.color ?? "#64748b" }}
+            >
               {meta.icon}
             </div>
             <h2 className="text-[15px] font-semibold text-foreground">
@@ -138,6 +143,16 @@ function ProviderForm({
         </div>
 
         <div className="space-y-4 px-5 py-5">
+          {meta.apiKeyUrl ? (
+            <a
+              href={meta.apiKeyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[12px] font-medium text-accent hover:underline"
+            >
+              Get an API key ↗
+            </a>
+          ) : null}
           <div>
             <label className="mb-1 block text-[12px] font-medium text-text-secondary">
               Display name
@@ -145,6 +160,17 @@ function ProviderForm({
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-[13px] text-foreground outline-none focus:border-accent focus:ring-2 focus:ring-accent"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[12px] font-medium text-text-secondary">
+              Priority <span className="text-text-muted">(lower = preferred when multiple keys exist)</span>
+            </label>
+            <input
+              type="number"
+              value={priority}
+              onChange={(e) => setPriority(Number.parseInt(e.target.value, 10) || 100)}
               className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-[13px] text-foreground outline-none focus:border-accent focus:ring-2 focus:ring-accent"
             />
           </div>

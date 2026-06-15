@@ -51,6 +51,23 @@ export const AI_PROVIDERS: AIProviderConfig[] = [
     requiresApiKey: true,
   },
   {
+    id: 'mistral',
+    name: 'Mistral AI',
+    baseUrl: 'https://api.mistral.ai/v1',
+    models: [
+      { id: 'mistral-large-latest', name: 'Mistral Large', contextWindow: 128000 },
+      { id: 'mistral-small-latest', name: 'Mistral Small', contextWindow: 128000 },
+    ],
+    requiresApiKey: true,
+  },
+  {
+    id: 'cohere',
+    name: 'Cohere',
+    baseUrl: 'https://api.cohere.ai/compatibility/v1',
+    models: [{ id: 'command-r-plus', name: 'Command R+', contextWindow: 128000 }],
+    requiresApiKey: true,
+  },
+  {
     id: 'deepseek',
     name: 'DeepSeek',
     baseUrl: 'https://api.deepseek.com/v1',

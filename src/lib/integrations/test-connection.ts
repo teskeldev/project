@@ -9,6 +9,7 @@
  * transport failure degrades to a friendly error rather than throwing.
  */
 import type { ProviderId } from "@/lib/integrations/providers";
+import { getAiProvider } from "@/lib/ai/provider-registry";
 
 export type TestResult = { ok: boolean; message: string };
 
@@ -40,7 +41,7 @@ function stripTrailingSlash(url: string): string {
   return url.replace(/\/+$/, "");
 }
 
-async function testOpenAI(config: Record<string, unknown>): Promise<TestResult> {
+async function testOpenAI(config: Record<string, unknown>, defaultBaseUrl: string): Promise<TestResult> {
   const apiKey = typeof config.apiKey === "string" ? config.apiKey.trim() : "";
   if (!apiKey) {
     return { ok: false, message: "API key is missing." };
@@ -48,7 +49,7 @@ async function testOpenAI(config: Record<string, unknown>): Promise<TestResult> 
   const baseUrl = stripTrailingSlash(
     typeof config.baseUrl === "string" && config.baseUrl.trim().length > 0
       ? config.baseUrl.trim()
-      : "https://api.openai.com/v1"
+      : defaultBaseUrl || "https://api.openai.com/v1"
   );
 
   // Lightweight: list models. Avoids spending tokens on a completion.
@@ -107,7 +108,7 @@ async function testGitHub(config: Record<string, unknown>): Promise<TestResult> 
   return { ok: false, message: `GitHub returned HTTP ${res.status}.` };
 }
 
-async function testAnthropic(config: Record<string, unknown>): Promise<TestResult> {
+async function testAnthropic(config: Record<string, unknown>, defaultBaseUrl: string): Promise<TestResult> {
   const apiKey = typeof config.apiKey === "string" ? config.apiKey.trim() : "";
   if (!apiKey) {
     return { ok: false, message: "API key is missing." };
@@ -116,22 +117,13 @@ async function testAnthropic(config: Record<string, unknown>): Promise<TestResul
   const baseUrl = stripTrailingSlash(
     typeof config.baseUrl === "string" && config.baseUrl.trim().length > 0
       ? config.baseUrl.trim()
-      : "https://api.anthropic.com"
+      : defaultBaseUrl || "https://api.anthropic.com/v1"
   );
 
-  // Make a real API call: send a minimal completion request to verify credentials.
-  const result = await safeFetch(`${baseUrl}/v1/messages`, {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "claude-3-haiku-20240307",
-      max_tokens: 1,
-      messages: [{ role: "user", content: "hi" }],
-    }),
+  // Lightweight: list models with the key (no tokens spent).
+  const result = await safeFetch(`${baseUrl}/models`, {
+    method: "GET",
+    headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
   });
 
   if ("error" in result) {
@@ -197,21 +189,36 @@ function testMcp(config: Record<string, unknown>): TestResult {
   };
 }
 
-/** Dispatch a connection test by provider. */
+/** Local runtime (no key): just confirm the models endpoint is reachable. */
+async function testLocal(baseUrl: string): Promise<TestResult> {
+  const base = stripTrailingSlash(baseUrl);
+  const result = await safeFetch(`${base}/models`, { method: "GET" });
+  if ("error" in result) {
+    return { ok: false, message: `Could not reach ${base} — is the local runtime running?` };
+  }
+  return result.res.ok || result.res.status < 500
+    ? { ok: true, message: "Local runtime reachable." }
+    : { ok: false, message: `Runtime returned HTTP ${result.res.status}.` };
+}
+
+/** Dispatch a connection test by provider (AI providers via the registry). */
 export async function testConnection(
   provider: ProviderId,
   config: Record<string, unknown>
 ): Promise<TestResult> {
-  switch (provider) {
-    case "openai":
-      return testOpenAI(config);
-    case "github":
-      return testGitHub(config);
-    case "anthropic":
-      return testAnthropic(config);
-    case "mcp":
-      return testMcp(config);
-    default:
-      return { ok: false, message: "Unsupported provider." };
+  const entry = getAiProvider(provider);
+  if (entry) {
+    const baseUrl =
+      typeof config.baseUrl === "string" && config.baseUrl.trim().length > 0
+        ? config.baseUrl.trim()
+        : entry.transport.baseUrl;
+    if (!baseUrl) return { ok: false, message: "Base URL is required for this provider." };
+    if (!entry.requiresKey) return testLocal(baseUrl);
+    return entry.transport.format === "anthropic"
+      ? testAnthropic(config, baseUrl)
+      : testOpenAI(config, baseUrl);
   }
+  if (provider === "github") return testGitHub(config);
+  if (provider === "mcp") return testMcp(config);
+  return { ok: false, message: "Unsupported provider." };
 }
