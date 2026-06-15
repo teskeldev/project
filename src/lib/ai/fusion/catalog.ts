@@ -49,42 +49,16 @@ export function getProviderCatalog(kind: string): ProviderCatalogEntry | undefin
   return PROVIDER_CATALOG.find((p) => p.kind === kind);
 }
 
-export const MCP_KINDS = [
-  "filesystem",
-  "browser",
-  "github",
-  "postgres",
-  "supabase",
-  "notion",
-  "linear",
-  "slack",
-  "custom",
-] as const;
-export type McpKind = (typeof MCP_KINDS)[number];
-
 export const ROUTING_STRATEGIES = [
-  "fastest",
-  "cheapest",
-  "quality",
-  "coding",
-  "research",
-  "vision",
-  "weighted",
+  "sequential",
+  "parallel",
+  "fallback",
   "cost",
   "latency",
-  "fallback",
-  "custom",
 ] as const;
 export type RoutingStrategy = (typeof ROUTING_STRATEGIES)[number];
 
-export const JUDGE_MODES = [
-  "consensus",
-  "majority",
-  "debate",
-  "tournament",
-  "merge",
-  "custom",
-] as const;
+export const JUDGE_MODES = ["consensus", "majority", "merge", "debate"] as const;
 export type JudgeMode = (typeof JUDGE_MODES)[number];
 
 export type ModelCapabilities = {

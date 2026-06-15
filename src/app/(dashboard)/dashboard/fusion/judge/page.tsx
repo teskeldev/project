@@ -2,13 +2,20 @@
 
 import { useState } from "react";
 import { useProject } from "@/lib/store/project";
-import { fusionApi, type JudgeRow, type ModelRow } from "@/lib/client/fusion";
+import { fusionApi, type JudgeRow, type AvailableModel } from "@/lib/client/fusion";
 import { useFusion } from "@/components/fusion/useFusion";
 import { JUDGE_MODES } from "@/lib/ai/fusion/catalog";
 import { PageHeader, LoadingState, Banner, EmptyState, PrimaryButton, GhostButton, Card } from "@/components/fusion/primitives";
 import { Gavel, Plus, Trash2, Loader2 } from "lucide-react";
 
-export default function JudgesPage() {
+const MODE_HINT: Record<string, string> = {
+  consensus: "agree where models converge; flag disagreements",
+  majority: "return the answer most models support",
+  merge: "merge the strongest parts of each answer",
+  debate: "weigh answers as competing positions",
+};
+
+export default function JudgePage() {
   const { activeWorkspace } = useProject();
   const ws = activeWorkspace?.id ?? "";
   const { data, loading, error, reload } = useFusion(
@@ -25,7 +32,7 @@ export default function JudgesPage() {
 
   if (!ws) return <Banner kind="error">Select a workspace.</Banner>;
   const judges: JudgeRow[] = data?.[0]?.judges ?? [];
-  const models: ModelRow[] = data?.[1]?.models ?? [];
+  const models: AvailableModel[] = data?.[1]?.models ?? [];
 
   const add = async () => {
     setBusy("add"); setErr(null);
@@ -39,7 +46,7 @@ export default function JudgesPage() {
 
   return (
     <div>
-      <PageHeader title="Judges" description="How multiple model answers are reconciled into one."
+      <PageHeader title="Judge" description="How multiple model answers are reconciled into one result."
         action={<PrimaryButton onClick={() => setAdding((v) => !v)}><Plus size={16} /> New Judge</PrimaryButton>} />
       {err && <Banner kind="error">{err}</Banner>}
 
@@ -47,12 +54,15 @@ export default function JudgesPage() {
         <Card className="mb-4 space-y-3">
           <input className="w-full rounded-lg border border-slate-200 bg-transparent px-3 py-2 text-sm dark:border-slate-800" placeholder="Judge name" value={name} onChange={(e) => setName(e.target.value)} />
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <select value={mode} onChange={(e) => setMode(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-transparent px-3 py-2 text-sm dark:border-slate-800">
-              {JUDGE_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
+            <div>
+              <select value={mode} onChange={(e) => setMode(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-transparent px-3 py-2 text-sm dark:border-slate-800">
+                {JUDGE_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+              <p className="mt-1 text-xs text-slate-400">{MODE_HINT[mode]}</p>
+            </div>
             <select value={judgeModelId} onChange={(e) => setJudgeModelId(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-transparent px-3 py-2 text-sm dark:border-slate-800">
-              <option value="">Judge model (default: Opus 4.8)</option>
-              {models.map((m) => <option key={m.id} value={m.modelId}>{m.name}</option>)}
+              <option value="">Judge model (default: first answer)</option>
+              {models.map((m) => <option key={m.ref} value={m.ref}>{m.name}</option>)}
             </select>
           </div>
           <label className="block text-xs text-slate-500">Confidence threshold ({threshold.toFixed(2)})
@@ -66,7 +76,7 @@ export default function JudgesPage() {
       )}
 
       {loading ? <LoadingState /> : error ? <Banner kind="error">{error}</Banner> : judges.length === 0 ? (
-        <EmptyState icon={<Gavel size={32} />} title="No judges configured" description="Add consensus, majority-vote, debate, tournament, or merge judges." />
+        <EmptyState icon={<Gavel size={32} />} title="No judges yet" description="Add a consensus, majority, merge, or debate judge." />
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {judges.map((j) => (
@@ -74,7 +84,7 @@ export default function JudgesPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <div className="font-semibold">{j.name}</div>
-                  <div className="text-xs text-slate-400">mode: {j.mode}{j.judgeModelId ? ` · ${j.judgeModelId}` : ""}</div>
+                  <div className="text-xs text-slate-400">{j.mode}{j.judgeModelId ? ` · ${j.judgeModelId}` : ""}</div>
                 </div>
                 <button onClick={() => void remove(j)} className="rounded p-1 text-slate-400 hover:text-rose-500"><Trash2 size={15} /></button>
               </div>

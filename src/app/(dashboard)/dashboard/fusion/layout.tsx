@@ -2,36 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  Plug,
-  Boxes,
-  Users,
-  UserCog,
-  Sparkles,
-  Route,
-  Gavel,
-  Server,
-  Workflow,
-  GitCompare,
-  BarChart3,
-  Settings,
-} from "lucide-react";
+import { LayoutDashboard, Boxes, Route, Gavel, FlaskConical } from "lucide-react";
 
 const NAV = [
   { href: "/dashboard/fusion/overview", label: "Overview", icon: LayoutDashboard },
-  { href: "/dashboard/fusion/providers", label: "Providers", icon: Plug },
   { href: "/dashboard/fusion/models", label: "Models", icon: Boxes },
-  { href: "/dashboard/fusion/teams", label: "Teams", icon: Users },
-  { href: "/dashboard/fusion/profiles", label: "Profiles", icon: UserCog },
-  { href: "/dashboard/fusion/skills", label: "Skills", icon: Sparkles },
   { href: "/dashboard/fusion/routing", label: "Routing", icon: Route },
-  { href: "/dashboard/fusion/judges", label: "Judges", icon: Gavel },
-  { href: "/dashboard/fusion/mcp", label: "MCP", icon: Server },
-  { href: "/dashboard/fusion/workflows", label: "Workflows", icon: Workflow },
-  { href: "/dashboard/fusion/compare", label: "Compare", icon: GitCompare },
-  { href: "/dashboard/fusion/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/dashboard/fusion/settings", label: "Settings", icon: Settings },
+  { href: "/dashboard/fusion/judge", label: "Judge", icon: Gavel },
+  { href: "/dashboard/fusion/playground", label: "Playground", icon: FlaskConical },
 ];
 
 export default function FusionLayout({ children }: { children: React.ReactNode }) {
@@ -39,14 +17,13 @@ export default function FusionLayout({ children }: { children: React.ReactNode }
 
   return (
     <div className="min-h-full bg-slate-50/50 dark:bg-slate-950">
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 p-4 md:flex-row md:p-6">
-        {/* Sub-nav */}
-        <aside className="md:w-56 md:shrink-0">
+      <div className="mx-auto flex max-w-5xl flex-col gap-6 p-4 md:flex-row md:p-6">
+        <aside className="md:w-52 md:shrink-0">
           <div className="mb-4 px-2">
             <div className="bg-gradient-to-r from-accent to-purple-600 bg-clip-text text-lg font-extrabold tracking-tight text-transparent">
-              AI Orchestration
+              Fusion
             </div>
-            <p className="text-xs text-slate-400">Fusion Hub</p>
+            <p className="text-xs text-slate-400">Model Orchestration</p>
           </div>
           <nav className="flex gap-1 overflow-x-auto pb-2 md:flex-col md:overflow-visible md:pb-0">
             {NAV.map(({ href, label, icon: Icon }) => {
@@ -69,7 +46,6 @@ export default function FusionLayout({ children }: { children: React.ReactNode }
           </nav>
         </aside>
 
-        {/* Content */}
         <main className="min-w-0 flex-1 text-slate-950 dark:text-slate-100">{children}</main>
       </div>
     </div>

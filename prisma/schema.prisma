@@ -199,16 +199,9 @@ model Workspace {
   usageRecords      UsageRecord[]
   slashCommands     SlashCommand[]
   aiPermissions     AIPermission[]
-  fusionProfiles    FusionProfile[]
-  fusionProviders   FusionProvider[]
-  fusionModels      FusionModel[]
-  fusionTeams       FusionTeam[]
   fusionRoutings    FusionRouting[]
   fusionJudges      FusionJudge[]
-  fusionMcpServers  FusionMcpServer[]
-  fusionWorkflows   FusionWorkflow[]
   fusionRequestLogs FusionRequestLog[]
-  fusionSettings    FusionSettings?
 
   @@index([ownerId])
 }
@@ -789,114 +782,21 @@ model Skill {
   @@index([projectId, enabled])
 }
 
-// ----------------------------- Fusion Profiles -----------------------------
-
-// A reusable, per-workspace Multi-Model Fusion configuration that "fuses"
-// chosen panelist models with chosen skills. The active profile (isDefault)
-// drives the fusion panel; Opus 4.8 always judges regardless of config.
-model FusionProfile {
-  id                 String   @id @default(cuid())
-  workspaceId        String
-  name               String
-  isDefault          Boolean  @default(false)
-  // "auto" | "opus4.8-4.8" | "opus4.8-gpt5.5" | "opus4.8-gpt5.5-gemini3.1pro" | "custom"
-  panelSlug          String   @default("auto")
-  // [{ model, provider, temperature, skillSlugs?: string[] }]
-  panelists          Json
-  // { model, provider }
-  judge              Json
-  // Shared skill slugs injected into every panelist.
-  skillSlugs         Json
-  // { validateSyntax, runLint, runTests }
-  trackAVerification Json
-  // Orchestration Hub bindings (all optional, additive).
-  systemPrompt       String?  @db.Text
-  teamId             String?
-  routingId          String?
-  judgeId            String?
-  mcpServerIds       Json?
-  memory             Json?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-
-  @@unique([workspaceId, name])
-  @@index([workspaceId])
-}
-
-// ----------------------------- Fusion Orchestration Hub -----------------------------
-
-model FusionProvider {
-  id            String    @id @default(cuid())
-  workspaceId   String
-  // openai | anthropic | google | openrouter | deepseek | groq | cerebras |
-  // together | fireworks | xai | ollama | lmstudio | azure-openai | custom
-  kind          String
-  name          String
-  baseUrl       String?
-  // The encrypted API key lives in an Integration row; we reference it here.
-  integrationId String?
-  enabled       Boolean   @default(true)
-  lastStatus    String? // "connected" | "error" | "disconnected"
-  lastLatencyMs Int?
-  lastCheckedAt DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  models    FusionModel[]
-
-  @@unique([workspaceId, name])
-  @@index([workspaceId])
-}
-
-model FusionModel {
-  id            String   @id @default(cuid())
-  workspaceId   String
-  providerId    String
-  name          String
-  modelId       String
-  contextWindow Int      @default(0)
-  // { input, output } USD per 1M tokens
-  pricing       Json
-  // { reasoning, vision, tools, structuredOutput, jsonMode }
-  capabilities  Json
-  enabled       Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  workspace Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  provider  FusionProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-
-  @@index([workspaceId])
-  @@index([providerId])
-}
-
-model FusionTeam {
-  id          String   @id @default(cuid())
-  workspaceId String
-  name        String
-  description String?
-  // FusionModel ids
-  modelIds    Json
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-
-  @@unique([workspaceId, name])
-  @@index([workspaceId])
-}
+// ----------------------------- Fusion (Model Orchestration) -----------------------------
+//
+// Fusion is a lightweight orchestration layer over the models the platform
+// already connects via Integrations. Only two configs are persisted — Routing
+// (how requests fan out) and Judge (how answers reconcile) — plus a request log
+// that powers Overview + Playground metrics. Models are NOT stored; they are
+// derived at runtime from enabled Integrations × the provider catalog.
 
 model FusionRouting {
   id          String   @id @default(cuid())
   workspaceId String
   name        String
-  // fastest | cheapest | quality | coding | research | vision | weighted |
-  // cost | latency | fallback | custom
+  // sequential | parallel | fallback | cost | latency
   strategy    String
-  // { fallbackChain: string[], weights: Record<id,number>, rules: [...] }
+  // { steps: string[] (provider:modelId), weights, maxFanout }
   config      Json
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -912,9 +812,9 @@ model FusionJudge {
   workspaceId  String
   name         String
   judgeModelId String?
-  // consensus | majority | debate | tournament | merge | custom
+  // consensus | majority | merge | debate
   mode         String
-  // { confidenceThreshold, mergeStrategy, rankingStrategy }
+  // { confidenceThreshold }
   config       Json
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -925,46 +825,9 @@ model FusionJudge {
   @@index([workspaceId])
 }
 
-model FusionMcpServer {
-  id            String    @id @default(cuid())
-  workspaceId   String
-  name          String
-  // filesystem | browser | github | postgres | supabase | notion | linear | slack | custom
-  kind          String
-  url           String?
-  command       String?
-  enabled       Boolean   @default(true)
-  lastStatus    String?
-  lastCheckedAt DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-
-  @@unique([workspaceId, name])
-  @@index([workspaceId])
-}
-
-model FusionWorkflow {
-  id          String   @id @default(cuid())
-  workspaceId String
-  name        String
-  // { nodes: [...], edges: [...] }
-  graph       Json
-  enabled     Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-
-  @@unique([workspaceId, name])
-  @@index([workspaceId])
-}
-
 model FusionRequestLog {
   id          String   @id @default(cuid())
   workspaceId String
-  profileId   String?
   modelId     String?
   provider    String
   tokensIn    Int      @default(0)
@@ -978,19 +841,6 @@ model FusionRequestLog {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, createdAt])
-}
-
-model FusionSettings {
-  id           String   @id @default(cuid())
-  workspaceId  String   @unique
-  // { defaultProvider, defaultTeam, defaultJudge, defaultRouting }
-  defaults     Json
-  // { experimentalModels, betaProviders, autoFallback, autoRetry }
-  featureFlags Json
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
 // ----------------------------- Commands -----------------------------
