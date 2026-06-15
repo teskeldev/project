@@ -9,7 +9,7 @@ import { FUSION_STRATEGIES, JUDGE_OPTIONS, DEFAULT_LIMITS } from "@/lib/ai/fusio
 import Link from "next/link";
 import { LoadingState, Banner, PrimaryButton, Card } from "@/components/fusion/primitives";
 import { FusionTester } from "@/components/fusion/FusionTester";
-import { Save, Loader2, AlertTriangle, ArrowLeft } from "lucide-react";
+import { Save, Loader2, AlertTriangle, ArrowLeft, Plus, X } from "lucide-react";
 
 type NamedRow = { id: string; label: string };
 
@@ -65,10 +65,6 @@ function BuilderInner() {
   if (loading) return <LoadingState />;
 
   const patch = (f: Partial<Fusion>) => setForm((prev) => ({ ...prev, ...f }));
-  const toggle = (key: "modelIds" | "skillIds" | "ruleIds" | "knowledgeIds", id: string) => {
-    const cur = (form[key] as string[]) ?? [];
-    patch({ [key]: cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id] } as Partial<Fusion>);
-  };
 
   const availableRefs = new Set(models.map((m) => m.ref));
   const missingModels = (form.modelIds ?? []).filter((r) => !availableRefs.has(r));
@@ -139,16 +135,24 @@ function BuilderInner() {
           <input className="w-full rounded-lg border border-slate-200 bg-transparent px-3 py-2 text-sm dark:border-slate-800" placeholder="Description (optional)" value={form.description ?? ""} onChange={(e) => patch({ description: e.target.value })} />
         </Card>
 
-        <Picker title="Models" hint="From your connected providers (Integrations)." empty="No connected models — add a provider in Integrations." items={models.map((m) => ({ id: m.ref, label: `${m.name} · ${m.providerLabel}` }))} selected={form.modelIds ?? []} onToggle={(id) => toggle("modelIds", id)} />
+        <AddRemovePicker
+          title="Models"
+          addLabel="Add model"
+          hint="From your connected providers (Integrations)."
+          empty="No connected models — add a provider in Integrations."
+          items={models.map((m) => ({ id: m.ref, label: `${m.name} · ${m.providerLabel}` }))}
+          selected={form.modelIds ?? []}
+          onChange={(next) => patch({ modelIds: next })}
+        />
         {missingModels.length > 0 && (
           <div className="-mt-2 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
             <AlertTriangle size={12} /> Unavailable, will be skipped: {missingModels.join(", ")}
           </div>
         )}
 
-        <Picker title="Skills" empty="No installed skills." items={skills} selected={form.skillIds ?? []} onToggle={(id) => toggle("skillIds", id)} />
-        <Picker title="Rules" empty="No rules." items={rules} selected={form.ruleIds ?? []} onToggle={(id) => toggle("ruleIds", id)} />
-        <Picker title="Knowledge" empty="No knowledge items." items={knowledge} selected={form.knowledgeIds ?? []} onToggle={(id) => toggle("knowledgeIds", id)} />
+        <AddRemovePicker title="Skills" addLabel="Add skill" empty="No installed skills." items={skills} selected={form.skillIds ?? []} onChange={(next) => patch({ skillIds: next })} />
+        <AddRemovePicker title="Rules" addLabel="Add rule" empty="No rules." items={rules} selected={form.ruleIds ?? []} onChange={(next) => patch({ ruleIds: next })} />
+        <AddRemovePicker title="Knowledge" addLabel="Add knowledge" empty="No knowledge items." items={knowledge} selected={form.knowledgeIds ?? []} onChange={(next) => patch({ knowledgeIds: next })} />
 
         <Card>
           <h2 className="mb-3 text-sm font-bold">Execution</h2>
@@ -182,21 +186,96 @@ function BuilderInner() {
   );
 }
 
-function Picker({ title, hint, empty, items, selected, onToggle }: { title: string; hint?: string; empty: string; items: NamedRow[]; selected: string[]; onToggle: (id: string) => void }) {
+/**
+ * Add/remove picker: shows the selected items as removable chips + a "＋ Add"
+ * button that opens a searchable list of the not-yet-selected available items.
+ */
+function AddRemovePicker({
+  title,
+  addLabel,
+  hint,
+  empty,
+  items,
+  selected,
+  onChange,
+}: {
+  title: string;
+  addLabel: string;
+  hint?: string;
+  empty: string;
+  items: NamedRow[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const labelOf = new Map(items.map((i) => [i.id, i.label]));
+  const available = items.filter(
+    (i) => !selected.includes(i.id) && i.label.toLowerCase().includes(q.toLowerCase())
+  );
+
+  const add = (id: string) => onChange([...selected, id]);
+  const remove = (id: string) => onChange(selected.filter((x) => x !== id));
+
   return (
     <Card>
-      <h2 className="text-sm font-bold">{title}</h2>
-      {hint && <p className="mb-2 text-xs text-slate-400">{hint}</p>}
-      {items.length === 0 ? (
-        <p className="mt-1 text-xs text-slate-400">{empty}</p>
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-bold">{title}</h2>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          disabled={items.length === 0}
+          className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-40 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800/50"
+        >
+          <Plus size={13} /> {addLabel}
+        </button>
+      </div>
+      {hint && <p className="mt-1 text-xs text-slate-400">{hint}</p>}
+
+      {/* Selected chips */}
+      {selected.length === 0 ? (
+        <p className="mt-2 text-xs text-slate-400">{items.length === 0 ? empty : "Nothing added yet — click ＋."}</p>
       ) : (
         <div className="mt-2 flex flex-wrap gap-2">
-          {items.map((it) => {
-            const on = selected.includes(it.id);
-            return (
-              <button key={it.id} onClick={() => onToggle(it.id)} className={`rounded-full px-3 py-1 text-xs font-medium ${on ? "bg-accent text-white" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>{it.label}</button>
-            );
-          })}
+          {selected.map((id) => (
+            <span key={id} className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent">
+              {labelOf.get(id) ?? id}
+              <button type="button" onClick={() => remove(id)} className="hover:text-rose-500" aria-label="Remove">
+                <X size={12} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Add panel */}
+      {open && items.length > 0 && (
+        <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-800">
+          <div className="border-b border-slate-100 p-2 dark:border-slate-800/60">
+            <input
+              autoFocus
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={`Search to ${addLabel.toLowerCase()}…`}
+              className="w-full rounded-md border border-slate-200 bg-transparent px-2.5 py-1.5 text-xs focus:border-accent focus:outline-none dark:border-slate-800"
+            />
+          </div>
+          <div className="max-h-48 overflow-auto py-1">
+            {available.length === 0 ? (
+              <p className="px-3 py-2 text-xs text-slate-400">{q ? "No matches." : "All added."}</p>
+            ) : (
+              available.map((it) => (
+                <button
+                  key={it.id}
+                  type="button"
+                  onClick={() => add(it.id)}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                >
+                  <Plus size={12} className="text-slate-400" /> {it.label}
+                </button>
+              ))
+            )}
+          </div>
         </div>
       )}
     </Card>
