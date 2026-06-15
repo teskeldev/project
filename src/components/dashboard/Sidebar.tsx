@@ -94,7 +94,7 @@ const configLinks = [
   { href: "/dashboard/rules", icon: FileText, label: "Rules" },
   { href: "/dashboard/skills", icon: Zap, label: "Skills" },
   { href: "/dashboard/commands", icon: TerminalSquare, label: "Commands" },
-  { href: "/dashboard/fusion/overview", icon: Sliders, label: "Fusion" },
+  { href: "/dashboard/fusion/library", icon: Sliders, label: "Fusion" },
   { href: "/dashboard/integrations", icon: Plug, label: "Integrations" },
   { href: "/dashboard/webhooks", icon: Webhook, label: "Webhooks" },
   { href: "/dashboard/permissions", icon: Shield, label: "Permissions" },
