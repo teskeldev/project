@@ -27,6 +27,8 @@ export type ChatOptions = {
   signal?: AbortSignal;
   /** Override the provider for this request (e.g. 'anthropic', 'groq'). */
   provider?: string;
+  /** Override the base URL (e.g. a per-workspace custom/Azure endpoint). */
+  baseUrl?: string;
   /** Workspace ID to resolve API keys from DB integrations. */
   workspaceId?: string;
 };
@@ -42,32 +44,29 @@ function getActiveProviderId(opts?: ChatOptions): string {
 }
 
 function getApiKeyForProvider(providerId: string): string | undefined {
-  let key: string | undefined;
-  switch (providerId) {
-    case "openai":
-      key = process.env.OPENAI_API_KEY;
-      break;
-    case "anthropic":
-      key = process.env.ANTHROPIC_API_KEY;
-      break;
-    case "google":
-      key = process.env.GOOGLE_API_KEY ?? process.env.GEMINI_API_KEY;
-      break;
-    case "groq":
-      key = process.env.GROQ_API_KEY;
-      break;
-    case "ollama":
-      // Ollama doesn't require an API key
-      return "ollama";
-    default:
-      key = process.env.OPENAI_API_KEY;
+  // Local runtimes don't need a key.
+  if (providerId === "ollama") return "ollama";
+  if (providerId === "lmstudio") return "lmstudio";
+
+  // Provider-specific env fallbacks, then a generic <PROVIDER>_API_KEY.
+  const envName = providerId.toUpperCase().replace(/-/g, "_") + "_API_KEY";
+  const candidates: (string | undefined)[] = [process.env[envName]];
+  if (providerId === "google") candidates.push(process.env.GEMINI_API_KEY);
+  if (providerId === "azure-openai") candidates.push(process.env.AZURE_OPENAI_API_KEY);
+
+  for (const key of candidates) {
+    if (key && key.trim().length > 0) return key.trim();
   }
-  return key && key.trim().length > 0 ? key.trim() : undefined;
+  return undefined;
 }
 
-function getBaseUrl(providerId: string): string {
+function getBaseUrl(providerId: string, opts?: ChatOptions): string {
+  // Explicit per-request override (e.g. a custom/Azure per-workspace endpoint).
+  if (opts?.baseUrl && opts.baseUrl.trim().length > 0) {
+    return opts.baseUrl.trim().replace(/\/+$/, "");
+  }
   // Allow env override for any provider
-  const envBase = process.env[`${providerId.toUpperCase()}_BASE_URL`]?.trim();
+  const envBase = process.env[`${providerId.toUpperCase().replace(/-/g, "_")}_BASE_URL`]?.trim();
   if (envBase && envBase.length > 0) {
     return envBase.replace(/\/+$/, "");
   }
@@ -168,7 +167,7 @@ async function* streamOpenAICompatible(
   opts?: ChatOptions
 ): AsyncGenerator<string> {
   const apiKey = await requireApiKeyAsync(providerId, opts?.workspaceId);
-  const baseUrl = getBaseUrl(providerId);
+  const baseUrl = getBaseUrl(providerId, opts);
   const model = getModel(providerId, opts);
   const url = `${baseUrl}/chat/completions`;
 
@@ -228,7 +227,7 @@ async function* streamAnthropic(
   opts?: ChatOptions
 ): AsyncGenerator<string> {
   const apiKey = await requireApiKeyAsync("anthropic", opts?.workspaceId);
-  const baseUrl = getBaseUrl("anthropic");
+  const baseUrl = getBaseUrl("anthropic", opts);
   const model = getModel("anthropic", opts);
   const url = `${baseUrl}/messages`;
 

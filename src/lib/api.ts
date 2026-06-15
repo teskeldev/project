@@ -151,6 +151,24 @@ export async function requireProjectAccess(
 }
 
 /**
+ * Ensures the current user is a member of the given workspace. Returns the
+ * session user + their membership (role). Throws ApiError(401/403) otherwise.
+ */
+export async function requireWorkspaceAccess(
+  workspaceId: string
+): Promise<{ user: SessionUser; member: { role: Role }; role: Role }> {
+  const user = await requireUser();
+  const member = await prisma.workspaceMember.findFirst({
+    where: { workspaceId, userId: user.id },
+    select: { role: true },
+  });
+  if (!member) {
+    throw new ApiError("You do not have access to this workspace", 403, "FORBIDDEN");
+  }
+  return { user, member, role: member.role };
+}
+
+/**
  * Workspace role hierarchy, highest privilege first. Used by `requireRole` to
  * gate write operations: anything below MEMBER (i.e. VIEWER) is read-only.
  */

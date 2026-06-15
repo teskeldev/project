@@ -29,6 +29,13 @@ export type FusionProfileData = {
   /** Skills injected into EVERY panelist (shared). */
   skillSlugs: string[];
   trackAVerification: { validateSyntax: boolean; runLint: boolean; runTests: boolean };
+  // Orchestration Hub bindings (all optional).
+  systemPrompt: string | null;
+  teamId: string | null;
+  routingId: string | null;
+  judgeId: string | null;
+  mcpServerIds: string[];
+  memory: unknown;
 };
 
 /** Total character cap for the concatenated skills block per panelist. */
@@ -45,6 +52,12 @@ type FusionProfileRow = {
   judge: unknown;
   skillSlugs: unknown;
   trackAVerification: unknown;
+  systemPrompt?: string | null;
+  teamId?: string | null;
+  routingId?: string | null;
+  judgeId?: string | null;
+  mcpServerIds?: unknown;
+  memory?: unknown;
 };
 
 function mapRow(row: FusionProfileRow): FusionProfileData {
@@ -59,6 +72,12 @@ function mapRow(row: FusionProfileRow): FusionProfileData {
     trackAVerification:
       (row.trackAVerification as FusionProfileData["trackAVerification"]) ??
       DEFAULT_CONFIG.trackAVerification,
+    systemPrompt: row.systemPrompt ?? null,
+    teamId: row.teamId ?? null,
+    routingId: row.routingId ?? null,
+    judgeId: row.judgeId ?? null,
+    mcpServerIds: Array.isArray(row.mcpServerIds) ? (row.mcpServerIds as string[]) : [],
+    memory: row.memory ?? null,
   };
 }
 
@@ -111,6 +130,12 @@ export type FusionProfileInput = {
   skillSlugs: string[];
   trackAVerification: { validateSyntax: boolean; runLint: boolean; runTests: boolean };
   isDefault?: boolean;
+  systemPrompt?: string | null;
+  teamId?: string | null;
+  routingId?: string | null;
+  judgeId?: string | null;
+  mcpServerIds?: string[];
+  memory?: unknown;
 };
 
 export async function createFusionProfile(
@@ -134,6 +159,12 @@ export async function createFusionProfile(
         judge: input.judge,
         skillSlugs: input.skillSlugs,
         trackAVerification: input.trackAVerification,
+        systemPrompt: input.systemPrompt ?? null,
+        teamId: input.teamId ?? null,
+        routingId: input.routingId ?? null,
+        judgeId: input.judgeId ?? null,
+        mcpServerIds: input.mcpServerIds ?? [],
+        memory: input.memory ?? undefined,
       },
     });
   });
@@ -164,6 +195,12 @@ export async function updateFusionProfile(
         ...(input.trackAVerification !== undefined && {
           trackAVerification: input.trackAVerification,
         }),
+        ...(input.systemPrompt !== undefined && { systemPrompt: input.systemPrompt }),
+        ...(input.teamId !== undefined && { teamId: input.teamId }),
+        ...(input.routingId !== undefined && { routingId: input.routingId }),
+        ...(input.judgeId !== undefined && { judgeId: input.judgeId }),
+        ...(input.mcpServerIds !== undefined && { mcpServerIds: input.mcpServerIds }),
+        ...(input.memory !== undefined && { memory: input.memory ?? undefined }),
         ...(input.isDefault === true && { isDefault: true }),
       },
     });

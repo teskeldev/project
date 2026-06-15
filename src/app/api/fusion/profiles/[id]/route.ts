@@ -30,6 +30,12 @@ const updateSchema = z.object({
     .object({ validateSyntax: z.boolean(), runLint: z.boolean(), runTests: z.boolean() })
     .optional(),
   isDefault: z.boolean().optional(),
+  systemPrompt: z.string().max(8000).nullable().optional(),
+  teamId: z.string().max(60).nullable().optional(),
+  routingId: z.string().max(60).nullable().optional(),
+  judgeId: z.string().max(60).nullable().optional(),
+  mcpServerIds: z.array(z.string().max(60)).max(50).optional(),
+  memory: z.unknown().optional(),
 });
 
 const deleteSchema = z.object({ workspaceId: z.string().min(1) });

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useProject } from "@/lib/store/project";
 import {
   ApiClientError,
@@ -93,10 +94,45 @@ const configLinks = [
   { href: "/dashboard/rules", icon: FileText, label: "Rules" },
   { href: "/dashboard/skills", icon: Zap, label: "Skills" },
   { href: "/dashboard/commands", icon: TerminalSquare, label: "Commands" },
+  { href: "/dashboard/fusion/overview", icon: Sliders, label: "Fusion" },
   { href: "/dashboard/integrations", icon: Plug, label: "Integrations" },
   { href: "/dashboard/webhooks", icon: Webhook, label: "Webhooks" },
   { href: "/dashboard/permissions", icon: Shield, label: "Permissions" },
 ];
+
+function SidebarLink({
+  href,
+  icon: Icon,
+  label,
+  isActive,
+}: {
+  href: string;
+  icon: React.ElementType;
+  label: string;
+  isActive: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`group relative flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium transition-colors ${
+        isActive
+          ? "text-slate-900 dark:text-white"
+          : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+      }`}
+    >
+      {isActive && (
+        <motion.div
+          layoutId="sidebar-active"
+          className="absolute inset-0 rounded-xl bg-white shadow-[0_2px_8px_rgba(0,0,0,0.04),0_0_0_1px_rgba(0,0,0,0.02)] dark:bg-white/10 dark:shadow-none"
+          initial={false}
+          transition={{ type: "spring" as const, stiffness: 350, damping: 30 }}
+        />
+      )}
+      <Icon size={16} className={`relative z-10 transition-colors ${isActive ? "text-stone-900 dark:text-white" : "group-hover:text-slate-700 dark:group-hover:text-slate-300"}`} />
+      <span className="relative z-10">{label}</span>
+    </Link>
+  );
+}
 
 function NewProjectModal({
   onClose,
@@ -335,111 +371,64 @@ function SidebarContent() {
   }
 
   return (
-    <aside className="animate-slide-in-left flex h-screen w-60 flex-col border-r border-border/60 bg-surface/80 backdrop-blur-xl">
+    <aside className="relative flex h-screen w-64 flex-col border-r border-border/50 bg-[#FCFBF9] dark:bg-[#121212]">
       {/* Top actions */}
-      <div className="space-y-0.5 p-3">
+      <div className="space-y-1 p-4">
         <button
           onClick={() => setCollapsed(true)}
-          className="mb-2 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-text-muted transition-colors hover:bg-surface-soft hover:text-text-secondary"
+          className="group mb-4 flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-white/5 dark:hover:text-slate-200"
         >
-          <ChevronDown size={16} className="-rotate-90" />
-          <span className="text-xs">Collapse</span>
+          <ChevronDown size={16} className="-rotate-90 transition-transform group-hover:-translate-x-0.5" />
+          <span>Collapse Sidebar</span>
         </button>
 
-        <button onClick={openCommandPalette} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-text-muted transition-colors hover:bg-surface-soft hover:text-text-secondary">
-          <Search size={16} />
+        <button onClick={openCommandPalette} className="group flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-white/5 dark:hover:text-slate-200">
+          <Search size={16} className="transition-colors group-hover:text-slate-700 dark:group-hover:text-slate-300" />
           <span>Search</span>
-          <kbd className="ml-auto rounded border border-border bg-surface-soft px-1.5 py-0.5 text-[10px] text-text-muted">
+          <kbd className="ml-auto rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             Ctrl+K
           </kbd>
         </button>
 
-        <Link
-          href="/dashboard"
-          className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
-            pathname === "/dashboard"
-              ? "bg-surface-soft text-foreground"
-              : "text-text-secondary hover:bg-surface-soft hover:text-foreground"
-          }`}
-        >
-          <PenLine size={16} />
-          <span>New Agent</span>
-          <kbd className="ml-auto rounded border border-border bg-surface-soft px-1.5 py-0.5 text-[10px] text-text-muted">
-            Ctrl+N
-          </kbd>
-        </Link>
-        <Link href="/dashboard/chat" className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-surface-soft hover:text-foreground">
-          <MessageSquare size={16} />
-          <span>Chat</span>
-        </Link>
-
-        <Link href="/dashboard/settings" className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-surface-soft hover:text-foreground">
-          <Sliders size={16} />
-          <span>Customize</span>
-        </Link>
+        <SidebarLink href="/dashboard" icon={PenLine} label="New Agent" isActive={pathname === "/dashboard"} />
+        <SidebarLink href="/dashboard/chat" icon={MessageSquare} label="Chat" isActive={pathname === "/dashboard/chat"} />
+        <SidebarLink href="/dashboard/settings" icon={Sliders} label="Customize" isActive={pathname === "/dashboard/settings"} />
       </div>
 
       {/* Workspace tools */}
-      <div className="border-t border-border px-3 py-2">
-        <p className="mb-1 px-3 text-[10px] font-medium uppercase tracking-wider text-text-muted">
+      <div className="border-t border-border/50 px-3 py-3">
+        <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
           Workspace
         </p>
-        {workspaceLinks.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            className={`flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-              pathname === link.href
-                ? "bg-surface-soft text-foreground"
-                : "text-text-muted hover:bg-surface-soft hover:text-text-secondary"
-            }`}
-          >
-            <link.icon size={14} />
-            <span>{link.label}</span>
-          </Link>
-        ))}
+        <div className="space-y-0.5">
+          {workspaceLinks.map((link) => (
+            <SidebarLink key={link.href} href={link.href} icon={link.icon} label={link.label} isActive={pathname === link.href} />
+          ))}
+        </div>
       </div>
 
       {/* AI Tools */}
-      <div className="border-t border-border px-3 py-2">
-        <p className="mb-1 px-3 text-[10px] font-medium uppercase tracking-wider text-text-muted">
+      <div className="border-t border-border/50 px-3 py-3">
+        <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
           AI Tools
         </p>
-        {aiLinks.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            className={`flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-              pathname === link.href
-                ? "bg-surface-soft text-foreground"
-                : "text-text-muted hover:bg-surface-soft hover:text-text-secondary"
-            }`}
-          >
-            <link.icon size={14} />
-            <span>{link.label}</span>
-          </Link>
-        ))}
+        <div className="space-y-0.5">
+          {aiLinks.map((link) => (
+            <SidebarLink key={link.href} href={link.href} icon={link.icon} label={link.label} isActive={pathname === link.href} />
+          ))}
+        </div>
       </div>
 
       {/* Configuration */}
-      <div className="border-t border-border px-3 py-2">
-        <p className="mb-1 px-3 text-[10px] font-medium uppercase tracking-wider text-text-muted">
+      <div className="border-t border-border/50 px-3 py-3">
+        <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
           Configuration
         </p>
-        {configLinks.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            className={`flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-              pathname === link.href
-                ? "bg-surface-soft text-foreground"
-                : "text-text-muted hover:bg-surface-soft hover:text-text-secondary"
-            }`}
-          >
-            <link.icon size={14} />
-            <span>{link.label}</span>
-          </Link>
-        ))}
+        <div className="space-y-0.5">
+          {configLinks.map((link) => (
+            <SidebarLink key={link.href} href={link.href} icon={link.icon} label={link.label} isActive={pathname === link.href} />
+          ))}
+        </div>
       </div>
 
       {/* Projects (real workspace + project switcher) */}
