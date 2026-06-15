@@ -6,6 +6,7 @@ import { useProject } from "@/lib/store/project";
 import { fusionApi, type Fusion } from "@/lib/client/fusion";
 import { useFusion } from "@/components/fusion/useFusion";
 import { PageHeader, LoadingState, Banner, EmptyState, PrimaryButton, GhostButton, Card } from "@/components/fusion/primitives";
+import { FusionTopTabs } from "@/components/fusion/FusionTopTabs";
 import { Plus, Copy, Pencil, Archive, Trash2, Loader2, Boxes } from "lucide-react";
 
 export default function LibraryPage() {
@@ -25,6 +26,7 @@ export default function LibraryPage() {
 
   return (
     <div>
+      <FusionTopTabs active="library" />
       <PageHeader
         title="Library"
         description="Your reusable AI Teams. Create once, use everywhere."

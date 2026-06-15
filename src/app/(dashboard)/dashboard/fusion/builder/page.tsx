@@ -6,8 +6,10 @@ import { useProject } from "@/lib/store/project";
 import { apiFetch } from "@/lib/client/api";
 import { fusionApi, type AvailableModel, type Fusion } from "@/lib/client/fusion";
 import { FUSION_STRATEGIES, JUDGE_OPTIONS, DEFAULT_LIMITS } from "@/lib/ai/fusion/catalog";
-import { PageHeader, LoadingState, Banner, PrimaryButton, Card } from "@/components/fusion/primitives";
-import { Save, Loader2, AlertTriangle } from "lucide-react";
+import Link from "next/link";
+import { LoadingState, Banner, PrimaryButton, Card } from "@/components/fusion/primitives";
+import { FusionTester } from "@/components/fusion/FusionTester";
+import { Save, Loader2, AlertTriangle, ArrowLeft } from "lucide-react";
 
 type NamedRow = { id: string; label: string };
 
@@ -21,6 +23,7 @@ function BuilderInner() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [tab, setTab] = useState<"configure" | "test">("configure");
 
   const [models, setModels] = useState<AvailableModel[]>([]);
   const [skills, setSkills] = useState<NamedRow[]>([]);
@@ -90,13 +93,45 @@ function BuilderInner() {
 
   return (
     <div>
-      <PageHeader
-        title={editId ? "Edit Fusion" : "New Fusion"}
-        description="Combine models, skills, rules and knowledge into a reusable AI Team."
-        action={<PrimaryButton onClick={() => void save()} disabled={saving}>{saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Save</PrimaryButton>}
-      />
+      {/* Breadcrumb header (drill-in detail; no second sidebar) */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <Link href="/dashboard/fusion/library" className="mb-1 inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-accent">
+            <ArrowLeft size={13} /> Library
+          </Link>
+          <h1 className="truncate text-2xl font-bold tracking-tight">
+            {form.name?.trim() || (editId ? "Fusion" : "New Fusion")}
+          </h1>
+        </div>
+        <PrimaryButton onClick={() => void save()} disabled={saving}>
+          {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Save
+        </PrimaryButton>
+      </div>
+
+      {/* Configure / Test tabs */}
+      <div className="mb-5 inline-flex rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-800 dark:bg-slate-900/60">
+        {(["configure", "test"] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`rounded-lg px-4 py-1.5 text-sm font-medium capitalize transition-colors ${
+              tab === t ? "bg-accent text-white shadow-sm" : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
+            }`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
       {err && <Banner kind="error">{err}</Banner>}
 
+      {tab === "test" ? (
+        editId ? (
+          <FusionTester workspaceId={ws} fusionId={editId} />
+        ) : (
+          <Card><p className="py-8 text-center text-sm text-slate-400">Save this Fusion first to test it.</p></Card>
+        )
+      ) : (
       <div className="space-y-4">
         <Card>
           <h2 className="mb-3 text-sm font-bold">Basic</h2>
@@ -142,6 +177,7 @@ function BuilderInner() {
           <p className="mt-2 text-xs text-slate-400">Limits are best-effort operational targets — they don&rsquo;t guarantee precise mid-stream cutoff.</p>
         </Card>
       </div>
+      )}
     </div>
   );
 }

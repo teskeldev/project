@@ -6,6 +6,7 @@ import { useProject } from "@/lib/store/project";
 import { fusionApi, type FusionTemplate } from "@/lib/client/fusion";
 import { useFusion } from "@/components/fusion/useFusion";
 import { PageHeader, LoadingState, Banner, PrimaryButton, Card } from "@/components/fusion/primitives";
+import { FusionTopTabs } from "@/components/fusion/FusionTopTabs";
 import { LayoutTemplate, Loader2, Wand2 } from "lucide-react";
 
 export default function TemplatesPage() {
@@ -33,6 +34,7 @@ export default function TemplatesPage() {
 
   return (
     <div>
+      <FusionTopTabs active="templates" />
       <PageHeader title="Templates" description="Start from a ready-made AI Team. Using a template creates an editable copy in your workspace." />
       {err && <Banner kind="error">{err}</Banner>}
 
