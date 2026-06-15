@@ -20,10 +20,19 @@
 
 import { readSSEStream, type SSEFrame } from "@/lib/client/sse";
 
+export type FusionResultPayload = {
+  output: string;
+  runs: Array<{ modelId: string; provider: string; ok: boolean; latencyMs: number }>;
+  judgeUsed: string;
+  warnings: string[];
+  metrics: { tokens: number; costUsd: number; latencyMs: number; executionMs: number };
+};
+
 export type ChatStreamEvent =
   | { type: "thinking"; content: string }
   | { type: "delta"; content: string }
   | { type: "compaction"; message: string; compactedCount: number; remainingCount: number }
+  | { type: "fusion-result"; payload: FusionResultPayload }
   | { type: "done" }
   | { type: "error"; message: string; code?: string };
 
@@ -33,6 +42,8 @@ export type ChatStreamCallbacks = {
   onError: (message: string, code?: string) => void;
   onCompaction?: (message: string, compactedCount: number, remainingCount: number) => void;
   onThinking?: (content: string) => void;
+  /** Fired once for a Fusion turn with the fused output + per-model debug info. */
+  onFusionResult?: (payload: FusionResultPayload) => void;
 };
 
 type StreamArgs = {
@@ -40,6 +51,7 @@ type StreamArgs = {
   content: string;
   selectedPaths?: string[];
   model?: string;
+  fusionId?: string;
   signal?: AbortSignal;
 };
 
@@ -63,6 +75,17 @@ function toEvent(raw: SSEFrame): ChatStreamEvent | null {
         message: String(obj.message ?? ""),
         compactedCount: Number(obj.compactedCount ?? 0),
         remainingCount: Number(obj.remainingCount ?? 0),
+      };
+    case "fusion-result":
+      return {
+        type: "fusion-result",
+        payload: {
+          output: String(obj.output ?? ""),
+          runs: Array.isArray(obj.runs) ? (obj.runs as FusionResultPayload["runs"]) : [],
+          judgeUsed: String(obj.judgeUsed ?? ""),
+          warnings: Array.isArray(obj.warnings) ? (obj.warnings as string[]) : [],
+          metrics: (obj.metrics as FusionResultPayload["metrics"]) ?? { tokens: 0, costUsd: 0, latencyMs: 0, executionMs: 0 },
+        },
       };
     case "done":
       return { type: "done" };
@@ -88,14 +111,14 @@ export async function streamChatCompletion(
   args: StreamArgs,
   callbacks: ChatStreamCallbacks
 ): Promise<void> {
-  const { threadId, content, selectedPaths, model, signal } = args;
+  const { threadId, content, selectedPaths, model, fusionId, signal } = args;
 
   let res: Response;
   try {
     res = await fetch("/api/ai/chat/stream", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ threadId, content, selectedPaths, model }),
+      body: JSON.stringify({ threadId, content, selectedPaths, model, fusionId }),
       signal,
     });
   } catch (err) {
@@ -145,6 +168,9 @@ export async function streamChatCompletion(
         callbacks.onDelta(evt.content);
       } else if (evt.type === "compaction") {
         callbacks.onCompaction?.(evt.message, evt.compactedCount, evt.remainingCount);
+      } else if (evt.type === "fusion-result") {
+        callbacks.onFusionResult?.(evt.payload);
+        callbacks.onDelta(evt.payload.output); // render the fused text in the bubble
       } else if (evt.type === "done") {
         callbacks.onDone();
         return;

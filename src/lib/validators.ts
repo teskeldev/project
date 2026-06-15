@@ -86,6 +86,7 @@ export const chatStreamSchema = z.object({
   selectedPaths: z.array(z.string()).max(100).optional(),
   model: z.string().optional(),
   provider: z.string().optional(),
+  fusionId: z.string().optional(),
   useQualityEngine: z.boolean().optional(),
   qualityLevel: z.enum(["fast", "balanced", "maximum"]).optional(),
 });

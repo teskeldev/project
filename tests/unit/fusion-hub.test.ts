@@ -1,43 +1,34 @@
 import { describe, it, expect } from "vitest";
-import { resolveRoutingSteps, isParallel, stopsAtFirstSuccess } from "@/lib/ai/fusion/routing";
-import { PROVIDER_CATALOG, getProviderCatalog, ROUTING_STRATEGIES, JUDGE_MODES } from "@/lib/ai/fusion/catalog";
+import { PROVIDER_CATALOG, getProviderCatalog, FUSION_STRATEGIES, JUDGE_OPTIONS, DEFAULT_LIMITS } from "@/lib/ai/fusion/catalog";
+import { FUSION_TEMPLATES, getFusionTemplate } from "@/lib/ai/fusion/templates";
 
-describe("routing helpers", () => {
-  it("returns the configured steps in order", () => {
-    expect(resolveRoutingSteps({ steps: ["openai:gpt-4o", "anthropic:claude-opus-4-8"] })).toEqual([
-      "openai:gpt-4o",
-      "anthropic:claude-opus-4-8",
-    ]);
-  });
-
-  it("caps steps by maxFanout", () => {
-    expect(resolveRoutingSteps({ steps: ["a", "b", "c"], maxFanout: 2 })).toEqual(["a", "b"]);
-  });
-
-  it("classifies strategy execution semantics", () => {
-    expect(isParallel("parallel")).toBe(true);
-    expect(isParallel("fallback")).toBe(false);
-    expect(stopsAtFirstSuccess("sequential")).toBe(true);
-    expect(stopsAtFirstSuccess("fallback")).toBe(true);
-    expect(stopsAtFirstSuccess("parallel")).toBe(false);
-  });
-});
-
-describe("catalog", () => {
-  it("keeps the OpenRouter-class providers (managed in Integrations)", () => {
+describe("fusion catalog", () => {
+  it("keeps provider kinds (managed in Integrations, consumed read-only)", () => {
     const kinds = PROVIDER_CATALOG.map((p) => p.kind);
     for (const k of ["openai", "anthropic", "google", "openrouter", "deepseek", "groq", "xai", "ollama", "custom"]) {
       expect(kinds).toContain(k);
     }
-  });
-
-  it("marks local runtimes as not requiring a key", () => {
     expect(getProviderCatalog("ollama")?.requiresKey).toBe(false);
     expect(getProviderCatalog("openai")?.requiresKey).toBe(true);
   });
 
-  it("exposes the simplified routing strategies and judge modes", () => {
-    expect([...ROUTING_STRATEGIES]).toEqual(["sequential", "parallel", "fallback", "cost", "latency"]);
-    expect([...JUDGE_MODES]).toEqual(["consensus", "majority", "merge", "debate"]);
+  it("exposes the simple strategy + judge sets", () => {
+    expect([...FUSION_STRATEGIES]).toEqual(["single", "parallel", "consensus"]);
+    expect([...JUDGE_OPTIONS]).toEqual(["auto", "anthropic", "openai", "google"]);
+  });
+
+  it("provides sane default limits", () => {
+    expect(DEFAULT_LIMITS.maxTokens).toBeGreaterThan(0);
+    expect(DEFAULT_LIMITS.timeoutMs).toBeGreaterThan(0);
+  });
+});
+
+describe("fusion templates", () => {
+  it("ships the built-in templates and resolves by id", () => {
+    const ids = FUSION_TEMPLATES.map((t) => t.id);
+    expect(ids).toContain("senior-fullstack");
+    expect(ids).toContain("web3-auditor");
+    expect(getFusionTemplate("research-analyst")?.strategy).toBe("consensus");
+    expect(getFusionTemplate("nope")).toBeUndefined();
   });
 });

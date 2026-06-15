@@ -31,7 +31,7 @@ function sse(event: string, data: unknown): string {
 export async function POST(req: Request) {
   try {
     const body = await validateBody(req, chatStreamSchema);
-    const { threadId, content, selectedPaths, model, provider, useQualityEngine, qualityLevel } = body;
+    const { threadId, content, selectedPaths, model, provider, fusionId, useQualityEngine, qualityLevel } = body;
 
     // OPTIONAL idempotency: if the client supplies an Idempotency-Key header
     // and a USER message with that key already exists in this thread, skip
@@ -104,6 +104,62 @@ export async function POST(req: Request) {
           ...(idempotencyKey
             ? { metadata: { idempotencyKey } }
             : {}),
+        },
+      });
+    }
+
+    // ─── Fusion path: run a saved Fusion (AI Team) for this turn ───────────────
+    if (fusionId) {
+      const { runFusion } = await import("@/lib/ai/fusion/runner");
+      const result = await runFusion({
+        fusionId,
+        prompt: content,
+        workspaceId,
+        projectId,
+        signal: req.signal,
+      });
+
+      await prisma.chatMessage.create({
+        data: {
+          threadId,
+          role: "ASSISTANT",
+          content: result.fused,
+          metadata: {
+            fusion: true,
+            fusionId,
+            judgeUsed: result.judgeUsed,
+            runs: result.runs.map((r) => ({ modelId: r.modelId, provider: r.provider, ok: r.ok, latencyMs: r.latencyMs })),
+            metrics: result.metrics,
+            warnings: result.warnings,
+          },
+        },
+      });
+      await prisma.chatThread.update({ where: { id: threadId }, data: { updatedAt: new Date() } });
+
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode(
+              sse("fusion-result", {
+                output: result.fused,
+                runs: result.runs,
+                judgeUsed: result.judgeUsed,
+                warnings: result.warnings,
+                metrics: result.metrics,
+              })
+            )
+          );
+          controller.enqueue(encoder.encode(sse("done", { ok: true })));
+          controller.close();
+        },
+      });
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+          "X-Accel-Buffering": "no",
         },
       });
     }

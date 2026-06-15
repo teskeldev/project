@@ -1,129 +1,171 @@
 /**
- * Fusion store — only the two persisted orchestration configs (Routing, Judge)
- * plus the Overview snapshot. Models are derived (see models.ts), not stored.
- *
- * SERVER-ONLY.
+ * Fusion CRUD — the single reusable "AI Team" config. SERVER-ONLY.
  */
 import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma/client";
-import { listAvailableModels } from "./models";
+import { DEFAULT_LIMITS, type FusionLimits } from "./catalog";
 
 const json = (v: unknown): Prisma.InputJsonValue => v as Prisma.InputJsonValue;
 
-/* -------------------------------- Routing --------------------------------- */
+export type FusionData = {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description: string | null;
+  modelIds: string[];
+  skillIds: string[];
+  ruleIds: string[];
+  knowledgeIds: string[];
+  strategy: string;
+  judge: string;
+  judgeModelId: string | null;
+  limits: FusionLimits;
+  status: string;
+  isTemplate: boolean;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+};
 
-export type RoutingInput = { name: string; strategy: string; config?: unknown };
+export type FusionInput = {
+  name: string;
+  description?: string | null;
+  modelIds?: string[];
+  skillIds?: string[];
+  ruleIds?: string[];
+  knowledgeIds?: string[];
+  strategy?: string;
+  judge?: string;
+  judgeModelId?: string | null;
+  limits?: Partial<FusionLimits>;
+  status?: string;
+};
 
-export function listRoutings(workspaceId: string) {
-  return prisma.fusionRouting.findMany({ where: { workspaceId }, orderBy: { createdAt: "asc" } });
-}
-export function createRouting(workspaceId: string, data: RoutingInput) {
-  return prisma.fusionRouting.create({
-    data: { workspaceId, name: data.name, strategy: data.strategy, config: json(data.config ?? {}) },
-  });
-}
-export async function updateRouting(workspaceId: string, id: string, data: Partial<RoutingInput>) {
-  await assertOwned("fusionRouting", workspaceId, id);
-  return prisma.fusionRouting.update({
-    where: { id },
-    data: {
-      ...(data.name !== undefined && { name: data.name }),
-      ...(data.strategy !== undefined && { strategy: data.strategy }),
-      ...(data.config !== undefined && { config: json(data.config) }),
-    },
-  });
-}
-export async function deleteRouting(workspaceId: string, id: string) {
-  await assertOwned("fusionRouting", workspaceId, id);
-  return prisma.fusionRouting.delete({ where: { id } });
-}
+type Row = {
+  id: string; workspaceId: string; name: string; description: string | null;
+  modelIds: unknown; skillIds: unknown; ruleIds: unknown; knowledgeIds: unknown;
+  strategy: string; judge: string; judgeModelId: string | null; limits: unknown;
+  status: string; isTemplate: boolean; createdById: string; createdAt: Date; updatedAt: Date;
+};
 
-/* --------------------------------- Judges --------------------------------- */
+const arr = (v: unknown): string[] => (Array.isArray(v) ? (v as string[]) : []);
 
-export type JudgeInput = { name: string; mode: string; judgeModelId?: string | null; config?: unknown };
-
-export function listJudges(workspaceId: string) {
-  return prisma.fusionJudge.findMany({ where: { workspaceId }, orderBy: { createdAt: "asc" } });
-}
-export function createJudge(workspaceId: string, data: JudgeInput) {
-  return prisma.fusionJudge.create({
-    data: {
-      workspaceId,
-      name: data.name,
-      mode: data.mode,
-      judgeModelId: data.judgeModelId ?? null,
-      config: json(data.config ?? {}),
-    },
-  });
-}
-export async function updateJudge(workspaceId: string, id: string, data: Partial<JudgeInput>) {
-  await assertOwned("fusionJudge", workspaceId, id);
-  return prisma.fusionJudge.update({
-    where: { id },
-    data: {
-      ...(data.name !== undefined && { name: data.name }),
-      ...(data.mode !== undefined && { mode: data.mode }),
-      ...(data.judgeModelId !== undefined && { judgeModelId: data.judgeModelId }),
-      ...(data.config !== undefined && { config: json(data.config) }),
-    },
-  });
-}
-export async function deleteJudge(workspaceId: string, id: string) {
-  await assertOwned("fusionJudge", workspaceId, id);
-  return prisma.fusionJudge.delete({ where: { id } });
-}
-
-/* -------------------------------- Overview -------------------------------- */
-
-export async function getOverview(workspaceId: string) {
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-
-  const [models, routings, judges, dailyAgg, successCount, recent] = await Promise.all([
-    listAvailableModels(workspaceId),
-    prisma.fusionRouting.count({ where: { workspaceId } }),
-    prisma.fusionJudge.count({ where: { workspaceId } }),
-    prisma.fusionRequestLog.aggregate({
-      where: { workspaceId, createdAt: { gte: since } },
-      _sum: { tokensIn: true, tokensOut: true, costUsd: true },
-      _avg: { latencyMs: true },
-      _count: { _all: true },
-    }),
-    prisma.fusionRequestLog.count({ where: { workspaceId, createdAt: { gte: since }, success: true } }),
-    prisma.fusionRequestLog.findMany({
-      where: { workspaceId },
-      orderBy: { createdAt: "desc" },
-      take: 10,
-      select: { id: true, provider: true, modelId: true, success: true, latencyMs: true, costUsd: true, createdAt: true, error: true },
-    }),
-  ]);
-
-  const total = dailyAgg._count._all || 0;
-  const providers = new Set(models.map((m) => m.provider)).size;
-
+function mapRow(r: Row): FusionData {
   return {
-    stats: {
-      providers,
-      models: models.length,
-      routings,
-      judges,
-      dailyRequests: total,
-      tokenUsage: (dailyAgg._sum.tokensIn ?? 0) + (dailyAgg._sum.tokensOut ?? 0),
-      dailyCost: dailyAgg._sum.costUsd ?? 0,
-      avgLatencyMs: Math.round(dailyAgg._avg.latencyMs ?? 0),
-      successRate: total > 0 ? successCount / total : 1,
-    },
-    recent,
+    id: r.id,
+    workspaceId: r.workspaceId,
+    name: r.name,
+    description: r.description,
+    modelIds: arr(r.modelIds),
+    skillIds: arr(r.skillIds),
+    ruleIds: arr(r.ruleIds),
+    knowledgeIds: arr(r.knowledgeIds),
+    strategy: r.strategy,
+    judge: r.judge,
+    judgeModelId: r.judgeModelId,
+    limits: { ...DEFAULT_LIMITS, ...((r.limits as Partial<FusionLimits>) ?? {}) },
+    status: r.status,
+    isTemplate: r.isTemplate,
+    createdById: r.createdById,
+    createdAt: r.createdAt.toISOString(),
+    updatedAt: r.updatedAt.toISOString(),
   };
 }
 
-/* ------------------------------- internals -------------------------------- */
+export async function listFusions(
+  workspaceId: string,
+  opts: { includeArchived?: boolean } = {}
+): Promise<FusionData[]> {
+  const rows = await prisma.fusion.findMany({
+    where: { workspaceId, ...(opts.includeArchived ? {} : { status: { not: "archived" } }) },
+    orderBy: { updatedAt: "desc" },
+  });
+  return rows.map(mapRow);
+}
 
-async function assertOwned(model: "fusionRouting" | "fusionJudge", workspaceId: string, id: string): Promise<void> {
-  const where = { id, workspaceId };
-  const sel = { select: { id: true } };
-  const row =
-    model === "fusionRouting"
-      ? await prisma.fusionRouting.findFirst({ where, ...sel })
-      : await prisma.fusionJudge.findFirst({ where, ...sel });
-  if (!row) throw new Error("Resource not found");
+export async function getFusion(workspaceId: string, id: string): Promise<FusionData | null> {
+  const row = await prisma.fusion.findFirst({ where: { id, workspaceId } });
+  return row ? mapRow(row) : null;
+}
+
+export async function createFusion(
+  workspaceId: string,
+  createdById: string,
+  input: FusionInput
+): Promise<FusionData> {
+  const row = await prisma.fusion.create({
+    data: {
+      workspaceId,
+      createdById,
+      name: input.name,
+      description: input.description ?? null,
+      modelIds: json(input.modelIds ?? []),
+      skillIds: json(input.skillIds ?? []),
+      ruleIds: json(input.ruleIds ?? []),
+      knowledgeIds: json(input.knowledgeIds ?? []),
+      strategy: input.strategy ?? "single",
+      judge: input.judge ?? "auto",
+      judgeModelId: input.judgeModelId ?? null,
+      limits: json({ ...DEFAULT_LIMITS, ...(input.limits ?? {}) }),
+      status: input.status ?? "active",
+    },
+  });
+  return mapRow(row);
+}
+
+export async function updateFusion(
+  workspaceId: string,
+  id: string,
+  input: Partial<FusionInput>
+): Promise<FusionData> {
+  const owned = await prisma.fusion.findFirst({ where: { id, workspaceId }, select: { limits: true } });
+  if (!owned) throw new Error("Fusion not found");
+  const row = await prisma.fusion.update({
+    where: { id },
+    data: {
+      ...(input.name !== undefined && { name: input.name }),
+      ...(input.description !== undefined && { description: input.description }),
+      ...(input.modelIds !== undefined && { modelIds: json(input.modelIds) }),
+      ...(input.skillIds !== undefined && { skillIds: json(input.skillIds) }),
+      ...(input.ruleIds !== undefined && { ruleIds: json(input.ruleIds) }),
+      ...(input.knowledgeIds !== undefined && { knowledgeIds: json(input.knowledgeIds) }),
+      ...(input.strategy !== undefined && { strategy: input.strategy }),
+      ...(input.judge !== undefined && { judge: input.judge }),
+      ...(input.judgeModelId !== undefined && { judgeModelId: input.judgeModelId }),
+      ...(input.limits !== undefined && {
+        limits: json({ ...DEFAULT_LIMITS, ...((owned.limits as Partial<FusionLimits>) ?? {}), ...input.limits }),
+      }),
+      ...(input.status !== undefined && { status: input.status }),
+    },
+  });
+  return mapRow(row);
+}
+
+export async function duplicateFusion(workspaceId: string, id: string, createdById: string): Promise<FusionData> {
+  const src = await getFusion(workspaceId, id);
+  if (!src) throw new Error("Fusion not found");
+  // Ensure a unique name within the workspace.
+  let name = `${src.name} copy`;
+  for (let i = 2; await prisma.fusion.findFirst({ where: { workspaceId, name } }); i++) {
+    name = `${src.name} copy ${i}`;
+  }
+  return createFusion(workspaceId, createdById, {
+    name,
+    description: src.description,
+    modelIds: src.modelIds,
+    skillIds: src.skillIds,
+    ruleIds: src.ruleIds,
+    knowledgeIds: src.knowledgeIds,
+    strategy: src.strategy,
+    judge: src.judge,
+    judgeModelId: src.judgeModelId,
+    limits: src.limits,
+    status: "active",
+  });
+}
+
+export async function deleteFusion(workspaceId: string, id: string): Promise<void> {
+  const owned = await prisma.fusion.findFirst({ where: { id, workspaceId }, select: { id: true } });
+  if (!owned) throw new Error("Fusion not found");
+  await prisma.fusion.delete({ where: { id } });
 }

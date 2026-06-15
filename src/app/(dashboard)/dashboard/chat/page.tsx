@@ -62,8 +62,9 @@ import {
   type ChatMessage,
   forkThread,
 } from "@/lib/client/api";
-import { streamChatCompletion } from "@/lib/client/chatStream";
+import { streamChatCompletion, type FusionResultPayload } from "@/lib/client/chatStream";
 import { listProviders, type AIProviderInfo } from "@/lib/client/providers";
+import { fusionApi, type Fusion } from "@/lib/client/fusion";
 import { listCommands as listSlashCommands, resolveCommandTemplate, type SlashCommand } from "@/lib/client/commands";
 
 /* -------------------------------------------------------------------------- */
@@ -378,7 +379,7 @@ function ChatSurface() {
   const searchParams = useSearchParams();
   const threadParam = searchParams.get("thread");
 
-  const { activeProject } = useProject();
+  const { activeProject, activeWorkspace } = useProject();
   const projectId = activeProject?.id ?? null;
 
   const [threadId, setThreadId] = useState<string | null>(threadParam);
@@ -421,6 +422,10 @@ function ChatSurface() {
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [providers, setProviders] = useState<AIProviderInfo[]>([]);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
+  // Fusion (reusable AI Team) selection — mutually exclusive with a single model.
+  const [fusions, setFusions] = useState<Fusion[]>([]);
+  const [selectedFusionId, setSelectedFusionId] = useState<string | null>(null);
+  const [fusionDebug, setFusionDebug] = useState<FusionResultPayload | null>(null);
 
   // Slash commands state
   const [slashCommands, setSlashCommands] = useState<SlashCommand[]>([]);
@@ -461,6 +466,21 @@ function ChatSurface() {
     return () => { cancelled = true; };
   }, []);
 
+  // Load workspace Fusions for the model selector.
+  useEffect(() => {
+    if (!activeWorkspace?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { fusions: f } = await fusionApi.listFusions(activeWorkspace.id);
+        if (!cancelled) setFusions(f);
+      } catch {
+        // Non-fatal: the Fusions group just won't appear.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeWorkspace?.id]);
+
 
   // Load slash commands
   useEffect(() => {
@@ -475,9 +495,12 @@ function ChatSurface() {
     })();
     return () => { cancelled = true; };
   }, []);
-  const modelLabel = selectedModel
-    ? providers.flatMap((p) => p.models).find((m) => m.id === selectedModel)?.name ?? selectedModel
-    : "Auto";
+  const activeFusion = selectedFusionId ? fusions.find((f) => f.id === selectedFusionId) ?? null : null;
+  const modelLabel = activeFusion
+    ? `🧩 ${activeFusion.name}`
+    : selectedModel
+      ? providers.flatMap((p) => p.models).find((m) => m.id === selectedModel)?.name ?? selectedModel
+      : "Auto";
 
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -663,9 +686,11 @@ function ChatSurface() {
         content,
         selectedPaths: selectedPaths.length > 0 ? selectedPaths : undefined,
         signal: controller.signal,
-        model: selectedModel ?? undefined,
+        model: selectedFusionId ? undefined : selectedModel ?? undefined,
+        fusionId: selectedFusionId ?? undefined,
       },
       {
+        onFusionResult: (payload) => setFusionDebug(payload),
         onThinking: (delta) =>
           setMessages((prev) =>
             prev.map((m) =>
@@ -750,7 +775,7 @@ function ChatSurface() {
         setChangesetState({ status: "idle" });
       }
     }
-  }, [inputValue, streaming, projectId, ensureThread, selectedModel, mentionChips, autonomyMode]);
+  }, [inputValue, streaming, projectId, ensureThread, selectedModel, selectedFusionId, mentionChips, autonomyMode]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -1294,8 +1319,8 @@ function ChatSurface() {
                     {showModelDropdown && (
                       <div className="absolute bottom-full right-0 mb-1 w-56 rounded-lg border border-border bg-surface py-1 shadow-lg z-50 max-h-64 overflow-y-auto">
                         <button
-                          onClick={() => { setSelectedModel(null); setShowModelDropdown(false); }}
-                          className={`flex w-full items-center px-3 py-1.5 text-left text-xs hover:bg-surface-soft ${!selectedModel ? "text-accent font-medium" : "text-text-secondary"}`}
+                          onClick={() => { setSelectedModel(null); setSelectedFusionId(null); setShowModelDropdown(false); }}
+                          className={`flex w-full items-center px-3 py-1.5 text-left text-xs hover:bg-surface-soft ${!selectedModel && !selectedFusionId ? "text-accent font-medium" : "text-text-secondary"}`}
                         >
                           Auto (default)
                         </button>
@@ -1307,7 +1332,7 @@ function ChatSurface() {
                             {provider.models.map((m) => (
                               <button
                                 key={m.id}
-                                onClick={() => { setSelectedModel(m.id); setShowModelDropdown(false); }}
+                                onClick={() => { setSelectedModel(m.id); setSelectedFusionId(null); setShowModelDropdown(false); }}
                                 className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-xs hover:bg-surface-soft ${selectedModel === m.id ? "text-accent font-medium" : "text-text-secondary"}`}
                               >
                                 <span>{m.name}</span>
@@ -1318,6 +1343,23 @@ function ChatSurface() {
                             ))}
                           </div>
                         ))}
+                        {fusions.length > 0 && (
+                          <div className="mt-1 border-t border-border pt-1">
+                            <div className="px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-text-muted">
+                              🧩 Fusions
+                            </div>
+                            {fusions.map((f) => (
+                              <button
+                                key={f.id}
+                                onClick={() => { setSelectedFusionId(f.id); setSelectedModel(null); setShowModelDropdown(false); }}
+                                className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-xs hover:bg-surface-soft ${selectedFusionId === f.id ? "text-accent font-medium" : "text-text-secondary"}`}
+                              >
+                                <span>{f.name}</span>
+                                <span className="text-[10px] text-text-muted">{f.strategy}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1349,6 +1391,26 @@ function ChatSurface() {
                   )}
                 </div>
               </div>
+              {fusionDebug && (
+                <div className="mt-2 rounded-lg border border-border bg-surface-soft/50 px-3 py-2 text-[11px] text-text-secondary">
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="font-medium">🧩 Fusion execution</span>
+                    <button onClick={() => setFusionDebug(null)} className="text-text-muted hover:text-text-secondary">×</button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {fusionDebug.runs.map((r, i) => (
+                      <span key={i} className={r.ok ? "text-emerald-500" : "text-rose-500"}>
+                        {r.modelId} {r.ok ? "✓" : "✗"} {r.latencyMs}ms
+                      </span>
+                    ))}
+                    <span className="text-text-muted">judge: {fusionDebug.judgeUsed}</span>
+                    <span className="text-text-muted">{fusionDebug.metrics.tokens} tok · {(fusionDebug.metrics.executionMs / 1000).toFixed(1)}s</span>
+                  </div>
+                  {fusionDebug.warnings.length > 0 && (
+                    <div className="mt-1 text-amber-600 dark:text-amber-400">{fusionDebug.warnings.join(" · ")}</div>
+                  )}
+                </div>
+              )}
               <div className="mt-2 flex items-center justify-between px-1">
                 <div className="flex items-center gap-2">
                   <button className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-text-muted hover:bg-surface-soft hover:text-text-secondary">

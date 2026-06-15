@@ -1,7 +1,7 @@
 /**
- * Static catalogs for the Fusion Orchestration Hub — provider kinds, MCP server
- * kinds, routing strategies and judge modes. Pure data (no secrets, no Node-only
- * imports) so it is safe to import from both server and client code.
+ * Static catalog for Fusion: provider kinds (used to derive the read-only model
+ * registry from Integrations) + the Fusion strategy / judge option sets. Pure
+ * data, safe to import from server and client.
  */
 
 export type ProviderKind =
@@ -49,33 +49,11 @@ export function getProviderCatalog(kind: string): ProviderCatalogEntry | undefin
   return PROVIDER_CATALOG.find((p) => p.kind === kind);
 }
 
-export const ROUTING_STRATEGIES = [
-  "sequential",
-  "parallel",
-  "fallback",
-  "cost",
-  "latency",
-] as const;
-export type RoutingStrategy = (typeof ROUTING_STRATEGIES)[number];
+export const FUSION_STRATEGIES = ["single", "parallel", "consensus"] as const;
+export type FusionStrategy = (typeof FUSION_STRATEGIES)[number];
 
-export const JUDGE_MODES = ["consensus", "majority", "merge", "debate"] as const;
-export type JudgeMode = (typeof JUDGE_MODES)[number];
+export const JUDGE_OPTIONS = ["auto", "anthropic", "openai", "google"] as const;
+export type JudgeOption = (typeof JUDGE_OPTIONS)[number];
 
-export type ModelCapabilities = {
-  reasoning: boolean;
-  vision: boolean;
-  tools: boolean;
-  structuredOutput: boolean;
-  jsonMode: boolean;
-};
-
-export const DEFAULT_CAPABILITIES: ModelCapabilities = {
-  reasoning: false,
-  vision: false,
-  tools: true,
-  structuredOutput: true,
-  jsonMode: true,
-};
-
-export type ModelPricing = { input: number; output: number };
-export const DEFAULT_PRICING: ModelPricing = { input: 0, output: 0 };
+export type FusionLimits = { maxCostUsd: number; maxTokens: number; timeoutMs: number };
+export const DEFAULT_LIMITS: FusionLimits = { maxCostUsd: 5, maxTokens: 50000, timeoutMs: 60000 };

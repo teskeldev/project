@@ -199,8 +199,7 @@ model Workspace {
   usageRecords      UsageRecord[]
   slashCommands     SlashCommand[]
   aiPermissions     AIPermission[]
-  fusionRoutings    FusionRouting[]
-  fusionJudges      FusionJudge[]
+  fusions           Fusion[]
   fusionRequestLogs FusionRequestLog[]
 
   @@index([ownerId])
@@ -790,32 +789,34 @@ model Skill {
 // that powers Overview + Playground metrics. Models are NOT stored; they are
 // derived at runtime from enabled Integrations × the provider catalog.
 
-model FusionRouting {
-  id          String   @id @default(cuid())
-  workspaceId String
-  name        String
-  // sequential | parallel | fallback | cost | latency
-  strategy    String
-  // { steps: string[] (provider:modelId), weights, maxFanout }
-  config      Json
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-
-  @@unique([workspaceId, name])
-  @@index([workspaceId])
-}
-
-model FusionJudge {
+// A reusable "AI Team": models + skills + rules + knowledge + strategy + judge
+// + limits, created once and usable across the platform. Models come from the
+// Integrations-derived registry; skills/rules/knowledge are referenced by id.
+model Fusion {
   id           String   @id @default(cuid())
   workspaceId  String
   name         String
+  description  String?
+  // ["provider:modelId", ...]
+  modelIds     Json
+  // Skill ids
+  skillIds     Json
+  // Rule ids
+  ruleIds      Json
+  // KnowledgeItem ids
+  knowledgeIds Json
+  // single | parallel | consensus
+  strategy     String   @default("single")
+  // auto | anthropic | openai | google
+  judge        String   @default("auto")
+  // optional explicit "provider:modelId" judge override
   judgeModelId String?
-  // consensus | majority | merge | debate
-  mode         String
-  // { confidenceThreshold }
-  config       Json
+  // { maxCostUsd, maxTokens, timeoutMs }
+  limits       Json
+  // draft | active | archived
+  status       String   @default("active")
+  isTemplate   Boolean  @default(false)
+  createdById  String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
