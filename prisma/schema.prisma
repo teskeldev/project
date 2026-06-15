@@ -319,6 +319,7 @@ model AgentRun {
   userId    String
   status    AgentStatus @default(QUEUED)
   goal      String      @db.Text
+  fusionId  String?
   plan      Json?
   result    Json?
   error     String?
@@ -526,6 +527,7 @@ model DesignSession {
   projectId String
   userId    String
   title     String
+  fusionId  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -577,6 +579,7 @@ model Artifact {
   content   String       @db.Text
   language  String?
   metadata  Json?
+  fusionId  String?
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 

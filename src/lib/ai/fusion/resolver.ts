@@ -89,3 +89,42 @@ export async function resolveFusion(
 
   return { fusion, models, skills, rules, knowledge, warnings };
 }
+
+/**
+ * Format a resolved Fusion's Rules → Knowledge → Skills into one injectable
+ * system block (bounded). Shared by the runner and by config-injection callers.
+ */
+export function buildFusionSystem(resolved: ResolvedFusion): string {
+  const parts: string[] = [];
+  if (resolved.rules.length) {
+    parts.push("--- RULES ---\n" + resolved.rules.map((r) => `# ${r.title}\n${r.content}`).join("\n\n"));
+  }
+  if (resolved.knowledge.length) {
+    parts.push("--- KNOWLEDGE ---\n" + resolved.knowledge.map((k) => `# ${k.title}\n${k.content}`).join("\n\n"));
+  }
+  if (resolved.skills.length) {
+    parts.push("--- SKILLS ---\n" + resolved.skills.map((s) => `# ${s.title}\n${s.content}`).join("\n\n"));
+  }
+  let block = parts.join("\n\n");
+  if (block.length > 16000) block = block.slice(0, 16000);
+  return block;
+}
+
+/**
+ * Lightweight config-injection primitive for multi-step / code-gen surfaces
+ * (Agent, Composer): the Fusion's injected system context + its primary model.
+ * No fan-out/judge — that stays in `runFusion` for single-shot surfaces.
+ */
+export async function resolveFusionContext(
+  fusionId: string,
+  workspaceId: string,
+  projectId?: string
+): Promise<{ system: string; primary: { provider: string; modelId: string } | null; warnings: string[] }> {
+  const resolved = await resolveFusion(fusionId, workspaceId, projectId);
+  const first = resolved.models[0];
+  return {
+    system: buildFusionSystem(resolved),
+    primary: first ? { provider: first.provider, modelId: first.modelId } : null,
+    warnings: resolved.warnings,
+  };
+}

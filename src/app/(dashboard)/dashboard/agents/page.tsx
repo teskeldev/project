@@ -14,6 +14,7 @@ import {
   GitBranch,
 } from "lucide-react";
 import { useProject } from "@/lib/store/project";
+import { FusionPicker } from "@/components/fusion/FusionPicker";
 import {
   listAgentRuns,
   getAgentRun,
@@ -72,7 +73,7 @@ function isActive(status: AgentStatus): boolean {
 }
 
 export default function BackgroundAgentsPage() {
-  const { activeProject } = useProject();
+  const { activeProject, activeWorkspace } = useProject();
   const projectId = activeProject?.id ?? null;
 
   const [runs, setRuns] = useState<AgentRunSummaryDTO[]>([]);
@@ -87,6 +88,7 @@ export default function BackgroundAgentsPage() {
   const [goal, setGoal] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [agentFusionId, setAgentFusionId] = useState<string | null>(null);
 
   const streamRef = useRef<{ abort: () => void } | null>(null);
 
@@ -197,7 +199,10 @@ export default function BackgroundAgentsPage() {
     setCreating(true);
     setCreateError(null);
     try {
-      const { run } = await createAgentRun(projectId, { goal: goal.trim() });
+      const { run } = await createAgentRun(projectId, {
+        goal: goal.trim(),
+        fusionId: agentFusionId ?? undefined,
+      });
       setGoal("");
       setRuns((prev) => [run, ...prev]);
       setSelectedId(run.id);
@@ -208,7 +213,7 @@ export default function BackgroundAgentsPage() {
     } finally {
       setCreating(false);
     }
-  }, [projectId, goal, creating]);
+  }, [projectId, goal, creating, agentFusionId]);
 
   const handleCancel = useCallback(
     async (id: string) => {
@@ -265,6 +270,14 @@ export default function BackgroundAgentsPage() {
                 }
               }}
             />
+            <div className="mt-2">
+              <FusionPicker
+                workspaceId={activeWorkspace?.id}
+                value={agentFusionId}
+                onChange={setAgentFusionId}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[12px] text-[var(--foreground)] focus:outline-none"
+              />
+            </div>
             <Button
               onClick={() => void handleCreate()}
               disabled={creating || goal.trim().length < 4}

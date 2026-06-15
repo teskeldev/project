@@ -68,7 +68,7 @@ export async function POST(req: Request, ctx: RouteContext) {
     const { projectId } = await ctx.params;
     const { user, member } = await requireProjectAccess(projectId);
     requireRole(member);
-    const { goal, threadId } = await validateBody(req, createAgentRunSchema);
+    const { goal, threadId, fusionId } = await validateBody(req, createAgentRunSchema);
 
     // Throttle run creation per user (10/min). Production: back with Redis.
     await enforceRateLimit(`agents:create:${user.id}`, 10, 60_000);
@@ -86,6 +86,7 @@ export async function POST(req: Request, ctx: RouteContext) {
       userId: user.id,
       goal,
       threadId,
+      fusionId,
     });
 
     const data: AgentRunSummaryDTO = {

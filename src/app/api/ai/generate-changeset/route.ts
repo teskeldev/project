@@ -19,12 +19,27 @@ import { checkQuota, recordUsage } from "@/lib/quota";
 // Returns the persisted PENDING_REVIEW ChangeSet with its fileChanges.
 export async function POST(req: Request) {
   try {
-    const { projectId, instruction, selectedPaths, model, provider, useQualityEngine } =
+    const { projectId, instruction, selectedPaths, model, provider, fusionId, useQualityEngine } =
       await validateBody(req, generateChangeSetSchema);
 
     const { user, project, member } = await requireProjectAccess(projectId);
     requireRole(member);
     const workspaceId = project!.workspaceId;
+
+    // Lightweight Fusion config injection (Composer): use the Fusion's primary
+    // model + injected rules/knowledge/skills context for this changeset.
+    let fusionAi: { model?: string; provider?: string } = {};
+    let fusionSystem: string | undefined;
+    if (fusionId) {
+      try {
+        const { resolveFusionContext } = await import("@/lib/ai/fusion/resolver");
+        const ctx = await resolveFusionContext(fusionId, workspaceId, projectId);
+        if (ctx.primary) fusionAi = { model: ctx.primary.modelId, provider: ctx.primary.provider };
+        fusionSystem = ctx.system || undefined;
+      } catch {
+        // Non-fatal: fall back to the default model/context.
+      }
+    }
 
     // Rate limit AI usage per user (20/min). Production should use Redis.
     await enforceRateLimit(`ai:changeset:${user.id}`, 20, 60_000);
@@ -142,11 +157,12 @@ export async function POST(req: Request) {
       );
     }
 
-    // ─── Standard path (existing behavior) ─────────────────────────────────────
+    // ─── Standard path (existing behavior + optional Fusion injection) ─────────
 
     const changeSet = await generateChangeSet(projectId, instruction, {
       selectedPaths,
-      ai: { workspaceId },
+      ai: { workspaceId, ...fusionAi },
+      systemPrefix: fusionSystem,
     });
 
     // Record AI token usage for the changeset generation.

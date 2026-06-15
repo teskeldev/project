@@ -12,6 +12,7 @@ import { isAIConfiguredAsync, streamChat, type AIMessage } from "@/lib/ai/provid
 const generateSchema = z.object({
   sessionId: z.string().min(1),
   prompt: z.string().min(1).max(10000),
+  fusionId: z.string().optional(),
 });
 
 const SYSTEM_PROMPT =
@@ -83,9 +84,23 @@ export async function POST(req: Request): Promise<Response> {
         };
 
         try {
-          for await (const delta of streamChat(messages)) {
-            fullContent += delta;
-            sendEvent("delta", { content: delta });
+          if (body.fusionId) {
+            // Single-shot Fusion path: fan out + judge into one component.
+            const { runFusion } = await import("@/lib/ai/fusion/runner");
+            const result = await runFusion({
+              fusionId: body.fusionId,
+              prompt: `${SYSTEM_PROMPT}\n\nComponent request:\n${body.prompt}`,
+              workspaceId: member.workspaceId,
+              projectId: session.projectId,
+              signal: req.signal,
+            });
+            fullContent = result.fused;
+            sendEvent("delta", { content: fullContent });
+          } else {
+            for await (const delta of streamChat(messages)) {
+              fullContent += delta;
+              sendEvent("delta", { content: delta });
+            }
           }
 
           // Persist the version
@@ -97,10 +112,10 @@ export async function POST(req: Request): Promise<Response> {
             },
           });
 
-          // Update session timestamp
+          // Update session timestamp + remember the Fusion used.
           await prisma.designSession.update({
             where: { id: body.sessionId },
-            data: { updatedAt: new Date() },
+            data: { updatedAt: new Date(), ...(body.fusionId ? { fusionId: body.fusionId } : {}) },
           });
 
           sendEvent("done", { versionId: version.id });

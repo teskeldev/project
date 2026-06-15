@@ -16,6 +16,7 @@ import type {
 export const createAgentRunSchema = z.object({
   goal: z.string().min(4, "Describe the goal in a bit more detail").max(4000),
   threadId: z.string().min(1).optional(),
+  fusionId: z.string().min(1).optional(),
 });
 export type CreateAgentRunInput = z.infer<typeof createAgentRunSchema>;
 

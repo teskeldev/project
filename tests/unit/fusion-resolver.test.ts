@@ -10,7 +10,7 @@ const db = vi.hoisted(() => ({
 
 vi.mock("@/lib/db", () => ({ prisma: db }));
 
-import { resolveFusion } from "@/lib/ai/fusion/resolver";
+import { resolveFusion, resolveFusionContext } from "@/lib/ai/fusion/resolver";
 
 beforeEach(() => {
   Object.values(db).forEach((m) => Object.values(m).forEach((fn) => (fn as ReturnType<typeof vi.fn>).mockReset()));
@@ -59,5 +59,34 @@ describe("resolveFusion graceful degradation", () => {
   it("throws when the Fusion does not exist", async () => {
     db.fusion.findFirst.mockResolvedValue(null);
     await expect(resolveFusion("nope", "ws1")).rejects.toThrow();
+  });
+});
+
+describe("resolveFusionContext (lightweight injection)", () => {
+  it("returns the primary available model + a system block from rules/skills", async () => {
+    db.fusion.findFirst.mockResolvedValue(
+      fusionRow({ modelIds: ["openai:gpt-4o"], ruleIds: ["r1"], skillIds: [], knowledgeIds: [] })
+    );
+    db.integration.findMany.mockResolvedValue([{ provider: "openai" }]);
+    db.skill.findMany.mockResolvedValue([]);
+    db.rule.findMany.mockResolvedValue([{ id: "r1", title: "No any", content: "Avoid any types.", workspaceId: "ws1", projectId: null }]);
+    db.knowledgeItem.findMany.mockResolvedValue([]);
+
+    const ctx = await resolveFusionContext("f1", "ws1");
+    expect(ctx.primary).toEqual({ provider: "openai", modelId: "gpt-4o" });
+    expect(ctx.system).toContain("RULES");
+    expect(ctx.system).toContain("Avoid any types.");
+  });
+
+  it("returns null primary when no model is available", async () => {
+    db.fusion.findFirst.mockResolvedValue(fusionRow({ modelIds: ["anthropic:claude-opus-4-8"] }));
+    db.integration.findMany.mockResolvedValue([{ provider: "openai" }]);
+    db.skill.findMany.mockResolvedValue([]);
+    db.rule.findMany.mockResolvedValue([]);
+    db.knowledgeItem.findMany.mockResolvedValue([]);
+
+    const ctx = await resolveFusionContext("f1", "ws1");
+    expect(ctx.primary).toBeNull();
+    expect(ctx.warnings.length).toBeGreaterThan(0);
   });
 });

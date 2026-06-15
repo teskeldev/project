@@ -35,6 +35,7 @@ import {
   type DesignVersion,
 } from "@/lib/client/design";
 import { createArtifact } from "@/lib/client/artifacts";
+import { FusionPicker } from "@/components/fusion/FusionPicker";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -96,7 +97,8 @@ function buildSrcdoc(code: string): string {
 }
 
 export default function DesignPage() {
-  const { activeProject } = useProject();
+  const { activeProject, activeWorkspace } = useProject();
+  const [designFusionId, setDesignFusionId] = useState<string | null>(null);
 
   const [viewMode, setViewMode] = useState<ViewMode>("preview");
   const [device, setDevice] = useState<DeviceSize>("desktop");
@@ -232,7 +234,7 @@ export default function DesignPage() {
     let accumulated = "";
 
     await streamDesignGeneration(
-      { sessionId: activeSessionId, prompt, signal: controller.signal },
+      { sessionId: activeSessionId, prompt, fusionId: designFusionId ?? undefined, signal: controller.signal },
       {
         onDelta(content) {
           accumulated += content;
@@ -278,7 +280,7 @@ export default function DesignPage() {
     );
 
     abortRef.current = null;
-  }, [input, activeSessionId, isGenerating]);
+  }, [input, activeSessionId, isGenerating, designFusionId]);
 
   const handleStop = () => {
     abortRef.current?.abort();
@@ -552,6 +554,14 @@ export default function DesignPage() {
 
         {/* Input */}
         <div className="border-t border-border p-3">
+          <div className="mb-1.5">
+            <FusionPicker
+              workspaceId={activeWorkspace?.id}
+              value={designFusionId}
+              onChange={setDesignFusionId}
+              className="w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-[12px] focus:outline-none"
+            />
+          </div>
           <div className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2">
             <label htmlFor="design-prompt-input" className="sr-only">
               Design prompt

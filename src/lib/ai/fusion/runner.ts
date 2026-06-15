@@ -7,7 +7,7 @@ import { chat, isAIConfiguredAsync } from "@/lib/ai/provider";
 import { getProviderConfig } from "@/lib/ai/providers";
 import { recordUsage } from "@/lib/quota";
 import { recordFusionRequest } from "./logging";
-import { resolveFusion, type ResolvedFusion, type ResolvedModel } from "./resolver";
+import { resolveFusion, buildFusionSystem, type ResolvedModel } from "./resolver";
 
 const CHARS_PER_TOKEN = 4;
 const estTokens = (t: string) => Math.ceil(t.length / CHARS_PER_TOKEN);
@@ -30,23 +30,6 @@ export type FusionRunResult = {
   warnings: string[];
   metrics: { tokens: number; costUsd: number; latencyMs: number; executionMs: number };
 };
-
-function buildSystem(resolved: ResolvedFusion): string {
-  const parts: string[] = [];
-  if (resolved.rules.length) {
-    parts.push("--- RULES ---\n" + resolved.rules.map((r) => `# ${r.title}\n${r.content}`).join("\n\n"));
-  }
-  if (resolved.knowledge.length) {
-    parts.push("--- KNOWLEDGE ---\n" + resolved.knowledge.map((k) => `# ${k.title}\n${k.content}`).join("\n\n"));
-  }
-  if (resolved.skills.length) {
-    parts.push("--- SKILLS ---\n" + resolved.skills.map((s) => `# ${s.title}\n${s.content}`).join("\n\n"));
-  }
-  let block = parts.join("\n\n");
-  // Keep the injected context bounded.
-  if (block.length > 16000) block = block.slice(0, 16000);
-  return block || "You are an expert assistant.";
-}
 
 async function resolveJudge(
   judge: string,
@@ -121,7 +104,7 @@ export async function runFusion(opts: {
   const resolved = await resolveFusion(opts.fusionId, opts.workspaceId, opts.projectId);
   const warnings = [...resolved.warnings];
   const { strategy, judge, judgeModelId, limits } = resolved.fusion;
-  const system = buildSystem(resolved);
+  const system = buildFusionSystem(resolved) || "You are an expert assistant.";
 
   let targets = resolved.models;
   if (targets.length === 0) {

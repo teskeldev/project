@@ -104,17 +104,17 @@ function toDesignEvent(frame: SSEFrame): { event: DesignStreamEvent; terminal: b
  * Resolves when the stream ends. Reports problems via onError.
  */
 export async function streamDesignGeneration(
-  args: { sessionId: string; prompt: string; signal?: AbortSignal },
+  args: { sessionId: string; prompt: string; fusionId?: string; signal?: AbortSignal },
   callbacks: DesignStreamCallbacks
 ): Promise<void> {
-  const { sessionId, prompt, signal } = args;
+  const { sessionId, prompt, fusionId, signal } = args;
 
   let res: Response;
   try {
     res = await fetch("/api/design/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId, prompt }),
+      body: JSON.stringify({ sessionId, prompt, fusionId }),
       signal,
     });
   } catch (err) {

@@ -78,6 +78,7 @@ export type StartAgentRunInput = {
   userId: string;
   goal: string;
   threadId?: string;
+  fusionId?: string;
 };
 
 /**
@@ -92,6 +93,7 @@ export async function startAgentRun(input: StartAgentRunInput) {
       userId: input.userId,
       goal: input.goal,
       threadId: input.threadId ?? null,
+      fusionId: input.fusionId ?? null,
       status: "QUEUED",
     },
   });
@@ -289,16 +291,22 @@ function extractJsonObject(raw: string): string {
 async function generatePlan(
   projectId: string,
   goal: string,
-  signal: AbortSignal
+  signal: AbortSignal,
+  fusion?: { system: string; primary: { provider: string; modelId: string } | null }
 ): Promise<AgentPlan> {
   const { system } = await buildProjectContext(projectId);
   const messages: AIMessage[] = [
+    ...(fusion?.system ? [{ role: "system" as const, content: fusion.system }] : []),
     { role: "system", content: system },
     { role: "system", content: PLAN_INSTRUCTION },
     { role: "user", content: `Goal:\n${goal}` },
   ];
 
-  const raw = await chat(messages, { temperature: 0.2, signal });
+  const raw = await chat(messages, {
+    temperature: 0.2,
+    signal,
+    ...(fusion?.primary ? { model: fusion.primary.modelId, provider: fusion.primary.provider } : {}),
+  });
 
   try {
     const parsed = JSON.parse(extractJsonObject(raw)) as Partial<AgentPlan>;
@@ -351,7 +359,7 @@ export async function driveAgentRun(
 
   const run = await prisma.agentRun.findUnique({
     where: { id: agentRunId },
-    select: { id: true, projectId: true, goal: true, status: true },
+    select: { id: true, projectId: true, goal: true, status: true, fusionId: true },
   });
   if (!run) return;
 
@@ -362,9 +370,25 @@ export async function driveAgentRun(
 
   const project = await prisma.project.findUnique({
     where: { id: run.projectId },
-    select: { storageKey: true },
+    select: { storageKey: true, workspaceId: true },
   });
   const storageKey = project?.storageKey ?? "";
+
+  // Lightweight Fusion config injection: if the run was started with a Fusion,
+  // resolve its primary model + injected context (rules/knowledge/skills) and
+  // use them for this run's plan + changeset generation. No per-step fan-out.
+  let fusionCtx: { system: string; primary: { provider: string; modelId: string } | null; warnings: string[] } | null = null;
+  if (run.fusionId && project?.workspaceId) {
+    try {
+      const { resolveFusionContext } = await import("@/lib/ai/fusion/resolver");
+      fusionCtx = await resolveFusionContext(run.fusionId, project.workspaceId, run.projectId);
+    } catch {
+      // Non-fatal: fall back to default model/context.
+    }
+  }
+  const fusionAi = fusionCtx?.primary
+    ? { model: fusionCtx.primary.modelId, provider: fusionCtx.primary.provider }
+    : {};
 
   let currentStepId: string | null = null;
 
@@ -383,7 +407,7 @@ export async function driveAgentRun(
     {
       const step = await beginStep(agentRunId, "THINK", "Planning approach");
       currentStepId = step.id;
-      const plan = await generatePlan(run.projectId, run.goal, signal);
+      const plan = await generatePlan(run.projectId, run.goal, signal, fusionCtx ?? undefined);
       assertNotAborted(signal);
       await prisma.agentRun.update({
         where: { id: agentRunId },
@@ -496,7 +520,8 @@ export async function driveAgentRun(
         `${run.goal}${planText}${relevantText}`,
         {
           selectedPaths: relevantPaths,
-          ai: { signal },
+          ai: { signal, ...fusionAi },
+          systemPrefix: fusionCtx?.system || undefined,
         }
       );
       changeSetId = changeSet.id;

@@ -99,6 +99,7 @@ export const generateChangeSetSchema = z.object({
   selectedPaths: z.array(z.string()).optional(),
   model: z.string().optional(),
   provider: z.string().optional(),
+  fusionId: z.string().optional(),
   useQualityEngine: z.boolean().optional(),
 });
 export type GenerateChangeSetInput = z.infer<typeof generateChangeSetSchema>;

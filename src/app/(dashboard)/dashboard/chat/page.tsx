@@ -756,6 +756,7 @@ function ChatSurface() {
           projectId,
           instruction: content,
           selectedPaths: selectedPaths.length > 0 ? selectedPaths : undefined,
+          fusionId: selectedFusionId ?? undefined,
         });
         if (AUTONOMY_MODES[autonomyMode].canAutoEdit) {
           // Instead of silently auto-applying, show a confirmation prompt
@@ -862,6 +863,7 @@ function ChatSurface() {
       const { changeSet } = await generateChangeSet({
         projectId,
         instruction,
+        fusionId: selectedFusionId ?? undefined,
       });
       setChangesetState({ status: "ready", id: changeSet.id });
     } catch (err) {
@@ -873,7 +875,7 @@ function ChatSurface() {
             : "Failed to generate changes",
       });
     }
-  }, [inputValue, projectId]);
+  }, [inputValue, projectId, selectedFusionId]);
 
   // Handle input changes — detect @ mentions and / commands
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

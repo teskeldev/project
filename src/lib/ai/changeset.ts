@@ -147,6 +147,8 @@ export type GenerateChangeSetOptions = {
   selectedPaths?: string[];
   /** Forwarded to the provider (model/temperature). Defaults to temp 0.1. */
   ai?: ChatOptions;
+  /** Extra system context prepended before project context (e.g. a Fusion's rules/knowledge/skills). */
+  systemPrefix?: string;
 };
 
 /**
@@ -172,6 +174,7 @@ export async function generateChangeSet(
   });
 
   const messages: AIMessage[] = [
+    ...(opts?.systemPrefix ? [{ role: "system" as const, content: opts.systemPrefix }] : []),
     { role: "system", content: system },
     { role: "system", content: CHANGESET_INSTRUCTION },
     {

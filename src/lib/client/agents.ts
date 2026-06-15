@@ -53,7 +53,7 @@ export function listAgentRuns(
 
 export function createAgentRun(
   projectId: string,
-  input: { goal: string; threadId?: string }
+  input: { goal: string; threadId?: string; fusionId?: string }
 ): Promise<{ run: AgentRunSummaryDTO }> {
   return agentFetch(`/api/projects/${projectId}/agents`, {
     method: "POST",

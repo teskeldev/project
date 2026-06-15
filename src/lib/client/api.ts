@@ -275,6 +275,7 @@ export function generateChangeSet(input: {
   projectId: string;
   instruction: string;
   selectedPaths?: string[];
+  fusionId?: string;
 }): Promise<{ changeSet: ChangeSet }> {
   return apiFetch("/api/ai/generate-changeset", {
     method: "POST",
