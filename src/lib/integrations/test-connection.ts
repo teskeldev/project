@@ -9,6 +9,7 @@
  * transport failure degrades to a friendly error rather than throwing.
  */
 import type { ProviderId } from "@/lib/integrations/providers";
+import { getAiProvider } from "@/lib/ai/provider-registry";
 
 export type TestResult = { ok: boolean; message: string };
 
@@ -40,7 +41,7 @@ function stripTrailingSlash(url: string): string {
   return url.replace(/\/+$/, "");
 }
 
-async function testOpenAI(config: Record<string, unknown>): Promise<TestResult> {
+async function testOpenAI(config: Record<string, unknown>, defaultBaseUrl: string): Promise<TestResult> {
   const apiKey = typeof config.apiKey === "string" ? config.apiKey.trim() : "";
   if (!apiKey) {
     return { ok: false, message: "API key is missing." };
@@ -48,7 +49,7 @@ async function testOpenAI(config: Record<string, unknown>): Promise<TestResult> 
   const baseUrl = stripTrailingSlash(
     typeof config.baseUrl === "string" && config.baseUrl.trim().length > 0
       ? config.baseUrl.trim()
-      : "https://api.openai.com/v1"
+      : defaultBaseUrl || "https://api.openai.com/v1"
   );
 
   // Lightweight: list models. Avoids spending tokens on a completion.
@@ -107,23 +108,59 @@ async function testGitHub(config: Record<string, unknown>): Promise<TestResult> 
   return { ok: false, message: `GitHub returned HTTP ${res.status}.` };
 }
 
-function testAnthropic(config: Record<string, unknown>): TestResult {
-  // TODO(phase-future): perform a real Anthropic API call (e.g. GET /v1/models
-  // with the x-api-key + anthropic-version headers). For this phase we only
-  // validate that a plausibly-formatted key is present.
+async function testAnthropic(config: Record<string, unknown>, defaultBaseUrl: string): Promise<TestResult> {
   const apiKey = typeof config.apiKey === "string" ? config.apiKey.trim() : "";
   if (!apiKey) {
     return { ok: false, message: "API key is missing." };
   }
-  if (!apiKey.startsWith("sk-")) {
+
+  const baseUrl = stripTrailingSlash(
+    typeof config.baseUrl === "string" && config.baseUrl.trim().length > 0
+      ? config.baseUrl.trim()
+      : defaultBaseUrl || "https://api.anthropic.com/v1"
+  );
+
+  // Lightweight: list models with the key (no tokens spent).
+  const result = await safeFetch(`${baseUrl}/models`, {
+    method: "GET",
+    headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+  });
+
+  if ("error" in result) {
     return {
-      ok: false,
-      message: "Key format looks unexpected (expected an 'sk-' prefix).",
+      ok: true,
+      message: "Key saved. Could not verify against provider (network unavailable).",
     };
   }
+
+  const { res } = result;
+  if (res.ok) {
+    return { ok: true, message: "Connected to Anthropic. Credentials are valid." };
+  }
+  if (res.status === 401) {
+    return { ok: false, message: "Authentication failed. Check the API key." };
+  }
+  if (res.status === 403) {
+    return { ok: false, message: "Access denied. The API key may lack permissions." };
+  }
+  // 400 with an "invalid_api_key" error also indicates bad credentials
+  if (res.status === 400) {
+    try {
+      const body = await res.json();
+      if (body?.error?.type === "invalid_api_key") {
+        return { ok: false, message: "Invalid API key." };
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }
+  // A 429 (rate limit) or 529 (overloaded) still means the key is valid
+  if (res.status === 429 || res.status === 529) {
+    return { ok: true, message: "Connected to Anthropic (rate limited, but credentials are valid)." };
+  }
   return {
-    ok: true,
-    message: "Key saved (format looks valid). Live test not yet implemented.",
+    ok: false,
+    message: `Anthropic returned HTTP ${res.status}.`,
   };
 }
 
@@ -145,21 +182,36 @@ function testMcp(config: Record<string, unknown>): TestResult {
   };
 }
 
-/** Dispatch a connection test by provider. */
+/** Local runtime (no key): just confirm the models endpoint is reachable. */
+async function testLocal(baseUrl: string): Promise<TestResult> {
+  const base = stripTrailingSlash(baseUrl);
+  const result = await safeFetch(`${base}/models`, { method: "GET" });
+  if ("error" in result) {
+    return { ok: false, message: `Could not reach ${base} — is the local runtime running?` };
+  }
+  return result.res.ok || result.res.status < 500
+    ? { ok: true, message: "Local runtime reachable." }
+    : { ok: false, message: `Runtime returned HTTP ${result.res.status}.` };
+}
+
+/** Dispatch a connection test by provider (AI providers via the registry). */
 export async function testConnection(
   provider: ProviderId,
   config: Record<string, unknown>
 ): Promise<TestResult> {
-  switch (provider) {
-    case "openai":
-      return testOpenAI(config);
-    case "github":
-      return testGitHub(config);
-    case "anthropic":
-      return testAnthropic(config);
-    case "mcp":
-      return testMcp(config);
-    default:
-      return { ok: false, message: "Unsupported provider." };
+  const entry = getAiProvider(provider);
+  if (entry) {
+    const baseUrl =
+      typeof config.baseUrl === "string" && config.baseUrl.trim().length > 0
+        ? config.baseUrl.trim()
+        : entry.transport.baseUrl;
+    if (!baseUrl) return { ok: false, message: "Base URL is required for this provider." };
+    if (!entry.requiresKey) return testLocal(baseUrl);
+    return entry.transport.format === "anthropic"
+      ? testAnthropic(config, baseUrl)
+      : testOpenAI(config, baseUrl);
   }
+  if (provider === "github") return testGitHub(config);
+  if (provider === "mcp") return testMcp(config);
+  return { ok: false, message: "Unsupported provider." };
 }

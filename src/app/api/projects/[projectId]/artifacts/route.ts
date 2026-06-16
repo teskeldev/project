@@ -52,6 +52,7 @@ const createSchema = z.object({
   content: z.string(),
   language: z.string().max(50).optional(),
   metadata: z.record(z.unknown()).optional(),
+  fusionId: z.string().max(60).optional(),
 });
 
 // POST /api/projects/:projectId/artifacts
@@ -70,6 +71,7 @@ export async function POST(req: Request, ctx: RouteContext) {
         content: body.content,
         language: body.language ?? null,
         metadata: (body.metadata ?? undefined) as Prisma.InputJsonValue | undefined,
+        fusionId: body.fusionId ?? null,
       },
     });
 

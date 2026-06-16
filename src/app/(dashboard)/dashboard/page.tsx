@@ -1,6 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import {
   Sparkles,
@@ -33,26 +34,29 @@ import {
   type DashboardSummary,
   type AgentRunStatus,
 } from "@/lib/client/dashboard";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 const suggestions = [
-  { icon: Zap, label: "Build a feature", prompt: "Build a new feature for my project", color: "text-amber-500" },
-  { icon: Bug, label: "Fix a bug", prompt: "Help me debug and fix an issue", color: "text-red-500" },
-  { icon: Palette, label: "Design a component", prompt: "Design and implement a UI component", color: "text-purple-500" },
-  { icon: Database, label: "Set up database", prompt: "Set up database schema and queries", color: "text-blue-500" },
-  { icon: Shield, label: "Add authentication", prompt: "Implement authentication and authorization", color: "text-green-500" },
-  { icon: Rocket, label: "Deploy project", prompt: "Help me deploy my project to production", color: "text-blue-500" },
+  { icon: Zap, label: "Build a feature", prompt: "Build a new feature for my project", color: "text-slate-700" },
+  { icon: Bug, label: "Fix a bug", prompt: "Help me debug and fix an issue", color: "text-slate-700" },
+  { icon: Palette, label: "Design a component", prompt: "Design and implement a UI component", color: "text-slate-700" },
+  { icon: Database, label: "Set up database", prompt: "Set up database schema and queries", color: "text-slate-700" },
+  { icon: Shield, label: "Add authentication", prompt: "Implement authentication and authorization", color: "text-slate-700" },
+  { icon: Rocket, label: "Deploy project", prompt: "Help me deploy my project to production", color: "text-slate-700" },
 ];
 
 /** sessionStorage key the chat page can read to prefill the composer. */
 export const PENDING_PROMPT_KEY = "teskel.pendingPrompt";
 
-const AGENT_STATUS_STYLES: Record<AgentRunStatus, string> = {
-  QUEUED: "bg-gray-100 text-gray-600",
-  RUNNING: "bg-blue-50 text-blue-600",
-  WAITING_APPROVAL: "bg-amber-50 text-amber-600",
-  COMPLETED: "bg-green-50 text-green-600",
-  FAILED: "bg-red-50 text-red-600",
-  CANCELLED: "bg-gray-100 text-gray-500",
+const AGENT_STATUS_VARIANT: Record<AgentRunStatus, "default" | "success" | "warning" | "destructive" | "outline"> = {
+  QUEUED: "outline",
+  RUNNING: "default",
+  WAITING_APPROVAL: "warning",
+  COMPLETED: "success",
+  FAILED: "destructive",
+  CANCELLED: "outline",
 };
 
 function relativeTime(iso: string): string {
@@ -88,32 +92,41 @@ export default function DashboardPage() {
 
   const model = "Auto";
 
-  // Read the id into a local so the callback's inferred dependency matches
-  // the manual dependency list (satisfies react-hooks/preserve-manual-memoization).
+  // Onboarding is now gated server-side by the dashboard layout, so no
+  // client-side check is needed here.
+
   const activeProjectId = activeProject?.id;
 
-  const loadSummary = useCallback(async () => {
+  const loadSummary = useCallback(async (ignoreFlag?: { ignored: boolean }) => {
     setSummaryLoading(true);
     setSummaryError(null);
     try {
       const data = await getDashboardSummary(activeProjectId);
-      setSummary(data);
+      if (ignoreFlag && !ignoreFlag.ignored) {
+        setSummary(data);
+      }
     } catch (err) {
-      setSummaryError(
-        err instanceof ApiClientError ? err.message : "Failed to load dashboard"
-      );
+      if (ignoreFlag && !ignoreFlag.ignored) {
+        setSummaryError(
+          err instanceof ApiClientError ? err.message : "Failed to load dashboard"
+        );
+      }
     } finally {
-      setSummaryLoading(false);
+      if (ignoreFlag && !ignoreFlag.ignored) {
+        setSummaryLoading(false);
+      }
     }
   }, [activeProjectId]);
 
   useEffect(() => {
-    // Wait for the project store to settle so we focus the right project.
     if (projectLoading) return;
-    void loadSummary();
+    const ignoreFlag = { ignored: false };
+    void loadSummary(ignoreFlag);
+    return () => {
+      ignoreFlag.ignored = true;
+    };
   }, [projectLoading, loadSummary]);
 
-  /** Create a thread for the given project, stash the prompt, navigate. */
   const startChatWithPrompt = useCallback(
     async (projectId: string, prompt: string) => {
       const { thread } = await createThread(
@@ -123,7 +136,7 @@ export default function DashboardPage() {
       try {
         sessionStorage.setItem(PENDING_PROMPT_KEY, prompt);
       } catch {
-        // sessionStorage unavailable (private mode) -> rely on query param.
+        // sessionStorage unavailable
       }
       const qs = `thread=${thread.id}&prompt=${encodeURIComponent(prompt)}`;
       router.push(`/dashboard/chat?${qs}`);
@@ -139,7 +152,6 @@ export default function DashboardPage() {
 
       setSubmitError(null);
 
-      // No active project -> prompt the user to create one first.
       if (!activeProject) {
         setNeedsProject(true);
         return;
@@ -195,100 +207,116 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="flex h-full flex-col items-center overflow-y-auto bg-white/50 px-6 py-12 backdrop-blur-sm">
+    <div className="flex h-full flex-col items-center overflow-y-auto px-6 py-12">
       <div className="w-full max-w-2xl">
-        <div className="animate-fade-in-up mb-8 text-center">
-          <div className="mb-4 inline-flex animate-float items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 p-3 shadow-lg shadow-blue-200/50">
-            <Sparkles size={28} className="text-white" />
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 100, damping: 20 }}
+          className="mb-10 text-center"
+        >
+          <div className="mb-5 inline-flex items-center justify-center rounded-2xl bg-slate-900 p-3 shadow-[0_8px_30px_rgba(17,24,39,0.15)] dark:bg-white">
+            <Sparkles size={28} className="text-white dark:text-slate-900" />
           </div>
-          <h1 className="text-2xl font-semibold text-gray-900">
+          <h1 className="text-[28px] font-semibold tracking-tight text-slate-900 dark:text-white">
             What do you want to build?
           </h1>
-          <p className="mt-2 text-sm text-gray-500">
+          <p className="mt-2 text-[14px] text-slate-500 dark:text-slate-400">
             Teskel can write code, fix bugs, run commands, and search the web.
           </p>
-        </div>
+        </motion.div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3.5 shadow-sm transition-all duration-300 focus-within:border-blue-200 focus-within:shadow-lg focus-within:shadow-blue-50">
-            <Plus size={18} className="shrink-0 text-gray-400" />
+        <motion.form 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.1 }}
+          onSubmit={handleSubmit}
+        >
+          <div className="flex items-center gap-2 rounded-[24px] border border-white/60 bg-white/70 px-4 py-4 shadow-[0_0_0_1px_rgba(255,255,255,0.7)_inset,0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-2xl transition-all duration-300 focus-within:border-slate-300 focus-within:shadow-[0_8px_32px_rgba(17,24,39,0.08)] dark:border-white/10 dark:bg-black/50 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
+            <Plus size={20} className="shrink-0 text-slate-400" />
             <input
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder="Ask Teskel anything..."
-              className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
+              className="flex-1 bg-transparent text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-white"
               autoFocus
             />
             <div className="flex items-center gap-2">
-              <button
+              <Button
                 type="button"
-                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-gray-500 hover:bg-gray-100"
+                variant="ghost"
+                size="sm"
+                className="gap-1 text-xs text-text-secondary"
               >
                 {model}
                 <ChevronDown size={12} />
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className="text-gray-400 hover:text-gray-600"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-text-muted"
               >
                 <Mic size={16} />
-              </button>
+              </Button>
               {inputValue.trim() && (
-                <button
+                <Button
                   type="submit"
                   disabled={submitting}
-                  className="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50"
+                  size="icon"
+                  className="h-7 w-7"
                 >
                   {submitting ? (
                     <Loader2 size={14} className="animate-spin" />
                   ) : (
                     <ArrowRight size={14} />
                   )}
-                </button>
+                </Button>
               )}
             </div>
           </div>
 
-          <div className="mt-2 flex items-center justify-between px-1">
-            <div className="flex items-center gap-2">
-              <button type="button" className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-gray-400 hover:bg-gray-100 hover:text-gray-600">
-                <Globe size={12} /> Web
+          <div className="mt-3 flex items-center justify-between px-2">
+            <div className="flex items-center gap-1.5">
+              <button type="button" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium text-slate-500 transition-colors hover:bg-slate-200/50 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-200">
+                <Globe size={14} /> Web
               </button>
-              <button type="button" className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-gray-400 hover:bg-gray-100 hover:text-gray-600">
-                <Code size={12} /> Code
+              <button type="button" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium text-slate-500 transition-colors hover:bg-slate-200/50 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-200">
+                <Code size={14} /> Code
               </button>
-              <button type="button" className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-gray-400 hover:bg-gray-100 hover:text-gray-600">
-                <Terminal size={12} /> Terminal
+              <button type="button" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium text-slate-500 transition-colors hover:bg-slate-200/50 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-200">
+                <Terminal size={14} /> Terminal
               </button>
-              <button type="button" className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-gray-400 hover:bg-gray-100 hover:text-gray-600">
-                <FileText size={12} /> Docs
+              <button type="button" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium text-slate-500 transition-colors hover:bg-slate-200/50 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-200">
+                <FileText size={14} /> Docs
               </button>
             </div>
-            <span className="text-[11px] text-gray-400">
+            <span className="text-[12px] font-medium text-slate-400">
               {activeProject ? activeProject.name : "Local"}
             </span>
           </div>
-        </form>
+        </motion.form>
 
         {/* No-project prompt-to-create + submit errors */}
         {needsProject && (
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-accent bg-accent-light px-4 py-3">
             <div className="flex items-center gap-2">
-              <FolderPlus size={16} className="text-blue-500" />
-              <p className="text-xs text-blue-700">
+              <FolderPlus size={16} className="text-accent" />
+              <p className="text-xs text-accent">
                 You need a project to start. Create one to continue.
               </p>
             </div>
-            <button
+            <Button
               type="button"
               onClick={() => void handleCreateAndContinue()}
               disabled={submitting}
-              className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              size="sm"
+              className="gap-1 bg-accent hover:bg-accent-hover"
             >
               {submitting ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
               Create project
-            </button>
+            </Button>
           </div>
         )}
         {submitError && (
@@ -298,18 +326,25 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="mt-8 grid grid-cols-3 gap-3">
-          {suggestions.map((s, i) => (
-            <button
-              key={s.label}
-              onClick={() => handleSuggestion(s.prompt)}
-              className="animate-fade-in-up group flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md"
-              style={{ animationDelay: `${i * 0.06}s` }}
-            >
-              <s.icon size={18} className={`${s.color} transition-transform duration-200 group-hover:scale-110`} />
-              <span className="text-xs font-medium text-gray-700">{s.label}</span>
-            </button>
-          ))}
+        <div className="mt-10 grid grid-cols-3 gap-3">
+          <AnimatePresence>
+            {suggestions.map((s, i) => (
+              <motion.div
+                key={s.label}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.15 + (i * 0.05) }}
+              >
+                <button
+                  onClick={() => handleSuggestion(s.prompt)}
+                  className="group flex w-full items-center gap-3 rounded-2xl border border-white/60 bg-white/50 px-4 py-3.5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.02)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-white/80 hover:shadow-[0_8px_20px_rgba(17,24,39,0.06)] dark:border-white/5 dark:bg-white/5 dark:hover:border-white/10 dark:hover:bg-white/10"
+                >
+                  <s.icon size={18} className="text-slate-500 transition-transform duration-300 group-hover:scale-110 group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-white" />
+                  <span className="text-[13px] font-medium text-slate-600 transition-colors group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-white">{s.label}</span>
+                </button>
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </div>
 
         {/* Real activity */}
@@ -325,12 +360,12 @@ export default function DashboardPage() {
       </div>
 
       <div className="mt-10 text-center">
-        <div className="flex items-center gap-3 text-[11px] text-gray-400">
+        <div className="flex items-center gap-3 text-[11px] text-text-muted">
           <span>Teskel v1.0</span>
           <span>&middot;</span>
-          <button className="hover:text-gray-600">Keyboard shortcuts</button>
+          <button className="hover:text-text-secondary">Keyboard shortcuts</button>
           <span>&middot;</span>
-          <button className="hover:text-gray-600">Documentation</button>
+          <button className="hover:text-text-secondary">Documentation</button>
         </div>
       </div>
     </div>
@@ -363,7 +398,7 @@ function ActivitySection({
   if (loading) {
     return (
       <div className="mt-10 flex items-center justify-center py-8">
-        <Loader2 size={18} className="animate-spin text-gray-300" />
+        <Loader2 size={18} className="animate-spin text-text-muted" />
       </div>
     );
   }
@@ -375,12 +410,14 @@ function ActivitySection({
           <AlertTriangle size={14} className="text-red-500" />
           <p className="text-xs text-red-600">{error}</p>
         </div>
-        <button
+        <Button
           onClick={onRetry}
-          className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-100"
+          variant="outline"
+          size="sm"
+          className="border-red-200 text-red-600 hover:bg-red-100"
         >
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -389,23 +426,24 @@ function ActivitySection({
 
   if (!hasProjects) {
     return (
-      <div className="mt-10 flex flex-col items-center rounded-2xl border border-dashed border-gray-200 bg-white/60 px-6 py-10 text-center">
-        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50">
-          <FolderPlus size={22} className="text-blue-500" />
+      <div className="mt-10 flex flex-col items-center rounded-2xl border border-dashed border-border bg-surface/60 px-6 py-10 text-center">
+        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-accent-light">
+          <FolderPlus size={22} className="text-accent" />
         </div>
-        <h3 className="text-sm font-semibold text-gray-900">No projects yet</h3>
-        <p className="mt-1 max-w-sm text-xs text-gray-500">
+        <h3 className="text-sm font-semibold text-foreground">No projects yet</h3>
+        <p className="mt-1 max-w-sm text-xs text-text-secondary">
           Create your first project to start chatting, running agents, and
           tracking changes.
         </p>
-        <button
+        <Button
           onClick={onCreateProject}
           disabled={creating}
-          className="mt-4 flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+          size="sm"
+          className="mt-4 gap-1"
         >
           {creating ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
           New project
-        </button>
+        </Button>
       </div>
     );
   }
@@ -416,26 +454,30 @@ function ActivitySection({
     <div className="mt-10 space-y-8">
       {/* Recent projects */}
       <div>
-        <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-gray-400">
+        <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-text-muted">
           Recent projects
         </h3>
         <div className="grid grid-cols-3 gap-3">
           {s.recentProjects.slice(0, 6).map((p) => (
-            <button
+            <Card
               key={p.id}
-              onClick={() => onOpenProject(p.id)}
-              className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md"
+              className="cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
             >
-              <Code size={16} className="shrink-0 text-gray-400" />
-              <div className="min-w-0">
-                <p className="truncate text-xs font-medium text-gray-900">
-                  {p.name}
-                </p>
-                <p className="text-[11px] text-gray-400">
-                  {relativeTime(p.updatedAt)}
-                </p>
-              </div>
-            </button>
+              <button
+                onClick={() => onOpenProject(p.id)}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left"
+              >
+                <Code size={16} className="shrink-0 text-text-muted" />
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-medium text-foreground">
+                    {p.name}
+                  </p>
+                  <p className="text-[11px] text-text-muted">
+                    {relativeTime(p.updatedAt)}
+                  </p>
+                </div>
+              </button>
+            </Card>
           ))}
         </div>
       </div>
@@ -457,12 +499,12 @@ function ActivitySection({
                 <li key={t.id}>
                   <button
                     onClick={() => router.push(`/dashboard/chat?thread=${t.id}`)}
-                    className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-gray-50"
+                    className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-surface-soft"
                   >
-                    <span className="truncate text-xs text-gray-700">
+                    <span className="truncate text-xs text-text-secondary">
                       {t.title}
                     </span>
-                    <span className="shrink-0 text-[10px] text-gray-400">
+                    <span className="shrink-0 text-[10px] text-text-muted">
                       {relativeTime(t.updatedAt)}
                     </span>
                   </button>
@@ -487,16 +529,14 @@ function ActivitySection({
                 <li key={r.id}>
                   <button
                     onClick={() => router.push("/dashboard/agents")}
-                    className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-gray-50"
+                    className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-surface-soft"
                   >
-                    <span className="truncate text-xs text-gray-700">
+                    <span className="truncate text-xs text-text-secondary">
                       {r.goal}
                     </span>
-                    <span
-                      className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${AGENT_STATUS_STYLES[r.status]}`}
-                    >
+                    <Badge variant={AGENT_STATUS_VARIANT[r.status]} className="shrink-0 text-[10px]">
                       {r.status.replace("_", " ").toLowerCase()}
-                    </span>
+                    </Badge>
                   </button>
                 </li>
               ))}
@@ -505,52 +545,56 @@ function ActivitySection({
         </Panel>
 
         {/* Pending changes */}
-        <button
-          onClick={() => router.push("/dashboard/composer")}
-          className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-5 py-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
-              <Layers size={16} className="text-amber-500" />
+        <Card className="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+          <button
+            onClick={() => router.push("/dashboard/composer")}
+            className="flex w-full items-center justify-between px-5 py-4 text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100">
+                <Layers size={16} className="text-slate-700" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-foreground">Pending changes</p>
+                <p className="text-[11px] text-text-muted">Review in Composer</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-medium text-gray-900">Pending changes</p>
-              <p className="text-[11px] text-gray-400">Review in Composer</p>
-            </div>
-          </div>
-          <span className="text-lg font-semibold text-gray-900">
-            {s.counts.pendingChanges}
-          </span>
-        </button>
+            <span className="text-lg font-semibold text-foreground">
+              {s.counts.pendingChanges}
+            </span>
+          </button>
+        </Card>
 
         {/* Git summary */}
-        <button
-          onClick={() => router.push("/dashboard/git")}
-          className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-5 py-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50">
-              <GitBranch size={16} className="text-blue-500" />
+        <Card className="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+          <button
+            onClick={() => router.push("/dashboard/git")}
+            className="flex w-full items-center justify-between px-5 py-4 text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100">
+                <GitBranch size={16} className="text-slate-700" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-foreground">
+                  {s.git ? s.git.branch : "No git state"}
+                </p>
+                <p className="text-[11px] text-text-muted">
+                  {s.git
+                    ? s.git.dirtyCount > 0
+                      ? `${s.git.dirtyCount} uncommitted`
+                      : "Working tree clean"
+                    : "Source control"}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-medium text-gray-900">
-                {s.git ? s.git.branch : "No git state"}
-              </p>
-              <p className="text-[11px] text-gray-400">
-                {s.git
-                  ? s.git.dirtyCount > 0
-                    ? `${s.git.dirtyCount} uncommitted`
-                    : "Working tree clean"
-                  : "Source control"}
-              </p>
-            </div>
-          </div>
-          {s.git && s.git.dirtyCount > 0 && (
-            <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-600">
-              {s.git.dirtyCount}
-            </span>
-          )}
-        </button>
+            {s.git && s.git.dirtyCount > 0 && (
+              <Badge variant="warning" className="text-[10px]">
+                {s.git.dirtyCount}
+              </Badge>
+            )}
+          </button>
+        </Card>
       </div>
     </div>
   );
@@ -570,24 +614,24 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-4">
+    <Card className="p-4">
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Icon size={14} className="text-gray-400" />
-          <h4 className="text-xs font-medium text-gray-700">{title}</h4>
+          <Icon size={14} className="text-text-muted" />
+          <h4 className="text-xs font-medium text-text-secondary">{title}</h4>
         </div>
         <button
           onClick={onAction}
-          className="text-[11px] text-blue-600 hover:text-blue-800"
+          className="text-[11px] text-accent hover:text-accent"
         >
           {actionLabel}
         </button>
       </div>
       {children}
-    </div>
+    </Card>
   );
 }
 
 function EmptyHint({ text }: { text: string }) {
-  return <p className="px-2 py-3 text-center text-[11px] text-gray-400">{text}</p>;
+  return <p className="px-2 py-3 text-center text-[11px] text-text-muted">{text}</p>;
 }

@@ -1,7 +1,10 @@
-﻿import { ZodError, type ZodSchema } from "zod";
+import { ZodError, type ZodSchema } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import type { Role } from "@prisma/client";
+import { requireCsrf } from "@/lib/security";
+import { httpRequestsTotal } from "@/lib/observability/metrics";
+import { captureException } from "@/lib/observability/sentry";
 
 /**
  * Standard JSON shapes:
@@ -23,10 +26,25 @@ export class ApiError extends Error {
   }
 }
 
-export function apiSuccess<T>(data: T, init?: { status?: number }): Response {
+/**
+ * Headers for user-scoped GET responses: prevent shared/intermediate caches
+ * from storing or transforming personalized data. Use as the 3rd arg of
+ * `apiSuccess(data, { headers: NO_STORE_HEADERS })`.
+ */
+export const NO_STORE_HEADERS: HeadersInit = {
+  "Cache-Control": "private, no-store",
+};
+
+export function apiSuccess<T>(
+  data: T,
+  init?: { status?: number; headers?: HeadersInit }
+): Response {
   return Response.json(
     { success: true, data },
-    { status: init?.status ?? 200 }
+    {
+      status: init?.status ?? 200,
+      headers: init?.headers,
+    }
   );
 }
 
@@ -81,7 +99,7 @@ export async function requireUser(): Promise<SessionUser> {
 
 export type ProjectAccess = {
   user: SessionUser;
-  project: Awaited<ReturnType<typeof prisma.project.findUnique>>;
+  project: NonNullable<Awaited<ReturnType<typeof prisma.project.findUnique>>>;
   member: { id: string; role: Role; workspaceId: string; userId: string };
   role: Role;
 };
@@ -89,6 +107,8 @@ export type ProjectAccess = {
 /**
  * Ensures the current user can access the given project (is a member of the
  * project's workspace). Throws ApiError(401/404/403) otherwise.
+ *
+ * Uses a single query with include to avoid N+1 (project + member lookup).
  */
 export async function requireProjectAccess(
   projectId: string
@@ -97,20 +117,23 @@ export async function requireProjectAccess(
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },
+    include: {
+      workspace: {
+        include: {
+          members: {
+            where: { userId: user.id },
+            take: 1,
+          },
+        },
+      },
+    },
   });
 
   if (!project) {
     throw new ApiError("Project not found", 404, "NOT_FOUND");
   }
 
-  const member = await prisma.workspaceMember.findUnique({
-    where: {
-      workspaceId_userId: {
-        workspaceId: project.workspaceId,
-        userId: user.id,
-      },
-    },
-  });
+  const member = project.workspace.members[0];
 
   if (!member) {
     throw new ApiError(
@@ -120,7 +143,54 @@ export async function requireProjectAccess(
     );
   }
 
-  return { user, project, member, role: member.role };
+  // Strip the workspace include from the returned project to match the
+  // original return shape (plain project without nested workspace data).
+  const { workspace: _workspace, ...projectData } = project;
+
+  return { user, project: projectData as typeof project, member, role: member.role };
+}
+
+/**
+ * Ensures the current user is a member of the given workspace. Returns the
+ * session user + their membership (role). Throws ApiError(401/403) otherwise.
+ */
+export async function requireWorkspaceAccess(
+  workspaceId: string
+): Promise<{ user: SessionUser; member: { role: Role }; role: Role }> {
+  const user = await requireUser();
+  const member = await prisma.workspaceMember.findFirst({
+    where: { workspaceId, userId: user.id },
+    select: { role: true },
+  });
+  if (!member) {
+    throw new ApiError("You do not have access to this workspace", 403, "FORBIDDEN");
+  }
+  return { user, member, role: member.role };
+}
+
+/**
+ * Workspace role hierarchy, highest privilege first. Used by `requireRole` to
+ * gate write operations: anything below MEMBER (i.e. VIEWER) is read-only.
+ */
+const ROLE_RANK: Record<Role, number> = {
+  OWNER: 3,
+  ADMIN: 2,
+  MEMBER: 1,
+  VIEWER: 0,
+};
+
+/**
+ * Assert the member holds at least `minRole`. `requireProjectAccess` only
+ * proves membership; call this on any state-changing route so a VIEWER cannot
+ * perform writes. Throws ApiError(403) when the role is insufficient.
+ */
+export function requireRole(
+  member: { role: Role },
+  minRole: Role = "MEMBER"
+): void {
+  if (ROLE_RANK[member.role] < ROLE_RANK[minRole]) {
+    throw new ApiError("Insufficient permissions", 403, "FORBIDDEN");
+  }
 }
 
 /**
@@ -168,12 +238,20 @@ export async function validateBody<T>(
  */
 export function handleApiError(err: unknown): Response {
   if (err instanceof ApiError) {
+    // Count expected client/server errors; only escalate real 5xx to Sentry.
+    httpRequestsTotal.inc({ method: "-", route: "-", status: String(err.status) });
+    if (err.status >= 500) captureException(err);
     return apiError(err.message, err.status, err.code, err.details);
   }
 
   if (err instanceof ZodError) {
+    httpRequestsTotal.inc({ method: "-", route: "-", status: "422" });
     return apiError("Validation failed", 422, "VALIDATION_ERROR", err.flatten());
   }
+
+  // Unknown error -> 500. Always track these; they're the ones that matter.
+  httpRequestsTotal.inc({ method: "-", route: "-", status: "500" });
+  captureException(err);
 
   if (process.env.NODE_ENV !== "production") {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -187,17 +265,29 @@ export function handleApiError(err: unknown): Response {
  * Optional wrapper that runs a route handler and converts thrown errors
  * into proper responses.
  *
+ * Options:
+ *   csrf: when true, mutating requests (POST/PUT/PATCH/DELETE) must carry a
+ *         valid double-submit CSRF token. The check is skipped for safe
+ *         methods (GET/HEAD/OPTIONS).
+ *
  * Usage:
- *   export const POST = withApi(async (req) => {
- *     const body = await validateBody(req, schema);
- *     return apiSuccess(body);
- *   });
+ *   export const POST = withApi(
+ *     async (req) => {
+ *       const body = await validateBody(req, schema);
+ *       return apiSuccess(body);
+ *     },
+ *     { csrf: true }
+ *   );
  */
 export function withApi(
-  handler: (req: Request, ctx?: unknown) => Promise<Response> | Response
+  handler: (req: Request, ctx?: unknown) => Promise<Response> | Response,
+  options: { csrf?: boolean } = {}
 ) {
   return async (req: Request, ctx?: unknown): Promise<Response> => {
     try {
+      if (options.csrf) {
+        await requireCsrf(req);
+      }
       return await handler(req, ctx);
     } catch (err) {
       return handleApiError(err);

@@ -1,4 +1,4 @@
-﻿import type { NextAuthConfig } from "next-auth";
+import type { NextAuthConfig } from "next-auth";
 
 /**
  * Edge-safe base config. Contains NO database adapter and NO Node-only
@@ -8,7 +8,18 @@
  */
 export const authConfig = {
   session: { strategy: "jwt" },
-  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  // Trust the Host / X-Forwarded-Host set by the reverse proxy / load balancer.
+  // REQUIRED for self-hosted (non-Vercel) deploys: without it NextAuth v5
+  // rejects every /api/auth/* request in production with `UntrustedHost`,
+  // breaking login entirely behind a proxy. Equivalent to AUTH_TRUST_HOST=true.
+  trustHost: true,
+  secret: (() => {
+    const s = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+    if (!s && process.env.NODE_ENV === "production") {
+      throw new Error("AUTH_SECRET or NEXTAUTH_SECRET must be set in production");
+    }
+    return s ?? "dev-only-insecure-secret-do-not-use-in-production";
+  })(),
   pages: {
     signIn: "/login",
   },
@@ -24,6 +35,12 @@ export const authConfig = {
     session: async ({ session, token }) => {
       if (session.user) {
         session.user.id = (token.id as string | undefined) ?? token.sub ?? "";
+      }
+      if (token.tokenVersion !== undefined) {
+        session.tokenVersion = token.tokenVersion as number;
+      }
+      if (token.onboardingCompleted !== undefined) {
+        session.onboardingCompleted = token.onboardingCompleted as boolean;
       }
       return session;
     },

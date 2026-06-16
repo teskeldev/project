@@ -1,6 +1,11 @@
-﻿import registry from "@/data/extension-registry.json";
+import registry from "@/data/extension-registry.json";
+import { apiSuccess, handleApiError } from "@/lib/api";
 
 // GET /api/extensions/registry - public catalog data, no auth required
 export async function GET() {
-  return Response.json({ success: true, data: { extensions: registry } });
+  try {
+    return apiSuccess({ extensions: registry });
+  } catch (err) {
+    return handleApiError(err);
+  }
 }

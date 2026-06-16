@@ -4,8 +4,12 @@ import {
   handleApiError,
   requireUser,
   validateBody,
+  NO_STORE_HEADERS,
 } from "@/lib/api";
 import { createWorkspaceSchema } from "@/lib/validators";
+import { Prisma } from "@prisma/client";
+import { randomBytes } from "node:crypto";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 function slugify(input: string): string {
   return input
@@ -13,15 +17,6 @@ function slugify(input: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 40);
-}
-
-function randomSuffix(length = 6): string {
-  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-  let out = "";
-  for (let i = 0; i < length; i += 1) {
-    out += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return out;
 }
 
 // GET /api/workspaces -> workspaces the current user is a member of.
@@ -51,7 +46,7 @@ export async function GET() {
       updatedAt: m.workspace.updatedAt,
     }));
 
-    return apiSuccess({ workspaces });
+    return apiSuccess({ workspaces }, { headers: NO_STORE_HEADERS });
   } catch (err) {
     return handleApiError(err);
   }
@@ -61,27 +56,50 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const user = await requireUser();
+    await enforceRateLimit(`workspaces:create:${user.id}`, 10, 60_000);
     const { name } = await validateBody(req, createWorkspaceSchema);
 
     const baseSlug = slugify(name) || "workspace";
 
-    const workspace = await prisma.$transaction(async (tx) => {
-      let slug = `${baseSlug}-${randomSuffix()}`;
-       
-      while (await tx.workspace.findUnique({ where: { slug } })) {
-        slug = `${baseSlug}-${randomSuffix()}`;
+    // The (slug) unique index on Workspace is the source of truth for slug
+    // uniqueness. The previous read-then-write loop is racy: two concurrent
+    // creates with the same base slug would both pass the findUnique and
+    // then one would crash on a unique violation. Instead, we generate a
+    // random suffix upfront and catch P2002 as a fallback. Capped at 5
+    // retries to avoid an infinite loop.
+    const MAX_SLUG_ATTEMPTS = 5;
+    let attempt = 0;
+    let slug = `${baseSlug}-${randomBytes(6).toString("hex")}`;
+
+    let workspace;
+    while (true) {
+      try {
+        workspace = await prisma.$transaction(async (tx) => {
+          const created = await tx.workspace.create({
+            data: { name, slug, ownerId: user.id },
+          });
+
+          await tx.workspaceMember.create({
+            data: { workspaceId: created.id, userId: user.id, role: "OWNER" },
+          });
+
+          return created;
+        });
+        break;
+      } catch (err) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === "P2002" &&
+          attempt < MAX_SLUG_ATTEMPTS
+        ) {
+          // Slug collided; regenerate with a fresh random suffix and retry.
+          attempt += 1;
+          slug = `${baseSlug}-${randomBytes(6).toString("hex")}`;
+          continue;
+        }
+        throw err;
       }
-
-      const created = await tx.workspace.create({
-        data: { name, slug, ownerId: user.id },
-      });
-
-      await tx.workspaceMember.create({
-        data: { workspaceId: created.id, userId: user.id, role: "OWNER" },
-      });
-
-      return created;
-    });
+    }
 
     return apiSuccess({ workspace }, { status: 201 });
   } catch (err) {

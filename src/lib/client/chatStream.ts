@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SSE-over-POST client for the Teskel chat stream.
  *
  * `EventSource` can only issue GET requests, but `/api/ai/chat/stream` needs a
@@ -7,7 +7,9 @@
  * framing ourselves.
  *
  * Wire format (see the route handler):
+ *   event: thinking\ndata: {"content":"..."}\n\n
  *   event: delta\ndata: {"content":"..."}\n\n
+ *   event: compaction\ndata: {"message":"...","compactedCount":N,"remainingCount":N}\n\n
  *   event: done\ndata: {"ok":true}\n\n
  *   event: error\ndata: {"message":"..."}\n\n
  *
@@ -16,8 +18,27 @@
  * "add an API key" affordance.
  */
 
+import { readSSEStream, type SSEFrame } from "@/lib/client/sse";
+
+export type FusionResultPayload = {
+  output: string;
+  runs: Array<{ modelId: string; provider: string; ok: boolean; latencyMs: number }>;
+  judgeUsed: string;
+  warnings: string[];
+  metrics: { tokens: number; costUsd: number; latencyMs: number; executionMs: number };
+};
+
+export type FusionProgressPayload =
+  | { type: "model_start"; ref: string; modelId: string }
+  | { type: "model_done"; ref: string; modelId: string; ok: boolean; latencyMs: number }
+  | { type: "judging" };
+
 export type ChatStreamEvent =
+  | { type: "thinking"; content: string }
   | { type: "delta"; content: string }
+  | { type: "compaction"; message: string; compactedCount: number; remainingCount: number }
+  | { type: "fusion-progress"; payload: FusionProgressPayload }
+  | { type: "fusion-result"; payload: FusionResultPayload }
   | { type: "done" }
   | { type: "error"; message: string; code?: string };
 
@@ -25,38 +46,24 @@ export type ChatStreamCallbacks = {
   onDelta: (content: string) => void;
   onDone: () => void;
   onError: (message: string, code?: string) => void;
+  onCompaction?: (message: string, compactedCount: number, remainingCount: number) => void;
+  onThinking?: (content: string) => void;
+  /** Fired once for a Fusion turn with the fused output + per-model debug info. */
+  onFusionResult?: (payload: FusionResultPayload) => void;
+  /** Live per-model progress during a Fusion turn ("thinking"). */
+  onFusionProgress?: (payload: FusionProgressPayload) => void;
 };
 
 type StreamArgs = {
   threadId: string;
   content: string;
   selectedPaths?: string[];
+  model?: string;
+  fusionId?: string;
   signal?: AbortSignal;
 };
 
-/** A single SSE frame parsed into its `event:` name and `data:` payload. */
-type RawEvent = { event: string; data: string };
-
-/** Parse one `\n\n`-delimited SSE block into { event, data }. */
-function parseFrame(block: string): RawEvent | null {
-  let event = "message";
-  const dataLines: string[] = [];
-
-  for (const rawLine of block.split("\n")) {
-    const line = rawLine.replace(/\r$/, "");
-    if (line.startsWith("event:")) {
-      event = line.slice("event:".length).trim();
-    } else if (line.startsWith("data:")) {
-      dataLines.push(line.slice("data:".length).replace(/^\s/, ""));
-    }
-    // ignore comments (":...") and other fields (id:, retry:)
-  }
-
-  if (dataLines.length === 0) return null;
-  return { event, data: dataLines.join("\n") };
-}
-
-function toEvent(raw: RawEvent): ChatStreamEvent | null {
+function toEvent(raw: SSEFrame): ChatStreamEvent | null {
   let payload: unknown = {};
   try {
     payload = raw.data ? JSON.parse(raw.data) : {};
@@ -66,8 +73,30 @@ function toEvent(raw: RawEvent): ChatStreamEvent | null {
   const obj = (payload ?? {}) as Record<string, unknown>;
 
   switch (raw.event) {
+    case "thinking":
+      return { type: "thinking", content: String(obj.content ?? "") };
     case "delta":
       return { type: "delta", content: String(obj.content ?? "") };
+    case "compaction":
+      return {
+        type: "compaction",
+        message: String(obj.message ?? ""),
+        compactedCount: Number(obj.compactedCount ?? 0),
+        remainingCount: Number(obj.remainingCount ?? 0),
+      };
+    case "fusion-progress":
+      return { type: "fusion-progress", payload: obj as unknown as FusionProgressPayload };
+    case "fusion-result":
+      return {
+        type: "fusion-result",
+        payload: {
+          output: String(obj.output ?? ""),
+          runs: Array.isArray(obj.runs) ? (obj.runs as FusionResultPayload["runs"]) : [],
+          judgeUsed: String(obj.judgeUsed ?? ""),
+          warnings: Array.isArray(obj.warnings) ? (obj.warnings as string[]) : [],
+          metrics: (obj.metrics as FusionResultPayload["metrics"]) ?? { tokens: 0, costUsd: 0, latencyMs: 0, executionMs: 0 },
+        },
+      };
     case "done":
       return { type: "done" };
     case "error":
@@ -92,14 +121,14 @@ export async function streamChatCompletion(
   args: StreamArgs,
   callbacks: ChatStreamCallbacks
 ): Promise<void> {
-  const { threadId, content, selectedPaths, signal } = args;
+  const { threadId, content, selectedPaths, model, fusionId, signal } = args;
 
   let res: Response;
   try {
     res = await fetch("/api/ai/chat/stream", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ threadId, content, selectedPaths }),
+      body: JSON.stringify({ threadId, content, selectedPaths, model, fusionId }),
       signal,
     });
   } catch (err) {
@@ -138,56 +167,30 @@ export async function streamChatCompletion(
     return;
   }
 
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  const flushFrame = (block: string): boolean => {
-    const trimmed = block.trim();
-    if (!trimmed) return false;
-    const raw = parseFrame(block);
-    if (!raw) return false;
-    const evt = toEvent(raw);
-    if (!evt) return false;
-
-    if (evt.type === "delta") {
-      callbacks.onDelta(evt.content);
-    } else if (evt.type === "done") {
-      callbacks.onDone();
-      return true; // signal completion
-    } else if (evt.type === "error") {
-      callbacks.onError(evt.message, evt.code);
-      return true;
-    }
-    return false;
-  };
-
   try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    for await (const frame of readSSEStream(res)) {
+      const evt = toEvent(frame);
+      if (!evt) continue;
 
-      buffer += decoder.decode(value, { stream: true });
-
-      // SSE events are separated by a blank line (\n\n).
-      let sepIndex: number;
-      while ((sepIndex = buffer.indexOf("\n\n")) !== -1) {
-        const block = buffer.slice(0, sepIndex);
-        buffer = buffer.slice(sepIndex + 2);
-        const finished = flushFrame(block);
-        if (finished) {
-          try {
-            await reader.cancel();
-          } catch {
-            // ignore
-          }
-          return;
-        }
+      if (evt.type === "thinking") {
+        callbacks.onThinking?.(evt.content);
+      } else if (evt.type === "delta") {
+        callbacks.onDelta(evt.content);
+      } else if (evt.type === "compaction") {
+        callbacks.onCompaction?.(evt.message, evt.compactedCount, evt.remainingCount);
+      } else if (evt.type === "fusion-progress") {
+        callbacks.onFusionProgress?.(evt.payload);
+      } else if (evt.type === "fusion-result") {
+        callbacks.onFusionResult?.(evt.payload);
+        callbacks.onDelta(evt.payload.output); // render the fused text in the bubble
+      } else if (evt.type === "done") {
+        callbacks.onDone();
+        return;
+      } else if (evt.type === "error") {
+        callbacks.onError(evt.message, evt.code);
+        return;
       }
     }
-
-    // Drain any trailing frame without a terminating blank line.
-    if (buffer.trim()) flushFrame(buffer);
   } catch (err) {
     if (signal?.aborted || (err instanceof Error && err.name === "AbortError")) {
       return; // user pressed Stop

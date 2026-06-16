@@ -55,20 +55,6 @@ export type WorkspaceMember = {
   createdAt: string;
 };
 
-export type DashboardSummary = {
-  counts: {
-    workspaces: number;
-    projects: number;
-    threads: number;
-    agentRuns: number;
-    pendingChanges: number;
-  };
-  focusProject: unknown;
-  recentProjects: unknown[];
-  recentThreads: unknown[];
-  recentAgentRuns: unknown[];
-  git: unknown;
-};
 
 /* -------------------------------------------------------------------------- */
 /* Profile                                                                    */
@@ -156,12 +142,4 @@ export function removeMember(
   return apiFetch(`/api/workspace-members/${memberId}`, {
     method: "DELETE",
   });
-}
-
-/* -------------------------------------------------------------------------- */
-/* Dashboard Summary (for billing usage stats)                                */
-/* -------------------------------------------------------------------------- */
-
-export function fetchDashboardSummary(): Promise<DashboardSummary> {
-  return apiFetch("/api/dashboard/summary");
 }

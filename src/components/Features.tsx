@@ -1,131 +1,195 @@
 "use client";
 
-import Link from "next/link";
+import { motion } from "framer-motion";
+import { useRef } from "react";
 
-export default function Features() {
+const bentoContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.15 },
+  },
+};
+
+const bentoItem = {
+  hidden: { opacity: 0, y: 50 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: "spring" as const, stiffness: 100, damping: 15, mass: 0.8 },
+  },
+};
+
+// Spatial Spotlight Card using pure CSS custom attributes via onPointerMove
+function GlowingBentoCard({ children, className }: { children: React.ReactNode; className?: string }) {
+  const divRef = useRef<HTMLDivElement>(null);
+  
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!divRef.current) return;
+    const rect = divRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    divRef.current.style.setProperty("--x", `${x}px`);
+    divRef.current.style.setProperty("--y", `${y}px`);
+  };
+
   return (
-    <section id="product" className="px-6 py-20 md:py-28">
-      <div className="mx-auto max-w-[1100px]">
-        <h2 className="text-center text-[1.75rem] font-medium tracking-tight text-[#0F172A] md:text-[2.25rem]">
-          Stay on the frontier
-        </h2>
-
-        {/* Feature grid */}
-        <div className="mt-16 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {/* Use the best model */}
-          <div className="rounded-xl border border-[#E5E7EB] bg-white p-6">
-            <h3 className="text-[16px] font-semibold text-[#0F172A]">Use the best model for every task</h3>
-            <p className="mt-2 text-[14px] leading-relaxed text-[#64748B]">
-              Choose between every cutting-edge model from OpenAI, Anthropic, Gemini, xAI, and Teskel.
-            </p>
-            <Link href="/docs" className="mt-4 inline-flex items-center gap-1 text-[13px] font-medium text-[#0F172A] hover:text-[#3B82F6]">
-              Explore models <span className="text-[11px]">↗</span>
-            </Link>
-            {/* Model selector preview */}
-            <div className="mt-5 overflow-hidden rounded-lg border border-gray-200 bg-[#FAFAFA]">
-              <div className="space-y-0 divide-y divide-gray-100">
-                <ModelRow name="Auto" badge="Suggested" active />
-                <ModelRow name="Composer 2.5" />
-                <ModelRow name="GPT-5.5" />
-                <ModelRow name="Opus 4.8" />
-                <ModelRow name="Gemini 3.1 Pro" />
-              </div>
-            </div>
-          </div>
-
-          {/* Codebase understanding */}
-          <div className="rounded-xl border border-[#E5E7EB] bg-white p-6">
-            <h3 className="text-[16px] font-semibold text-[#0F172A]">Complete codebase understanding</h3>
-            <p className="mt-2 text-[14px] leading-relaxed text-[#64748B]">
-              Teskel learns how your codebase works, no matter the scale or complexity.
-            </p>
-            <Link href="/docs" className="mt-4 inline-flex items-center gap-1 text-[13px] font-medium text-[#0F172A] hover:text-[#3B82F6]">
-              Learn about codebase indexing <span className="text-[11px]">↗</span>
-            </Link>
-            {/* Index visualization */}
-            <div className="mt-5 rounded-lg border border-gray-200 bg-[#0B0F19] p-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                  <span className="text-[11px] text-gray-400">Indexed 2,847 files</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                  <span className="text-[11px] text-gray-400">Semantic search active</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-1.5 w-1.5 rounded-full bg-purple-500" />
-                  <span className="text-[11px] text-gray-400">Context-aware completions</span>
-                </div>
-              </div>
-              <div className="mt-4 rounded bg-gray-800/50 px-3 py-2">
-                <span className="text-[12px] text-gray-300">Where are these menu label colors defined?</span>
-              </div>
-              <div className="mt-2 text-[11px] text-gray-500">Grepping...</div>
-            </div>
-          </div>
-
-          {/* Enterprise */}
-          <div className="rounded-xl border border-[#E5E7EB] bg-white p-6">
-            <h3 className="text-[16px] font-semibold text-[#0F172A]">Develop enduring software</h3>
-            <p className="mt-2 text-[14px] leading-relaxed text-[#64748B]">
-              Trusted by leading companies to accelerate development, securely and at scale.
-            </p>
-            <Link href="/enterprise" className="mt-4 inline-flex items-center gap-1 text-[13px] font-medium text-[#0F172A] hover:text-[#3B82F6]">
-              Explore enterprise <span className="text-gray-400">&rarr;</span>
-            </Link>
-            {/* Security badges */}
-            <div className="mt-5 space-y-3">
-              <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-[#FAFAFA] px-4 py-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-50">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-[12px] font-medium text-gray-800">SOC 2 Certified</p>
-                  <p className="text-[11px] text-gray-500">Enterprise-grade security</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-[#FAFAFA] px-4 py-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-[12px] font-medium text-gray-800">Zero data retention</p>
-                  <p className="text-[11px] text-gray-500">Your code stays private</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-[#FAFAFA] px-4 py-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9333ea" strokeWidth="2">
-                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-[12px] font-medium text-gray-800">Self-hosted option</p>
-                  <p className="text-[11px] text-gray-500">Run on your own infra</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
+    <motion.div
+      ref={divRef}
+      onPointerMove={handlePointerMove}
+      variants={bentoItem}
+      className={`group relative overflow-hidden rounded-[32px] bg-white/60 p-8 backdrop-blur-2xl transition-shadow duration-500 hover:shadow-[0_0_0_1px_rgba(255,255,255,0.7)_inset,0_1px_2px_rgba(0,0,0,0.01),0_8px_32px_rgba(0,0,0,0.03),0_24px_64px_rgba(37,99,235,0.08)] shadow-[0_0_0_1px_rgba(255,255,255,0.7)_inset,0_1px_2px_rgba(0,0,0,0.01),0_8px_32px_rgba(0,0,0,0.03)] border border-white/40 ${className}`}
+    >
+      {/* Dynamic Spatial Spotlight mask driven by CSS vars */}
+      <div 
+        className="pointer-events-none absolute -inset-px opacity-0 transition-opacity duration-300 group-hover:opacity-100 will-change-transform"
+        style={{
+          background: `radial-gradient(400px circle at var(--x, 50%) var(--y, 50%), rgba(37,99,235,0.08), transparent 40%)`
+        }}
+      />
+      <div className="relative z-10 h-full flex flex-col">{children}</div>
+    </motion.div>
   );
 }
 
-function ModelRow({ name, badge, active }: { name: string; badge?: string; active?: boolean }) {
+export default function Features() {
   return (
-    <div className={`flex items-center justify-between px-3 py-2.5 ${active ? "bg-white" : ""}`}>
-      <div className="flex items-center gap-2">
-        <span className={`text-[13px] ${active ? "font-medium text-gray-900" : "text-gray-600"}`}>{name}</span>
-        {badge && <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">{badge}</span>}
+    <section id="features" className="px-6 py-24 md:py-32 bg-[#F7F7F5]">
+      <div className="mx-auto max-w-[1100px]">
+        <div className="mb-20">
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ type: "spring", stiffness: 100, damping: 20 }}
+            className="text-[2.75rem] font-semibold tracking-tighter text-slate-900 md:text-[3.75rem]"
+          >
+            Spatial intelligence for code.
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.2 }}
+            className="mt-6 max-w-2xl text-[18px] text-slate-500"
+          >
+            Not just an autocomplete. A living system that maps the structural DNA of your architecture in real-time.
+          </motion.p>
+        </div>
+
+        {/* Asymmetrical Bento Grid */}
+        <motion.div
+          variants={bentoContainer}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+          className="grid gap-6 md:grid-cols-3 md:grid-rows-[auto_auto]"
+        >
+          {/* Main Card: Context Engine (Span 2 cols) */}
+          <GlowingBentoCard className="md:col-span-2">
+            <h3 className="text-[24px] font-semibold tracking-tight text-slate-900">Real-time Context Engine</h3>
+            <p className="mt-3 max-w-md text-[15px] leading-relaxed text-slate-500">
+              Teskel processes hundreds of files instantly using localized AST scanning. It watches what you type and updates its memory matrix in real-time.
+            </p>
+            
+            {/* Micro-UI: Indexing Chamber */}
+            <div className="mt-10 flex-1 rounded-2xl border border-blue-500/10 bg-white/50 p-6 relative overflow-hidden">
+              <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
+                <div className="relative flex h-3 w-3 items-center justify-center">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-500 opacity-40" style={{ animationDuration: '2s' }}></span>
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-600"></span>
+                </div>
+                <span className="text-[13px] font-medium text-slate-600">AST Indexer Active</span>
+              </div>
+              
+              <div className="mt-6 relative h-[100px]">
+                {/* Simulated floating nodes into a chamber */}
+                <motion.div 
+                  animate={{ y: [40, 0, -10], opacity: [0, 1, 0], scale: [0.8, 1, 0.9] }}
+                  transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                  className="absolute left-4 top-4 rounded-lg border border-gray-200 bg-white px-2 py-1 text-[11px] shadow-sm text-slate-600"
+                >
+                  <span className="text-blue-500">@</span> auth/route.ts
+                </motion.div>
+                <motion.div 
+                  animate={{ y: [40, 0, -10], opacity: [0, 1, 0], scale: [0.8, 1, 0.9] }}
+                  transition={{ repeat: Infinity, duration: 2.5, delay: 0.8, ease: "easeInOut" }}
+                  className="absolute left-32 top-8 rounded-lg border border-gray-200 bg-white px-2 py-1 text-[11px] shadow-sm text-slate-600"
+                >
+                  <span className="text-blue-500">@</span> lib/db.ts
+                </motion.div>
+                <motion.div 
+                  animate={{ y: [40, 0, -10], opacity: [0, 1, 0], scale: [0.8, 1, 0.9] }}
+                  transition={{ repeat: Infinity, duration: 2.2, delay: 1.5, ease: "easeInOut" }}
+                  className="absolute left-16 top-16 rounded-lg border border-gray-200 bg-white px-2 py-1 text-[11px] shadow-sm text-slate-600"
+                >
+                  <span className="text-blue-500">@</span> Nav.tsx
+                </motion.div>
+                
+                {/* Chamber Target */}
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 w-16 h-16 rounded-full border border-blue-500/20 bg-blue-50/50 flex items-center justify-center shadow-[0_0_15px_rgba(37,99,235,0.1)]">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-blue-600"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" strokeWidth="2"/><polyline points="17 8 12 3 7 8" stroke="currentColor" strokeWidth="2"/><line x1="12" y1="3" x2="12" y2="15" stroke="currentColor" strokeWidth="2"/></svg>
+                </div>
+              </div>
+            </div>
+          </GlowingBentoCard>
+
+          {/* Metrics Card (Span 1 col) */}
+          <GlowingBentoCard className="md:col-span-1 flex flex-col justify-between">
+            <div>
+              <h3 className="text-[24px] font-semibold tracking-tight text-slate-900">Zero-Friction Models</h3>
+              <p className="mt-3 text-[15px] leading-relaxed text-slate-500">
+                Intelligently routes trivial tasks to high-speed models (Teskel-Flash) and complex reasoning to frontier models.
+              </p>
+            </div>
+            
+            <div className="mt-10 space-y-4">
+              <div className="rounded-2xl border border-gray-200/50 bg-white/50 p-5 shadow-sm">
+                <div className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Latency Profile</div>
+                <div className="mt-1 text-[32px] font-bold tracking-tighter text-slate-900">120<span className="text-[18px] text-slate-500">ms</span></div>
+              </div>
+              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-50/30 p-5 shadow-sm">
+                <div className="text-[11px] font-bold uppercase tracking-widest text-emerald-600">Accuracy Vector</div>
+                <div className="mt-1 text-[32px] font-bold tracking-tighter text-emerald-700">99.9<span className="text-[18px] text-emerald-600/70">%</span></div>
+              </div>
+            </div>
+          </GlowingBentoCard>
+
+          {/* Sync Card (Span 3 cols wide bottom) */}
+          <GlowingBentoCard className="md:col-span-3 flex flex-col md:flex-row gap-8 items-center">
+            <div className="flex-1">
+              <h3 className="text-[24px] font-semibold tracking-tight text-slate-900">Living Codebase Sync</h3>
+              <p className="mt-3 text-[15px] leading-relaxed text-slate-500 max-w-xl">
+                Your repository isn&apos;t static. As you switch branches, pull changes, or refactor, Teskel&apos;s vector representations shift seamlessly without re-indexing friction.
+              </p>
+            </div>
+            
+            {/* Breathing Vector Meter */}
+            <div className="w-full md:w-96 rounded-2xl border border-gray-200/50 bg-white p-6 shadow-sm">
+              <div className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-semibold text-slate-500">Vector Embeddings</span>
+                  <span className="text-[12px] font-medium text-emerald-600 flex items-center gap-1.5">
+                    <span className="relative flex h-2 w-2 items-center justify-center"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-40"></span><span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500"></span></span>
+                    Synced
+                  </span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 relative">
+                  <motion.div 
+                    animate={{ width: ["98%", "100%", "98%"], opacity: [0.8, 1, 0.8] }}
+                    transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+                    className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500" 
+                  />
+                </div>
+                <div className="flex justify-between items-center text-[11px] text-slate-400 font-mono">
+                  <span>Branch: feature/auth-v2</span>
+                  <span>14,032 chunks</span>
+                </div>
+              </div>
+            </div>
+          </GlowingBentoCard>
+        </motion.div>
       </div>
-      {active && <span className="text-[13px] text-blue-600">✓</span>}
-    </div>
+    </section>
   );
 }

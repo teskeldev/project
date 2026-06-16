@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -14,6 +14,7 @@ import {
   GitBranch,
 } from "lucide-react";
 import { useProject } from "@/lib/store/project";
+import { FusionPicker } from "@/components/fusion/FusionPicker";
 import {
   listAgentRuns,
   getAgentRun,
@@ -25,20 +26,23 @@ import {
   type AgentRunDetailDTO,
   type AgentStepDTO,
 } from "@/lib/client/agents";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 type AgentStatus = AgentRunSummaryDTO["status"];
 type FilterStatus = "all" | "RUNNING" | "WAITING_APPROVAL" | "COMPLETED" | "FAILED";
 
 const statusConfig: Record<
   AgentStatus,
-  { icon: typeof CheckCircle2; color: string; bg: string; label: string; spin?: boolean }
+  { icon: typeof CheckCircle2; color: string; bg: string; label: string; badgeVariant: "default" | "success" | "warning" | "destructive" | "outline"; spin?: boolean }
 > = {
-  QUEUED: { icon: Clock, color: "text-gray-500", bg: "bg-gray-50", label: "Queued" },
-  RUNNING: { icon: Loader2, color: "text-blue-600", bg: "bg-blue-50", label: "Running", spin: true },
-  WAITING_APPROVAL: { icon: Sparkles, color: "text-amber-600", bg: "bg-amber-50", label: "Awaiting review" },
-  COMPLETED: { icon: CheckCircle2, color: "text-green-600", bg: "bg-green-50", label: "Completed" },
-  FAILED: { icon: AlertCircle, color: "text-red-600", bg: "bg-red-50", label: "Failed" },
-  CANCELLED: { icon: X, color: "text-gray-500", bg: "bg-gray-50", label: "Cancelled" },
+  QUEUED: { icon: Clock, color: "text-[var(--text-secondary)]", bg: "bg-[var(--surface-soft)]", label: "Queued", badgeVariant: "outline" },
+  RUNNING: { icon: Loader2, color: "text-accent", bg: "bg-accent-light", label: "Running", badgeVariant: "default", spin: true },
+  WAITING_APPROVAL: { icon: Sparkles, color: "text-amber-600", bg: "bg-amber-50", label: "Awaiting review", badgeVariant: "warning" },
+  COMPLETED: { icon: CheckCircle2, color: "text-green-600", bg: "bg-green-50", label: "Completed", badgeVariant: "success" },
+  FAILED: { icon: AlertCircle, color: "text-red-600", bg: "bg-red-50", label: "Failed", badgeVariant: "destructive" },
+  CANCELLED: { icon: X, color: "text-[var(--text-secondary)]", bg: "bg-[var(--surface-soft)]", label: "Cancelled", badgeVariant: "outline" },
 };
 
 const STEP_LABEL: Record<string, string> = {
@@ -69,7 +73,7 @@ function isActive(status: AgentStatus): boolean {
 }
 
 export default function BackgroundAgentsPage() {
-  const { activeProject } = useProject();
+  const { activeProject, activeWorkspace } = useProject();
   const projectId = activeProject?.id ?? null;
 
   const [runs, setRuns] = useState<AgentRunSummaryDTO[]>([]);
@@ -84,6 +88,7 @@ export default function BackgroundAgentsPage() {
   const [goal, setGoal] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [agentFusionId, setAgentFusionId] = useState<string | null>(null);
 
   const streamRef = useRef<{ abort: () => void } | null>(null);
 
@@ -194,7 +199,10 @@ export default function BackgroundAgentsPage() {
     setCreating(true);
     setCreateError(null);
     try {
-      const { run } = await createAgentRun(projectId, { goal: goal.trim() });
+      const { run } = await createAgentRun(projectId, {
+        goal: goal.trim(),
+        fusionId: agentFusionId ?? undefined,
+      });
       setGoal("");
       setRuns((prev) => [run, ...prev]);
       setSelectedId(run.id);
@@ -205,7 +213,7 @@ export default function BackgroundAgentsPage() {
     } finally {
       setCreating(false);
     }
-  }, [projectId, goal, creating]);
+  }, [projectId, goal, creating, agentFusionId]);
 
   const handleCancel = useCallback(
     async (id: string) => {
@@ -224,9 +232,9 @@ export default function BackgroundAgentsPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <Sparkles className="mx-auto mb-3 text-gray-300" size={32} />
-          <p className="text-[14px] font-medium text-gray-900">No project selected</p>
-          <p className="mt-1 text-[12px] text-gray-500">
+          <Sparkles className="mx-auto mb-3 text-[var(--text-muted)]" size={32} />
+          <p className="text-[14px] font-medium text-[var(--foreground)]">No project selected</p>
+          <p className="mt-1 text-[12px] text-[var(--text-secondary)]">
             Choose a project to run background agents.
           </p>
         </div>
@@ -240,10 +248,10 @@ export default function BackgroundAgentsPage() {
   return (
     <div className="flex h-full">
       {/* Agent list */}
-      <div className="flex w-[360px] flex-col border-r border-gray-100">
-        <div className="border-b border-gray-100 p-4">
-          <h1 className="text-[15px] font-semibold text-gray-900">Background Agents</h1>
-          <p className="mt-1 text-[12px] text-gray-500">
+      <div className="flex w-[360px] flex-col border-r border-[var(--border)]">
+        <div className="border-b border-[var(--border)] p-4">
+          <h1 className="text-[15px] font-semibold text-[var(--foreground)]">Background Agents</h1>
+          <p className="mt-1 text-[12px] text-[var(--text-secondary)]">
             Agents propose changes for your review &mdash; they never apply edits
             or run commands automatically.
           </p>
@@ -255,21 +263,30 @@ export default function BackgroundAgentsPage() {
               onChange={(e) => setGoal(e.target.value)}
               placeholder="Describe a goal, e.g. Add a dark mode toggle to the navbar"
               rows={2}
-              className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-[12px] text-gray-900 placeholder:text-gray-400 focus:border-gray-400 focus:outline-none"
+              className="w-full resize-none rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[12px] text-[var(--foreground)] placeholder:text-[var(--text-muted)] focus:border-[var(--border-focus,var(--accent))] focus:outline-none"
               onKeyDown={(e) => {
                 if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
                   void handleCreate();
                 }
               }}
             />
-            <button
+            <div className="mt-2">
+              <FusionPicker
+                workspaceId={activeWorkspace?.id}
+                value={agentFusionId}
+                onChange={setAgentFusionId}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[12px] text-[var(--foreground)] focus:outline-none"
+              />
+            </div>
+            <Button
               onClick={() => void handleCreate()}
               disabled={creating || goal.trim().length < 4}
-              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md bg-gray-900 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-2 w-full"
+              size="sm"
             >
               {creating ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
               {creating ? "Starting..." : "New Agent"}
-            </button>
+            </Button>
             {createError && (
               <p className="mt-1.5 text-[11px] text-red-600">{createError}</p>
             )}
@@ -277,24 +294,22 @@ export default function BackgroundAgentsPage() {
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap gap-1 border-b border-gray-100 p-3">
+        <div className="flex flex-wrap gap-1 border-b border-[var(--border)] p-3">
           {(["all", "RUNNING", "WAITING_APPROVAL", "COMPLETED", "FAILED"] as const).map(
             (f) => (
-              <button
+              <Button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                  filter === f
-                    ? "bg-gray-900 text-white"
-                    : "text-gray-500 hover:bg-gray-100"
-                }`}
+                variant={filter === f ? "default" : "ghost"}
+                size="sm"
+                className="text-[11px]"
               >
                 {f === "all"
                   ? "All"
                   : f === "WAITING_APPROVAL"
                   ? "Review"
                   : statusConfig[f as AgentStatus].label}
-              </button>
+              </Button>
             )
           )}
         </div>
@@ -302,7 +317,7 @@ export default function BackgroundAgentsPage() {
         {/* Items */}
         <div className="flex-1 space-y-1 overflow-auto p-2">
           {loading && runs.length === 0 && (
-            <div className="flex items-center justify-center py-8 text-gray-400">
+            <div className="flex items-center justify-center py-8 text-[var(--text-muted)]">
               <Loader2 size={16} className="animate-spin" />
             </div>
           )}
@@ -310,7 +325,7 @@ export default function BackgroundAgentsPage() {
             <p className="px-3 py-2 text-[12px] text-red-600">{listError}</p>
           )}
           {!loading && !listError && filtered.length === 0 && (
-            <p className="px-3 py-8 text-center text-[12px] text-gray-400">
+            <p className="px-3 py-8 text-center text-[12px] text-[var(--text-muted)]">
               No agents yet. Describe a goal above to start one.
             </p>
           )}
@@ -323,8 +338,8 @@ export default function BackgroundAgentsPage() {
                 onClick={() => setSelectedId(run.id)}
                 className={`flex w-full items-start gap-3 rounded-lg p-3 text-left transition-colors ${
                   selectedId === run.id
-                    ? "bg-gray-50 ring-1 ring-gray-200"
-                    : "hover:bg-gray-50"
+                    ? "bg-[var(--surface-soft)] ring-1 ring-[var(--border)]"
+                    : "hover:bg-[var(--surface-soft)]"
                 }`}
               >
                 <div className={`mt-0.5 rounded-md p-1.5 ${config.bg}`}>
@@ -334,19 +349,19 @@ export default function BackgroundAgentsPage() {
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-medium text-gray-900">
+                  <p className="truncate text-[13px] font-medium text-[var(--foreground)]">
                     {run.goal}
                   </p>
                   <div className="mt-1 flex items-center gap-2">
                     <span className={`text-[11px] ${config.color}`}>
                       {config.label}
                     </span>
-                    <span className="text-gray-300">&middot;</span>
-                    <span className="text-[11px] text-gray-400">
+                    <span className="text-[var(--text-muted)]">&middot;</span>
+                    <span className="text-[11px] text-[var(--text-muted)]">
                       {run.stepCount} step{run.stepCount === 1 ? "" : "s"}
                     </span>
-                    <span className="text-gray-300">&middot;</span>
-                    <span className="text-[11px] text-gray-400">
+                    <span className="text-[var(--text-muted)]">&middot;</span>
+                    <span className="text-[11px] text-[var(--text-muted)]">
                       {relativeTime(run.createdAt)}
                     </span>
                   </div>
@@ -360,7 +375,7 @@ export default function BackgroundAgentsPage() {
       {/* Detail */}
       <div className="flex flex-1 flex-col">
         {!selectedId ? (
-          <div className="flex flex-1 items-center justify-center text-[13px] text-gray-400">
+          <div className="flex flex-1 items-center justify-center text-[13px] text-[var(--text-muted)]">
             Select an agent to view its progress.
           </div>
         ) : detailError ? (
@@ -368,7 +383,7 @@ export default function BackgroundAgentsPage() {
             {detailError}
           </div>
         ) : !detail ? (
-          <div className="flex flex-1 items-center justify-center text-gray-400">
+          <div className="flex flex-1 items-center justify-center text-[var(--text-muted)]">
             <Loader2 size={18} className="animate-spin" />
           </div>
         ) : (
@@ -393,42 +408,42 @@ function AgentDetail({
 
   return (
     <>
-      <div className="flex items-start justify-between border-b border-gray-100 px-6 py-4">
+      <div className="flex items-start justify-between border-b border-[var(--border)] px-6 py-4">
         <div className="min-w-0">
-          <h2 className="truncate text-[15px] font-semibold text-gray-900">
+          <h2 className="truncate text-[15px] font-semibold text-[var(--foreground)]">
             {detail.goal}
           </h2>
           <div className="mt-1 flex items-center gap-3">
-            <span className={`flex items-center gap-1 text-[12px] ${config.color}`}>
+            <Badge variant={config.badgeVariant} className="gap-1">
               <config.icon
                 size={12}
                 className={config.spin ? "animate-spin" : ""}
               />
               {config.label}
-            </span>
-            <span className="text-[11px] text-gray-400">
+            </Badge>
+            <span className="text-[11px] text-[var(--text-muted)]">
               {relativeTime(detail.createdAt)}
             </span>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {detail.status === "WAITING_APPROVAL" && (
-            <Link
-              href="/dashboard/composer"
-              className="flex items-center gap-1.5 rounded-md bg-gray-900 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-gray-800"
-            >
-              <ExternalLink size={12} />
-              Review proposed changes
-            </Link>
+            <Button asChild size="sm">
+              <Link href="/dashboard/composer" className="gap-1.5">
+                <ExternalLink size={12} />
+                Review proposed changes
+              </Link>
+            </Button>
           )}
           {isActive(detail.status) && (
-            <button
+            <Button
               onClick={onCancel}
-              className="flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-600 hover:bg-gray-50"
+              variant="outline"
+              size="sm"
             >
               <X size={12} />
               Cancel
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -436,51 +451,57 @@ function AgentDetail({
       <div className="flex-1 overflow-auto p-6">
         {/* Failed error banner */}
         {detail.status === "FAILED" && detail.error && (
-          <div className="mb-4 flex items-start gap-2 rounded-md border border-red-100 bg-red-50 p-3">
-            <AlertCircle size={14} className="mt-0.5 text-red-600" />
-            <p className="text-[12px] text-red-700">{detail.error}</p>
-          </div>
+          <Card className="mb-4 border-red-200 bg-red-50">
+            <CardContent className="flex items-start gap-2 p-3">
+              <AlertCircle size={14} className="mt-0.5 text-red-600" />
+              <p className="text-[12px] text-red-700">{detail.error}</p>
+            </CardContent>
+          </Card>
         )}
 
         {/* Waiting-approval callout */}
         {detail.status === "WAITING_APPROVAL" && (
-          <div className="mb-4 flex items-start gap-2 rounded-md border border-amber-100 bg-amber-50 p-3">
-            <Sparkles size={14} className="mt-0.5 text-amber-600" />
-            <div className="text-[12px] text-amber-800">
-              <p className="font-medium">Changes proposed for review</p>
-              <p className="mt-0.5">
-                {detail.result?.message ??
-                  "Open the Composer to review and apply the proposed changes."}
-              </p>
-            </div>
-          </div>
+          <Card className="mb-4 border-amber-200 bg-amber-50">
+            <CardContent className="flex items-start gap-2 p-3">
+              <Sparkles size={14} className="mt-0.5 text-amber-600" />
+              <div className="text-[12px] text-amber-800">
+                <p className="font-medium">Changes proposed for review</p>
+                <p className="mt-0.5">
+                  {detail.result?.message ??
+                    "Open the Composer to review and apply the proposed changes."}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Plan */}
         {detail.plan && detail.plan.steps.length > 0 && (
-          <div className="mb-6 rounded-lg border border-gray-100 bg-gray-50 p-4">
-            <p className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold text-gray-900">
-              <GitBranch size={12} />
-              Plan
-            </p>
-            {detail.plan.summary && (
-              <p className="mb-2 text-[12px] text-gray-600">{detail.plan.summary}</p>
-            )}
-            <ol className="space-y-1">
-              {detail.plan.steps.map((s, i) => (
-                <li key={i} className="flex gap-2 text-[12px] text-gray-600">
-                  <span className="text-gray-400">{i + 1}.</span>
-                  <span>{s}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
+          <Card className="mb-6 bg-[var(--surface-soft)]">
+            <CardContent className="p-4">
+              <p className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold text-[var(--foreground)]">
+                <GitBranch size={12} />
+                Plan
+              </p>
+              {detail.plan.summary && (
+                <p className="mb-2 text-[12px] text-[var(--text-secondary)]">{detail.plan.summary}</p>
+              )}
+              <ol className="space-y-1">
+                {detail.plan.steps.map((s, i) => (
+                  <li key={i} className="flex gap-2 text-[12px] text-[var(--text-secondary)]">
+                    <span className="text-[var(--text-muted)]">{i + 1}.</span>
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ol>
+            </CardContent>
+          </Card>
         )}
 
         {/* Step timeline */}
         <div className="space-y-0">
           {detail.steps.length === 0 ? (
-            <p className="text-[12px] text-gray-400">Waiting for the agent to start...</p>
+            <p className="text-[12px] text-[var(--text-muted)]">Waiting for the agent to start...</p>
           ) : (
             detail.steps.map((step, i) => (
               <StepItem
@@ -516,10 +537,10 @@ function StepItem({
             status === "COMPLETED"
               ? "bg-green-100 text-green-700"
               : status === "RUNNING"
-              ? "bg-blue-100 text-blue-700"
+              ? "bg-accent-light text-accent"
               : status === "FAILED"
               ? "bg-red-100 text-red-700"
-              : "bg-gray-100 text-gray-400"
+              : "bg-[var(--surface-soft)] text-[var(--text-muted)]"
           }`}
         >
           {status === "COMPLETED" ? (
@@ -532,22 +553,22 @@ function StepItem({
             index
           )}
         </div>
-        {!isLast && <div className="mt-1 h-full min-h-[24px] w-px bg-gray-100" />}
+        {!isLast && <div className="mt-1 h-full min-h-[24px] w-px bg-[var(--border)]" />}
       </div>
       <div className="pb-6">
         <div className="flex items-center gap-2">
-          <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500">
+          <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
             {STEP_LABEL[step.type] ?? step.type}
-          </span>
+          </Badge>
           <p
             className={`text-[13px] font-medium ${
-              status === "PENDING" ? "text-gray-400" : "text-gray-900"
+              status === "PENDING" ? "text-[var(--text-muted)]" : "text-[var(--foreground)]"
             }`}
           >
             {step.title}
           </p>
         </div>
-        {detail && <p className="mt-0.5 text-[12px] text-gray-500">{detail}</p>}
+        {detail && <p className="mt-0.5 text-[12px] text-[var(--text-secondary)]">{detail}</p>}
       </div>
     </div>
   );

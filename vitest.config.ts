@@ -16,6 +16,10 @@ export default defineConfig({
     },
   },
   test: {
+    /** Provide a test-only CSRF secret so `src/lib/security.ts` can load. */
+    env: {
+      CSRF_SECRET: "test-csrf-secret-do-not-use-in-production",
+    },
     environment: "node",
     globals: true,
     include: ["tests/unit/**/*.test.ts", "src/**/__tests__/**/*.test.ts"],

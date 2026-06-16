@@ -28,7 +28,7 @@ export function getProjectRoot(storageKey: string): string {
   if (!storageKey || /[\\/]|\0|\.\./.test(storageKey)) {
     throw new ApiError("Invalid project storage key", 400, "INVALID_PATH");
   }
-  return path.resolve(STORAGE_ROOT, storageKey);
+  return path.resolve(/*turbopackIgnore: true*/ STORAGE_ROOT, storageKey);
 }
 
 /**
@@ -86,7 +86,7 @@ export function resolveSafe(storageKey: string, relPath: string): string {
   const root = getProjectRoot(storageKey);
   const rel = normalizeRelPath(relPath);
 
-  const abs = path.resolve(root, rel);
+  const abs = path.resolve(/*turbopackIgnore: true*/ root, rel);
 
   // Containment check: abs must equal root or live beneath it. Compare with a
   // trailing separator to avoid sibling-prefix false positives

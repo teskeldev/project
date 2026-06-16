@@ -103,14 +103,14 @@ export default function ProjectsPage() {
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Repositories</h1>
-            <p className="mt-1 text-sm text-gray-500">
+            <h1 className="text-2xl font-semibold text-foreground">Repositories</h1>
+            <p className="mt-1 text-sm text-text-muted">
               Your connected repositories and projects
             </p>
           </div>
           <button
             onClick={() => setShowCreateForm(true)}
-            className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gray-800"
+            className="flex items-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-foreground"
           >
             <Plus size={16} />
             Connect repository
@@ -119,38 +119,40 @@ export default function ProjectsPage() {
 
         {/* Create form */}
         {showCreateForm && (
-          <div className="mb-6 rounded-xl border border-gray-200 bg-white p-5">
+          <div className="mb-6 rounded-xl border border-border bg-surface p-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-gray-900">Create new project</h2>
+              <h2 className="text-sm font-semibold text-foreground">Create new project</h2>
               <button
                 onClick={() => { setShowCreateForm(false); setCreateError(null); }}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-text-muted hover:text-text-secondary"
               >
                 <X size={16} />
               </button>
             </div>
             <div className="flex items-end gap-3">
               <div className="flex-1">
-                <label className="mb-1 block text-xs font-medium text-gray-600">
+                <label htmlFor="new-project-name" className="mb-1 block text-xs font-medium text-text-secondary">
                   Project name
                 </label>
                 <input
+                  id="new-project-name"
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="my-project"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-400 focus:outline-none"
+                  className="w-full rounded-lg border border-border px-3 py-2 text-sm text-foreground placeholder:text-text-muted focus:border-border-strong focus:outline-none"
                   onKeyDown={(e) => { if (e.key === "Enter") void handleCreate(); }}
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">
+                <label htmlFor="new-project-template" className="mb-1 block text-xs font-medium text-text-secondary">
                   Template
                 </label>
                 <select
+                  id="new-project-template"
                   value={newTemplate}
                   onChange={(e) => setNewTemplate(e.target.value as "blank" | "node")}
-                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-gray-400 focus:outline-none"
+                  className="rounded-lg border border-border px-3 py-2 text-sm text-foreground focus:border-border-strong focus:outline-none"
                 >
                   <option value="blank">Blank</option>
                   <option value="node">Node.js</option>
@@ -159,7 +161,7 @@ export default function ProjectsPage() {
               <button
                 onClick={() => void handleCreate()}
                 disabled={creating || !newName.trim()}
-                className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+                className="flex items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-foreground disabled:opacity-50"
               >
                 {creating && <Loader2 size={14} className="animate-spin" />}
                 Create
@@ -173,25 +175,25 @@ export default function ProjectsPage() {
 
         {/* Search and filters */}
         <div className="mb-6 flex items-center gap-4">
-          <div className="flex flex-1 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5">
-            <Search size={16} className="text-gray-400" />
+          <div className="flex flex-1 items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2.5">
+            <Search size={16} className="text-text-muted" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search repositories..."
-              className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
+              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-text-muted focus:outline-none"
             />
           </div>
-          <div className="flex rounded-lg border border-gray-200">
+          <div className="flex rounded-lg border border-border">
             {(["all", "active", "idle"] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
                 className={`px-4 py-2.5 text-xs font-medium capitalize ${
                   filter === f
-                    ? "bg-gray-100 text-gray-900"
-                    : "text-gray-500 hover:text-gray-700"
+                    ? "bg-surface-soft text-foreground"
+                    : "text-text-muted hover:text-text-secondary"
                 } ${f === "all" ? "rounded-l-lg" : ""} ${f === "idle" ? "rounded-r-lg" : ""}`}
               >
                 {f}
@@ -203,7 +205,7 @@ export default function ProjectsPage() {
         {/* Loading state */}
         {loading && (
           <div className="flex items-center justify-center py-20">
-            <Loader2 size={24} className="animate-spin text-gray-400" />
+            <Loader2 size={24} className="animate-spin text-text-muted" />
           </div>
         )}
 
@@ -220,14 +222,14 @@ export default function ProjectsPage() {
         {/* Empty state */}
         {!loading && !error && projects.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <FolderOpen size={48} className="mb-4 text-gray-300" />
-            <h2 className="text-lg font-medium text-gray-700">No projects yet</h2>
-            <p className="mt-1 text-sm text-gray-500">
+            <FolderOpen size={48} className="mb-4 text-text-muted" />
+            <h2 className="text-lg font-medium text-text-secondary">No projects yet</h2>
+            <p className="mt-1 text-sm text-text-muted">
               Create one to get started
             </p>
             <button
               onClick={() => setShowCreateForm(true)}
-              className="mt-4 flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gray-800"
+              className="mt-4 flex items-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-foreground"
             >
               <Plus size={16} />
               Create project
@@ -238,8 +240,8 @@ export default function ProjectsPage() {
         {/* No results from filter */}
         {!loading && !error && projects.length > 0 && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <Search size={32} className="mb-3 text-gray-300" />
-            <p className="text-sm text-gray-500">No projects match your search</p>
+            <Search size={32} className="mb-3 text-text-muted" />
+            <p className="text-sm text-text-muted">No projects match your search</p>
           </div>
         )}
 
@@ -252,15 +254,15 @@ export default function ProjectsPage() {
                 <button
                   key={project.id}
                   onClick={() => handleProjectClick(project)}
-                  className="group flex w-full items-center justify-between rounded-xl border border-gray-200 bg-white px-5 py-4 text-left transition-all hover:border-gray-300 hover:shadow-sm"
+                  className="group flex w-full items-center justify-between rounded-xl border border-border bg-surface px-5 py-4 text-left transition-all hover:border-border-strong hover:shadow-sm"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-50 text-gray-400 group-hover:bg-gray-100">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-surface-soft text-text-muted group-hover:bg-surface-soft">
                       <FolderOpen size={20} />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-semibold text-gray-900 group-hover:text-blue-600">
+                        <h3 className="text-sm font-semibold text-foreground group-hover:text-accent">
                           {project.name}
                         </h3>
                         {project.description && (
@@ -270,14 +272,14 @@ export default function ProjectsPage() {
                           </span>
                         )}
                       </div>
-                      <p className="mt-0.5 text-sm text-gray-500">
+                      <p className="mt-0.5 text-sm text-text-muted">
                         {project.description || project.storageKey}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-4 text-xs text-gray-400">
+                    <div className="flex items-center gap-4 text-xs text-text-muted">
                       <span className="flex items-center gap-1.5">
                         <span
                           className="h-2.5 w-2.5 rounded-full"
@@ -292,7 +294,7 @@ export default function ProjectsPage() {
                     </div>
                     <ArrowUpRight
                       size={16}
-                      className="text-gray-300 opacity-0 transition-opacity group-hover:opacity-100"
+                      className="text-text-muted opacity-0 transition-opacity group-hover:opacity-100"
                     />
                   </div>
                 </button>

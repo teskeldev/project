@@ -1,4 +1,4 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 import { prisma } from "@/lib/db";
 import {
   handleApiError,
@@ -6,11 +6,13 @@ import {
   validateBody,
   ApiError,
 } from "@/lib/api";
-import { isAIConfigured, streamChat, type AIMessage } from "@/lib/ai/provider";
+import { enforceRateLimit } from "@/lib/rate-limit";
+import { isAIConfiguredAsync, streamChat, type AIMessage } from "@/lib/ai/provider";
 
 const generateSchema = z.object({
   sessionId: z.string().min(1),
   prompt: z.string().min(1).max(10000),
+  fusionId: z.string().optional(),
 });
 
 const SYSTEM_PROMPT =
@@ -26,14 +28,6 @@ const SYSTEM_PROMPT =
  */
 export async function POST(req: Request): Promise<Response> {
   try {
-    if (!isAIConfigured()) {
-      throw new ApiError(
-        "AI is not configured. Add an OpenAI API key in Integrations to enable design generation.",
-        503,
-        "AI_NOT_CONFIGURED"
-      );
-    }
-
     const body = await validateBody(req, generateSchema);
 
     // Verify session exists and user has access
@@ -52,7 +46,18 @@ export async function POST(req: Request): Promise<Response> {
       throw new ApiError("Session not found", 404, "NOT_FOUND");
     }
 
-    await requireProjectAccess(session.projectId);
+    const { user, member } = await requireProjectAccess(session.projectId);
+
+    // Rate limit: 10 per user per minute
+    await enforceRateLimit(`design:generate:${user.id}`, 10, 60_000);
+
+    if (!await isAIConfiguredAsync(undefined, member.workspaceId)) {
+      throw new ApiError(
+        "AI is not configured. Add an OpenAI API key in Integrations to enable design generation.",
+        503,
+        "AI_NOT_CONFIGURED"
+      );
+    }
 
     // Build messages with context from previous versions
     const messages: AIMessage[] = [{ role: "system", content: SYSTEM_PROMPT }];
@@ -79,9 +84,23 @@ export async function POST(req: Request): Promise<Response> {
         };
 
         try {
-          for await (const delta of streamChat(messages)) {
-            fullContent += delta;
-            sendEvent("delta", { content: delta });
+          if (body.fusionId) {
+            // Single-shot Fusion path: fan out + judge into one component.
+            const { runFusion } = await import("@/lib/ai/fusion/runner");
+            const result = await runFusion({
+              fusionId: body.fusionId,
+              prompt: `${SYSTEM_PROMPT}\n\nComponent request:\n${body.prompt}`,
+              workspaceId: member.workspaceId,
+              projectId: session.projectId,
+              signal: req.signal,
+            });
+            fullContent = result.fused;
+            sendEvent("delta", { content: fullContent });
+          } else {
+            for await (const delta of streamChat(messages)) {
+              fullContent += delta;
+              sendEvent("delta", { content: delta });
+            }
           }
 
           // Persist the version
@@ -93,10 +112,10 @@ export async function POST(req: Request): Promise<Response> {
             },
           });
 
-          // Update session timestamp
+          // Update session timestamp + remember the Fusion used.
           await prisma.designSession.update({
             where: { id: body.sessionId },
-            data: { updatedAt: new Date() },
+            data: { updatedAt: new Date(), ...(body.fusionId ? { fusionId: body.fusionId } : {}) },
           });
 
           sendEvent("done", { versionId: version.id });
@@ -112,9 +131,10 @@ export async function POST(req: Request): Promise<Response> {
 
     return new Response(stream, {
       headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
         Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
       },
     });
   } catch (err) {

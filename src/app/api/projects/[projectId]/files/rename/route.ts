@@ -1,4 +1,4 @@
-﻿import { prisma } from "@/lib/db";
+import { prisma } from "@/lib/db";
 import {
   apiSuccess,
   handleApiError,
@@ -23,7 +23,13 @@ type RouteContext = { params: Promise<{ projectId: string }> };
 export async function POST(req: Request, ctx: RouteContext) {
   try {
     const { projectId } = await ctx.params;
-    const { project } = await requireProjectAccess(projectId);
+    const { project, member } = await requireProjectAccess(projectId);
+
+    // Role check: viewers cannot rename files/folders
+    if (member.role === "VIEWER") {
+      throw new ApiError("Insufficient permissions", 403, "FORBIDDEN");
+    }
+
     const storageKey = project!.storageKey;
 
     const body = await validateBody(req, renameNodeSchema);
@@ -109,19 +115,22 @@ export async function POST(req: Request, ctx: RouteContext) {
       });
 
       // Rewrite descendant paths (prefix swap) for folder renames/moves.
+      // The previous serial `for await` loop was N+1 round-trips; we now
+      // fetch descendants once and run the updates concurrently with
+      // Promise.all. (The sibling apply-handler uses the same approach.)
       if (node.type === "FOLDER") {
         const descendants = await tx.fileNode.findMany({
           where: { projectId, path: { startsWith: `${oldPath}/` } },
           select: { id: true, path: true },
         });
-        for (const d of descendants) {
-          const suffix = d.path.slice(oldPath.length); // includes leading "/"
-           
-          await tx.fileNode.update({
-            where: { id: d.id },
-            data: { path: `${newPath}${suffix}` },
-          });
-        }
+        await Promise.all(
+          descendants.map((d) =>
+            tx.fileNode.update({
+              where: { id: d.id },
+              data: { path: `${newPath}${d.path.slice(oldPath.length)}` },
+            })
+          )
+        );
       }
 
       return self;

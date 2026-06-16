@@ -1,5 +1,11 @@
-﻿import { prisma } from "@/lib/db";
-import { apiSuccess, handleApiError, requireUser, ApiError } from "@/lib/api";
+import { z } from "zod";
+import { prisma } from "@/lib/db";
+import { apiSuccess, handleApiError, requireUser, requireProjectAccess, validateBody, ApiError } from "@/lib/api";
+
+const updateReviewCommentSchema = z.object({
+  resolved: z.boolean(),
+  body: z.string().max(2000).optional(),
+});
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -11,29 +17,28 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     await requireUser();
     const { id } = await ctx.params;
 
-    let body: { resolved?: boolean };
-    try {
-      body = (await req.json()) as { resolved?: boolean };
-    } catch {
-      throw new ApiError("Invalid JSON body", 400, "INVALID_JSON");
-    }
-
-    if (typeof body.resolved !== "boolean") {
-      throw new ApiError("resolved (boolean) is required", 400, "MISSING_FIELD");
-    }
+    const { resolved, body: commentBody } = await validateBody(req, updateReviewCommentSchema);
 
     const existing = await prisma.reviewComment.findUnique({
       where: { id },
-      select: { id: true },
+      include: { changeSet: { select: { projectId: true } } },
     });
 
     if (!existing) {
       throw new ApiError("Review comment not found", 404, "NOT_FOUND");
     }
 
+    // Verify the user has access to the project that owns this review comment
+    await requireProjectAccess(existing.changeSet.projectId);
+
+    const updateData: { resolved: boolean; content?: string } = { resolved };
+    if (commentBody !== undefined) {
+      updateData.content = commentBody;
+    }
+
     const updated = await prisma.reviewComment.update({
       where: { id },
-      data: { resolved: body.resolved },
+      data: updateData,
     });
 
     return apiSuccess({

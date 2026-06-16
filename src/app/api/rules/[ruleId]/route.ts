@@ -8,16 +8,28 @@ import {
   type SessionUser,
 } from "@/lib/api";
 import { updateRuleSchema } from "@/lib/schemas/rulesKnowledge";
+import type { Role } from "@prisma/client";
 
 type RouteContext = { params: Promise<{ ruleId: string }> };
+
+/** True if the user holds ADMIN or OWNER in at least one of their workspaces. */
+async function userIsAdminAnywhere(userId: string): Promise<boolean> {
+  const adminMembership = await prisma.workspaceMember.findFirst({
+    where: { userId, role: { in: ["ADMIN", "OWNER"] } },
+    select: { id: true },
+  });
+  return adminMembership !== null;
+}
 
 /**
  * Loads a rule and verifies the current user can manage it.
  *
  * Management rules:
- *   - GLOBAL: any authenticated user (no owner column on the model — shared).
+ *   - GLOBAL: requires ADMIN/OWNER in at least one of the user's workspaces
+ *     (the model has no owner column, so GLOBAL is shared but still gated).
  *   - WORKSPACE / PROJECT / FILE: requires membership in the owning workspace
- *     (resolved via the rule's workspaceId or its project's workspaceId).
+ *     (resolved via the rule's workspaceId or its project's workspaceId) with
+ *     a role of MEMBER or higher.
  */
 async function loadManageableRule(user: SessionUser, ruleId: string) {
   const rule = await prisma.rule.findUnique({
@@ -29,7 +41,15 @@ async function loadManageableRule(user: SessionUser, ruleId: string) {
     throw new ApiError("Rule not found", 404, "NOT_FOUND");
   }
 
-  if (rule.scope !== "GLOBAL") {
+  if (rule.scope === "GLOBAL") {
+    if (!(await userIsAdminAnywhere(user.id))) {
+      throw new ApiError(
+        "Only admins and owners can manage global rules",
+        403,
+        "FORBIDDEN"
+      );
+    }
+  } else {
     const workspaceId = rule.workspaceId ?? rule.project?.workspaceId ?? null;
     if (!workspaceId) {
       // Malformed scoped rule with no resolvable workspace -> deny.
@@ -40,6 +60,10 @@ async function loadManageableRule(user: SessionUser, ruleId: string) {
     });
     if (!member) {
       throw new ApiError("You cannot manage this rule", 403, "FORBIDDEN");
+    }
+    const allowedRoles: Role[] = ["MEMBER", "ADMIN", "OWNER"];
+    if (!allowedRoles.includes(member.role)) {
+      throw new ApiError("Insufficient permissions", 403, "FORBIDDEN");
     }
   }
 

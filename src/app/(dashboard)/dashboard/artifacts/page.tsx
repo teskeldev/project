@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import DOMPurify from "isomorphic-dompurify";
 import {
   FileText,
   Code,
@@ -24,7 +25,7 @@ import {
 } from "@/lib/client/artifacts";
 
 const artifactTypes = [
-  { id: "CODE" as const, icon: Code, label: "Code", color: "text-blue-600 bg-blue-50" },
+  { id: "CODE" as const, icon: Code, label: "Code", color: "text-accent bg-accent-light" },
   { id: "DOCUMENT" as const, icon: FileText, label: "Document", color: "text-purple-600 bg-purple-50" },
   { id: "CHART" as const, icon: BarChart3, label: "Chart", color: "text-green-600 bg-green-50" },
   { id: "WEBAPP" as const, icon: Globe, label: "Web App", color: "text-orange-600 bg-orange-50" },
@@ -63,8 +64,26 @@ function formatTime(dateStr: string): string {
   return `${diffDays}d ago`;
 }
 
+/**
+ * Sanitize HTML content for safe iframe rendering.
+ * Uses DOMPurify with an allowlist of safe tags/attributes and an explicit
+ * denylist of dangerous elements and event handler attributes.
+ * The iframe uses sandbox="allow-scripts" without allow-same-origin,
+ * which prevents access to parent origin cookies/storage.
+ */
+function sanitizeHtmlContent(html: string): string {
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ["div", "span", "p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "a", "img", "button", "input", "label", "form", "table", "thead", "tbody", "tr", "td", "th", "br", "hr", "strong", "em", "b", "i", "code", "pre", "blockquote", "section", "article", "nav", "header", "footer", "main", "aside"],
+    ALLOWED_ATTR: ["class", "id", "href", "src", "alt", "title", "type", "value", "placeholder", "name", "for", "data-*"],
+    ALLOW_DATA_ATTR: true,
+    FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "svg", "math", "form"],
+    FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onfocus", "onblur", "style"],
+  });
+}
+
 export default function ArtifactsPage() {
   const { activeProject } = useProject();
+  const projectId = activeProject?.id ?? null;
   const [artifacts, setArtifacts] = useState<ArtifactListItem[]>([]);
   const [activeArtifact, setActiveArtifact] = useState<Artifact | null>(null);
   const [activeType, setActiveType] = useState<ArtifactType | null>(null);
@@ -75,12 +94,12 @@ export default function ArtifactsPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const fetchArtifacts = useCallback(async () => {
-    if (!activeProject) return;
+    if (!projectId) { setLoading(false); return; }
     setLoading(true);
     setError(null);
     try {
       const { artifacts: items } = await listArtifacts(
-        activeProject.id,
+        projectId,
         activeType ?? undefined
       );
       setArtifacts(items);
@@ -89,7 +108,7 @@ export default function ArtifactsPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeProject, activeType]);
+  }, [projectId, activeType]);
 
   useEffect(() => {
     void fetchArtifacts();
@@ -142,7 +161,7 @@ export default function ArtifactsPage() {
   if (!activeProject) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-[13px] text-gray-500">Select a project to view artifacts.</p>
+        <p className="text-[13px] text-text-secondary">Select a project to view artifacts.</p>
       </div>
     );
   }
@@ -150,18 +169,18 @@ export default function ArtifactsPage() {
   return (
     <div className="flex h-full">
       {/* Artifact list */}
-      <div className="w-[320px] border-r border-gray-100 bg-[#FAFAFA] flex flex-col">
-        <div className="border-b border-gray-100 p-4">
+      <div className="w-[320px] border-r border-border bg-surface-soft flex flex-col">
+        <div className="border-b border-border p-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-[15px] font-semibold text-gray-900">Artifacts</h1>
-              <p className="mt-1 text-[12px] text-gray-500">
+              <h1 className="text-[15px] font-semibold text-foreground">Artifacts</h1>
+              <p className="mt-1 text-[12px] text-text-secondary">
                 AI-generated code, documents, and visualizations
               </p>
             </div>
             <button
               onClick={() => setShowCreateForm(true)}
-              className="rounded-md bg-gray-900 p-1.5 text-white hover:bg-gray-800"
+              className="rounded-md bg-primary p-1.5 text-background hover:bg-primary-hover"
               title="New Artifact"
             >
               <Plus size={14} />
@@ -170,11 +189,11 @@ export default function ArtifactsPage() {
         </div>
 
         {/* Type filters */}
-        <div className="flex flex-wrap gap-1 border-b border-gray-100 p-3">
+        <div className="flex flex-wrap gap-1 border-b border-border p-3">
           <button
             onClick={() => setActiveType(null)}
             className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
-              !activeType ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100"
+              !activeType ? "bg-primary text-background" : "text-text-secondary hover:bg-surface-soft"
             }`}
           >
             All
@@ -184,7 +203,7 @@ export default function ArtifactsPage() {
               key={type.id}
               onClick={() => setActiveType(type.id)}
               className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                activeType === type.id ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100"
+                activeType === type.id ? "bg-primary text-background" : "text-text-secondary hover:bg-surface-soft"
               }`}
             >
               {type.label}
@@ -196,15 +215,15 @@ export default function ArtifactsPage() {
         <div className="flex-1 overflow-auto p-2">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 size={20} className="animate-spin text-gray-400" />
+              <Loader2 size={20} className="animate-spin text-text-muted" />
             </div>
           ) : error ? (
             <div className="p-4 text-center text-[12px] text-red-500">{error}</div>
           ) : artifacts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <FileText size={32} className="mb-2 text-gray-300" />
-              <p className="text-[13px] font-medium text-gray-500">No artifacts yet</p>
-              <p className="mt-1 text-[11px] text-gray-400">
+              <FileText size={32} className="mb-2 text-text-muted" />
+              <p className="text-[13px] font-medium text-text-secondary">No artifacts yet</p>
+              <p className="mt-1 text-[11px] text-text-muted">
                 Create your first artifact to get started.
               </p>
             </div>
@@ -218,17 +237,17 @@ export default function ArtifactsPage() {
                     key={artifact.id}
                     onClick={() => handleSelectArtifact(artifact)}
                     className={`flex w-full items-start gap-3 rounded-lg p-3 text-left transition-colors ${
-                      activeArtifact?.id === artifact.id ? "bg-white shadow-sm" : "hover:bg-white/60"
+                      activeArtifact?.id === artifact.id ? "bg-surface shadow-sm" : "hover:bg-surface/60"
                     }`}
                   >
                     <div className={`mt-0.5 rounded-md p-1.5 ${typeInfo.color}`}>
                       <Icon size={14} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-medium text-gray-900">
+                      <p className="truncate text-[13px] font-medium text-foreground">
                         {artifact.title}
                       </p>
-                      <p className="mt-0.5 text-[11px] text-gray-400">
+                      <p className="mt-0.5 text-[11px] text-text-muted">
                         {formatTime(artifact.createdAt)}
                       </p>
                     </div>
@@ -244,25 +263,25 @@ export default function ArtifactsPage() {
       <div className="flex flex-1 flex-col">
         {detailLoading ? (
           <div className="flex flex-1 items-center justify-center">
-            <Loader2 size={24} className="animate-spin text-gray-400" />
+            <Loader2 size={24} className="animate-spin text-text-muted" />
           </div>
         ) : !activeArtifact ? (
           <div className="flex flex-1 items-center justify-center">
-            <p className="text-[13px] text-gray-400">Select an artifact to preview</p>
+            <p className="text-[13px] text-text-muted">Select an artifact to preview</p>
           </div>
         ) : (
           <>
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-3">
+            <div className="flex items-center justify-between border-b border-border px-6 py-3">
               <div className="flex items-center gap-3">
-                <h2 className="text-[14px] font-semibold text-gray-900">
+                <h2 className="text-[14px] font-semibold text-foreground">
                   {activeArtifact.title}
                 </h2>
-                <span className="rounded bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">
+                <span className="rounded bg-surface-soft px-2 py-0.5 text-[11px] font-medium text-text-secondary">
                   {activeArtifact.type}
                 </span>
                 {activeArtifact.language && (
-                  <span className="rounded bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-600">
+                  <span className="rounded bg-accent-light px-2 py-0.5 text-[11px] font-medium text-accent">
                     {activeArtifact.language}
                   </span>
                 )}
@@ -270,13 +289,13 @@ export default function ArtifactsPage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleCopy}
-                  className="rounded-md border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-600 hover:bg-gray-50"
+                  className="rounded-md border border-border px-3 py-1.5 text-[12px] font-medium text-text-secondary hover:bg-surface-soft"
                 >
                   Copy
                 </button>
                 <button
                   onClick={handleDownload}
-                  className="rounded-md border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-600 hover:bg-gray-50"
+                  className="rounded-md border border-border px-3 py-1.5 text-[12px] font-medium text-text-secondary hover:bg-surface-soft"
                 >
                   Download
                 </button>
@@ -313,15 +332,15 @@ export default function ArtifactsPage() {
       {/* Delete confirmation */}
       {deleteConfirmId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-[360px] rounded-xl bg-white p-6 shadow-xl">
-            <h3 className="text-[14px] font-semibold text-gray-900">Delete Artifact</h3>
-            <p className="mt-2 text-[13px] text-gray-600">
+          <div className="w-[360px] rounded-xl bg-surface p-6 shadow-xl">
+            <h3 className="text-[14px] font-semibold text-foreground">Delete Artifact</h3>
+            <p className="mt-2 text-[13px] text-text-secondary">
               Are you sure you want to delete this artifact? This action cannot be undone.
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setDeleteConfirmId(null)}
-                className="rounded-md border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-600 hover:bg-gray-50"
+                className="rounded-md border border-border px-3 py-1.5 text-[12px] font-medium text-text-secondary hover:bg-surface-soft"
               >
                 Cancel
               </button>
@@ -347,13 +366,13 @@ function ArtifactContent({ artifact }: { artifact: Artifact }) {
   switch (artifact.type) {
     case "CODE":
       return (
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-[#0B0F19]">
-          <div className="flex items-center justify-between border-b border-gray-800 px-4 py-2">
-            <span className="text-[11px] text-gray-400">
+        <div className="overflow-hidden rounded-lg border border-border bg-editor-bg">
+          <div className="flex items-center justify-between border-b border-editor-border px-4 py-2">
+            <span className="text-[11px] text-text-muted">
               {artifact.language ?? "plaintext"}
             </span>
           </div>
-          <pre className="overflow-x-auto p-4 font-mono text-[12px] leading-6 text-gray-300">
+          <pre className="overflow-x-auto p-4 font-mono text-[12px] leading-6 text-text-muted">
             {artifact.content}
           </pre>
         </div>
@@ -361,8 +380,8 @@ function ArtifactContent({ artifact }: { artifact: Artifact }) {
 
     case "DOCUMENT":
       return (
-        <div className="rounded-lg border border-gray-200 bg-white p-6">
-          <pre className="whitespace-pre-wrap font-sans text-[13px] leading-7 text-gray-700">
+        <div className="rounded-lg border border-border bg-surface p-6">
+          <pre className="whitespace-pre-wrap font-sans text-[13px] leading-7 text-text-secondary">
             {artifact.content}
           </pre>
         </div>
@@ -373,8 +392,8 @@ function ArtifactContent({ artifact }: { artifact: Artifact }) {
       const chartData = (meta?.data as number[] | undefined) ?? [40, 65, 55, 80, 72, 90, 85, 95, 88, 100, 92, 110];
       const labels = (meta?.labels as string[] | undefined) ?? ["J","F","M","A","M","J","J","A","S","O","N","D"];
       return (
-        <div className="rounded-lg border border-gray-200 bg-white p-8">
-          <p className="mb-4 text-[14px] font-medium text-gray-800">{artifact.title}</p>
+        <div className="rounded-lg border border-border bg-surface p-8">
+          <p className="mb-4 text-[14px] font-medium text-foreground">{artifact.title}</p>
           {/* Illustrative bar chart from metadata */}
           <div className="flex h-[300px] items-end gap-3">
             {chartData.map((h, i) => {
@@ -383,10 +402,10 @@ function ArtifactContent({ artifact }: { artifact: Artifact }) {
               return (
                 <div key={i} className="flex flex-1 flex-col items-center gap-1">
                   <div
-                    className="w-full rounded-t bg-blue-500/80"
+                    className="w-full rounded-t bg-accent/80"
                     style={{ height: `${pct}%` }}
                   />
-                  <span className="text-[10px] text-gray-400">
+                  <span className="text-[10px] text-text-muted">
                     {labels[i] ?? ""}
                   </span>
                 </div>
@@ -394,7 +413,7 @@ function ArtifactContent({ artifact }: { artifact: Artifact }) {
             })}
           </div>
           {artifact.content && (
-            <pre className="mt-4 whitespace-pre-wrap text-[11px] text-gray-500">
+            <pre className="mt-4 whitespace-pre-wrap text-[11px] text-text-secondary">
               {artifact.content}
             </pre>
           )}
@@ -404,21 +423,21 @@ function ArtifactContent({ artifact }: { artifact: Artifact }) {
 
     case "WEBAPP":
       return (
-        <div className="overflow-hidden rounded-lg border border-gray-200">
-          <div className="flex items-center gap-2 border-b border-gray-100 bg-[#FAFAFA] px-3 py-2">
+        <div className="overflow-hidden rounded-lg border border-border">
+          <div className="flex items-center gap-2 border-b border-border bg-surface-soft px-3 py-2">
             <div className="flex gap-1.5">
               <div className="h-2.5 w-2.5 rounded-full bg-red-400" />
               <div className="h-2.5 w-2.5 rounded-full bg-yellow-400" />
               <div className="h-2.5 w-2.5 rounded-full bg-green-400" />
             </div>
-            <div className="flex-1 rounded bg-white px-3 py-1 text-center text-[11px] text-gray-400 ring-1 ring-gray-200">
+            <div className="flex-1 rounded bg-surface px-3 py-1 text-center text-[11px] text-text-muted ring-1 ring-border">
               sandbox preview
             </div>
           </div>
           <iframe
-            srcDoc={artifact.content}
+            srcDoc={sanitizeHtmlContent(artifact.content)}
             sandbox="allow-scripts"
-            className="h-[500px] w-full border-0 bg-white"
+            className="h-[500px] w-full border-0 bg-surface"
             title={artifact.title}
           />
         </div>
@@ -428,21 +447,22 @@ function ArtifactContent({ artifact }: { artifact: Artifact }) {
       const isUrl = artifact.content.startsWith("http://") || artifact.content.startsWith("https://");
       if (isUrl) {
         return (
-          <div className="flex items-center justify-center rounded-lg border border-gray-200 bg-white p-6">
+          <div className="flex items-center justify-center rounded-lg border border-border bg-surface p-6">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={artifact.content}
               alt={artifact.title}
+              referrerPolicy="no-referrer"
               className="max-h-[500px] max-w-full rounded object-contain"
             />
           </div>
         );
       }
       return (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-gray-200 bg-white p-12">
-          <ImageIcon size={48} className="mb-3 text-gray-300" />
-          <p className="text-[13px] text-gray-500">Image content (non-URL)</p>
-          <pre className="mt-4 max-h-[200px] overflow-auto whitespace-pre-wrap text-[11px] text-gray-400">
+        <div className="flex flex-col items-center justify-center rounded-lg border border-border bg-surface p-12">
+          <ImageIcon size={48} className="mb-3 text-text-muted" />
+          <p className="text-[13px] text-text-secondary">Image content (non-URL)</p>
+          <pre className="mt-4 max-h-[200px] overflow-auto whitespace-pre-wrap text-[11px] text-text-muted">
             {artifact.content.slice(0, 500)}
           </pre>
         </div>
@@ -451,8 +471,8 @@ function ArtifactContent({ artifact }: { artifact: Artifact }) {
 
     default:
       return (
-        <div className="rounded-lg border border-gray-200 bg-white p-6">
-          <pre className="whitespace-pre-wrap font-mono text-[13px] leading-7 text-gray-700">
+        <div className="rounded-lg border border-border bg-surface p-6">
+          <pre className="whitespace-pre-wrap font-mono text-[13px] leading-7 text-text-secondary">
             {artifact.content}
           </pre>
         </div>
@@ -505,30 +525,30 @@ function CreateArtifactModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-[520px] rounded-xl bg-white p-6 shadow-xl">
+      <div className="w-[520px] rounded-xl bg-surface p-6 shadow-xl">
         <div className="flex items-center justify-between">
-          <h3 className="text-[14px] font-semibold text-gray-900">New Artifact</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <h3 className="text-[14px] font-semibold text-foreground">New Artifact</h3>
+          <button onClick={onClose} className="text-text-muted hover:text-text-secondary">
             <X size={16} />
           </button>
         </div>
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <div>
-            <label className="block text-[12px] font-medium text-gray-700">Title</label>
+            <label className="block text-[12px] font-medium text-text-secondary">Title</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-[13px] outline-none focus:border-gray-400"
+              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-[13px] outline-none focus:border-border-strong"
               placeholder="My Artifact"
             />
           </div>
           <div>
-            <label className="block text-[12px] font-medium text-gray-700">Type</label>
+            <label className="block text-[12px] font-medium text-text-secondary">Type</label>
             <select
               value={type}
               onChange={(e) => setType(e.target.value as ArtifactType)}
-              className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-[13px] outline-none focus:border-gray-400"
+              className="mt-1 w-full rounded-md border border-border px-3 py-2 text-[13px] outline-none focus:border-border-strong"
             >
               {artifactTypes.map((t) => (
                 <option key={t.id} value={t.id}>{t.label}</option>
@@ -537,23 +557,23 @@ function CreateArtifactModal({
           </div>
           {type === "CODE" && (
             <div>
-              <label className="block text-[12px] font-medium text-gray-700">Language</label>
+              <label className="block text-[12px] font-medium text-text-secondary">Language</label>
               <input
                 type="text"
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
-                className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-[13px] outline-none focus:border-gray-400"
+                className="mt-1 w-full rounded-md border border-border px-3 py-2 text-[13px] outline-none focus:border-border-strong"
                 placeholder="typescript"
               />
             </div>
           )}
           <div>
-            <label className="block text-[12px] font-medium text-gray-700">Content</label>
+            <label className="block text-[12px] font-medium text-text-secondary">Content</label>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={8}
-              className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 font-mono text-[12px] outline-none focus:border-gray-400"
+              className="mt-1 w-full rounded-md border border-border px-3 py-2 font-mono text-[12px] outline-none focus:border-border-strong"
               placeholder="Paste or type content..."
             />
           </div>
@@ -564,14 +584,14 @@ function CreateArtifactModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-600 hover:bg-gray-50"
+              className="rounded-md border border-border px-3 py-1.5 text-[12px] font-medium text-text-secondary hover:bg-surface-soft"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="flex items-center gap-1.5 rounded-md bg-gray-900 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[12px] font-medium text-background hover:bg-primary-hover disabled:opacity-50"
             >
               {submitting && <Loader2 size={12} className="animate-spin" />}
               Create

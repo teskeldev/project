@@ -1,4 +1,4 @@
-﻿import { prisma } from "@/lib/db";
+import { prisma } from "@/lib/db";
 import {
   apiSuccess,
   handleApiError,
@@ -34,6 +34,15 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
 
     if (!member) {
       throw new ApiError("You do not have access to this workspace", 403, "FORBIDDEN");
+    }
+
+    // Role check: only ADMIN or OWNER can uninstall extensions
+    if (member.role !== "ADMIN" && member.role !== "OWNER") {
+      throw new ApiError(
+        "Only admins and owners can uninstall extensions",
+        403,
+        "FORBIDDEN"
+      );
     }
 
     await prisma.extension.delete({ where: { id: extensionId } });

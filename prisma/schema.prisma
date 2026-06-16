@@ -63,6 +63,7 @@ enum ChangeSetStatus {
   PENDING_REVIEW
   APPLIED
   REJECTED
+  REVERTED
 }
 
 enum FileChangeType {
@@ -112,6 +113,7 @@ model User {
   name          String?
   email         String    @unique
   passwordHash  String?
+  tokenVersion  Int       @default(0)
   image         String?
   bio           String?
   preferences   Json?
@@ -129,7 +131,9 @@ model User {
   apiKeys          ApiKey[]
   designSessions   DesignSession[]
   documents        Document[]
+  notifications    Notification[]
   artifacts        Artifact[]
+  reviewComments   ReviewComment[]
 }
 
 model Account {
@@ -174,21 +178,34 @@ model VerificationToken {
 // ----------------------------- Workspace -----------------------------
 
 model Workspace {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  ownerId   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique
+  ownerId         String
+  routingStrategy String   @default("fill-first")
+  stickyLimit     Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  owner        User              @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  members      WorkspaceMember[]
-  projects     Project[]
-  rules        Rule[]
-  knowledge    KnowledgeItem[]
-  integrations Integration[]
-  apiKeys      ApiKey[]
-  extensions   Extension[]
+  owner             User               @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members           WorkspaceMember[]
+  projects          Project[]
+  rules             Rule[]
+  knowledge         KnowledgeItem[]
+  integrations      Integration[]
+  apiKeys           ApiKey[]
+  extensions        Extension[]
+  webhooks          Webhook[]
+  subscription      Subscription?
+  skills            Skill[]
+  usageRecords      UsageRecord[]
+  slashCommands     SlashCommand[]
+  aiPermissions     AIPermission[]
+  fusions           Fusion[]
+  fusionRequestLogs FusionRequestLog[]
+  combos            Combo[]
+  aiRequestLogs     AiRequestLog[]
+  modelAliases      ModelAlias[]
 
   @@index([ownerId])
 }
@@ -233,9 +250,14 @@ model Project {
   designSessions   DesignSession[]
   documents        Document[]
   artifacts        Artifact[]
+  skills           Skill[]
+  qualityScores    QualityScore[]
+  embeddings       Embedding[]
+  failureLogs      FailureLog[]
 
   @@unique([workspaceId, slug])
   @@index([workspaceId])
+  @@index([updatedAt])
 }
 
 model FileNode {
@@ -276,6 +298,7 @@ model ChatThread {
 
   @@index([projectId])
   @@index([userId])
+  @@index([projectId, updatedAt])
 }
 
 model ChatMessage {
@@ -289,6 +312,7 @@ model ChatMessage {
   thread ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
 
   @@index([threadId])
+  @@index([threadId, createdAt])
 }
 
 // ----------------------------- Agent -----------------------------
@@ -300,21 +324,26 @@ model AgentRun {
   userId    String
   status    AgentStatus @default(QUEUED)
   goal      String      @db.Text
+  fusionId  String?
   plan      Json?
   result    Json?
   error     String?
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
-  project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  thread     ChatThread? @relation(fields: [threadId], references: [id], onDelete: SetNull)
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  steps      AgentStep[]
-  changeSets ChangeSet[]
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  thread        ChatThread?    @relation(fields: [threadId], references: [id], onDelete: SetNull)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  steps         AgentStep[]
+  changeSets    ChangeSet[]
+  qualityScores QualityScore[]
 
   @@index([projectId])
   @@index([threadId])
   @@index([userId])
+  @@index([status])
+  @@index([status, createdAt])
+  @@index([projectId, createdAt])
 }
 
 model AgentStep {
@@ -331,6 +360,7 @@ model AgentStep {
   agentRun AgentRun @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
 
   @@index([agentRunId])
+  @@index([agentRunId, createdAt])
 }
 
 // ----------------------------- Changes -----------------------------
@@ -352,6 +382,7 @@ model ChangeSet {
 
   @@index([projectId])
   @@index([agentRunId])
+  @@index([projectId, status])
 }
 
 model FileChange {
@@ -370,6 +401,7 @@ model FileChange {
   changeSet ChangeSet @relation(fields: [changeSetId], references: [id], onDelete: Cascade)
 
   @@index([changeSetId])
+  @@index([changeSetId, filePath])
 }
 
 // ----------------------------- Terminal -----------------------------
@@ -403,6 +435,7 @@ model TerminalCommand {
   session TerminalSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
+  @@index([sessionId, createdAt])
 }
 
 // ----------------------------- Git -----------------------------
@@ -420,6 +453,7 @@ model GitState {
 
 // ----------------------------- Rules & Knowledge -----------------------------
 
+/// Constraint: At least one of `workspaceId` or `projectId` should be set.
 model Rule {
   id          String    @id @default(cuid())
   workspaceId String?
@@ -437,6 +471,7 @@ model Rule {
 
   @@index([workspaceId])
   @@index([projectId])
+  @@index([scope, enabled])
 }
 
 model KnowledgeItem {
@@ -458,18 +493,27 @@ model KnowledgeItem {
 }
 
 model Integration {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   workspaceId     String
   provider        String
   name            String
-  encryptedConfig String   @db.Text
-  enabled         Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  encryptedConfig String    @db.Text
+  enabled         Boolean   @default(true)
+  // Lower = higher priority when multiple connections exist for one provider
+  // (key pool / failover). Resolution picks the lowest-priority enabled row.
+  priority        Int       @default(100)
+  // Error tracking & cooldown
+  errorType       String?
+  lastError       String?   @db.Text
+  lastErrorAt     DateTime?
+  cooldownUntil   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
+  @@index([workspaceId, provider, enabled])
 }
 
 model ApiKey {
@@ -478,6 +522,7 @@ model ApiKey {
   workspaceId String?
   name        String
   hashedKey   String    @unique
+  expiresAt   DateTime?
   lastUsedAt  DateTime?
   createdAt   DateTime  @default(now())
 
@@ -486,6 +531,7 @@ model ApiKey {
 
   @@index([userId])
   @@index([workspaceId])
+  @@index([userId, createdAt])
 }
 
 // ----------------------------- Design & Canvas -----------------------------
@@ -495,6 +541,7 @@ model DesignSession {
   projectId String
   userId    String
   title     String
+  fusionId  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -516,6 +563,7 @@ model DesignVersion {
   session DesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
+  @@index([sessionId, createdAt])
 }
 
 // ----------------------------- Documents & Artifacts -----------------------------
@@ -545,6 +593,7 @@ model Artifact {
   content   String       @db.Text
   language  String?
   metadata  Json?
+  fusionId  String?
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
@@ -580,7 +629,6 @@ model ReviewComment {
   changeSetId String
   filePath    String
   line        Int
-  author      String
   content     String   @db.Text
   suggestion  String?  @db.Text
   resolved    Boolean  @default(false)
@@ -588,5 +636,407 @@ model ReviewComment {
 
   changeSet ChangeSet @relation(fields: [changeSetId], references: [id], onDelete: Cascade)
 
+  // `author` is a soft display reference (username/handle) and may be left null
+  // when the author user has been deleted. `user` is the optional FK to User.
+  author String? // soft reference for display (e.g. username / handle)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
   @@index([changeSetId])
+  @@index([userId])
+}
+
+// ----------------------------- Billing -----------------------------
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  TRIALING
+  INCOMPLETE
+}
+
+enum PlanTier {
+  FREE
+  PRO
+  TEAM
+  ENTERPRISE
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  workspaceId          String             @unique
+  stripeCustomerId     String             @unique
+  stripeSubscriptionId String?            @unique
+  stripePriceId        String?
+  status               SubscriptionStatus @default(ACTIVE)
+  plan                 PlanTier           @default(FREE)
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  // Idempotency: the Stripe event.id of the last event we processed for
+  // this subscription. Webhook handlers check this to drop duplicate
+  // deliveries from Stripe's at-least-once retries.
+  lastEventId          String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model UsageRecord {
+  id          String   @id @default(cuid())
+  workspaceId String
+  type        String // 'ai_tokens' | 'compute_minutes' | 'storage_mb'
+  quantity    Int
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, type, createdAt])
+}
+
+// ----------------------------- Notifications -----------------------------
+
+enum NotificationType {
+  AGENT_COMPLETED
+  AGENT_FAILED
+  CHANGESET_READY
+  CHANGESET_APPLIED
+  TEAM_INVITE
+  SYSTEM
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  read      Boolean          @default(false)
+  metadata  Json?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read, createdAt])
+}
+
+// ----------------------------- Webhook idempotency -----------------------------
+//
+// NOTE: The `ProcessedWebhookEvent` model is declared in the Webhooks section
+// below. The matching CREATE TABLE migration was added earlier
+// (20260614030000_add_failure_log_embedding_processed_webhook_event).
+
+// ----------------------------- Webhooks -----------------------------
+
+model Webhook {
+  id          String   @id @default(cuid())
+  workspaceId String
+  url         String
+  secret      String
+  events      String[] // array of event types
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace  Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  @@index([workspaceId])
+}
+
+model WebhookDelivery {
+  id         String   @id @default(cuid())
+  webhookId  String
+  event      String
+  payload    Json
+  statusCode Int?
+  response   String?  @db.Text
+  success    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId, createdAt])
+}
+
+/// Idempotency record for already-processed webhook deliveries,
+/// keyed by the provider-supplied event id.
+model ProcessedWebhookEvent {
+  id        String   @id @default(cuid())
+  eventId   String   @unique
+  source    String
+  createdAt DateTime @default(now())
+
+  @@index([source])
+}
+
+// ----------------------------- Skills -----------------------------
+
+/// Constraint: At least one of `workspaceId` or `projectId` should be set.
+model Skill {
+  id          String   @id @default(cuid())
+  projectId   String?
+  workspaceId String?
+  name        String
+  slug        String
+  description String
+  content     String   @db.Text
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project   Project?   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, slug])
+  @@unique([projectId, slug])
+  @@index([projectId])
+  @@index([workspaceId])
+  @@index([projectId, enabled])
+}
+
+// ----------------------------- Fusion (Model Orchestration) -----------------------------
+//
+// Fusion is a lightweight orchestration layer over the models the platform
+// already connects via Integrations. Only two configs are persisted — Routing
+// (how requests fan out) and Judge (how answers reconcile) — plus a request log
+// that powers Overview + Playground metrics. Models are NOT stored; they are
+// derived at runtime from enabled Integrations × the provider catalog.
+
+// A reusable "AI Team": models + skills + rules + knowledge + strategy + judge
+// + limits, created once and usable across the platform. Models come from the
+// Integrations-derived registry; skills/rules/knowledge are referenced by id.
+model Fusion {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  name         String
+  description  String?
+  // ["provider:modelId", ...]
+  modelIds     Json
+  // Skill ids
+  skillIds     Json
+  // Rule ids
+  ruleIds      Json
+  // KnowledgeItem ids
+  knowledgeIds Json
+  // single | parallel | consensus
+  strategy     String   @default("single")
+  // auto | anthropic | openai | google
+  judge        String   @default("auto")
+  // optional explicit "provider:modelId" judge override
+  judgeModelId String?
+  // { maxCostUsd, maxTokens, timeoutMs }
+  limits       Json
+  // draft | active | archived
+  status       String   @default("active")
+  isTemplate   Boolean  @default(false)
+  createdById  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model FusionRequestLog {
+  id          String   @id @default(cuid())
+  workspaceId String
+  modelId     String?
+  provider    String
+  tokensIn    Int      @default(0)
+  tokensOut   Int      @default(0)
+  costUsd     Float    @default(0)
+  latencyMs   Int      @default(0)
+  success     Boolean  @default(true)
+  error       String?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+}
+
+// ----------------------------- Commands -----------------------------
+
+model SlashCommand {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  description String
+  template    String   @db.Text
+  variables   Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+// ----------------------------- AI Permissions -----------------------------
+
+enum PermissionAction {
+  ALLOW
+  ASK
+  DENY
+}
+
+model AIPermission {
+  id          String           @id @default(cuid())
+  workspaceId String
+  tool        String // "file_edit", "file_delete", "terminal", "git_push", "agent_run", etc.
+  pattern     String           @default("*") // glob pattern for file paths or commands
+  action      PermissionAction @default(ASK)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, tool, pattern])
+  @@index([workspaceId])
+}
+
+// ----------------------------- Quality Engine -----------------------------
+
+model QualityScore {
+  id           String   @id @default(cuid())
+  agentRunId   String?
+  projectId    String
+  score        Float
+  grade        String
+  dimensions   Json
+  suggestions  Json?
+  confidence   Float
+  modelUsed    String
+  pipelineUsed String
+  patternUsed  String
+  tokensUsed   Int      @default(0)
+  costEstimate Float    @default(0)
+  durationMs   Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  agentRun AgentRun? @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt])
+  @@index([agentRunId])
+}
+
+model FailureLog {
+  id             String   @id @default(cuid())
+  projectId      String?
+  taskType       String
+  modelId        String
+  errorType      String
+  errorMessage   String
+  context        String
+  resolution     String?
+  preventionHint String
+  createdAt      DateTime @default(now())
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([taskType, modelId])
+  @@index([errorType])
+  @@index([createdAt])
+  @@index([projectId])
+}
+
+model Embedding {
+  id        String   @id @default(cuid())
+  projectId String
+  filePath  String
+  chunkType String
+  chunkName String?
+  startLine Int
+  endLine   Int
+  content   String   @db.Text
+  vector    Bytes
+  model     String   @default("text-embedding-3-small")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, filePath, startLine])
+  @@index([projectId, chunkType])
+  @@index([projectId, filePath])
+  @@index([projectId, createdAt])
+}
+
+// ----------------------------- Combos (Fallback Chains) -----------------------------
+
+model Combo {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?
+  strategy    String   @default("fallback")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  models    ComboModel[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model ComboModel {
+  id       String @id @default(cuid())
+  comboId  String
+  provider String
+  model    String
+  position Int    @default(0)
+
+  combo Combo @relation(fields: [comboId], references: [id], onDelete: Cascade)
+
+  @@index([comboId])
+}
+
+// ----------------------------- AI Request Logs (Usage + History) ------------------
+
+model AiRequestLog {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  provider     String
+  model        String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  costUsd      Float    @default(0)
+  durationMs   Int      @default(0)
+  status       String   @default("success")
+  errorType    String?
+  errorMessage String?  @db.Text
+  source       String?
+  createdAt    DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, provider])
+  @@index([workspaceId, status])
+}
+
+// ----------------------------- Model Aliases ----------------------------------
+
+model ModelAlias {
+  id          String   @id @default(cuid())
+  workspaceId String
+  alias       String
+  provider    String
+  model       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, alias])
+  @@index([workspaceId])
 }

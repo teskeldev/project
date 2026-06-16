@@ -9,7 +9,6 @@ import { z } from "zod";
 import type { Integration } from "@prisma/client";
 import { decryptJson } from "@/lib/crypto";
 import {
-  SUPPORTED_PROVIDERS,
   PROVIDER_SECRET_FIELDS,
   isSupportedProvider,
   type ProviderId,
@@ -21,10 +20,11 @@ import {
 
 export const createIntegrationSchema = z.object({
   workspaceId: z.string().min(1, "workspaceId is required"),
-  provider: z.enum(SUPPORTED_PROVIDERS),
+  provider: z.string().refine(isSupportedProvider, { message: "Unsupported provider" }),
   name: z.string().trim().min(1, "Name is required").max(120),
   // Per-provider shape is validated separately once provider is known.
   config: z.record(z.string(), z.unknown()),
+  priority: z.number().int().min(0).max(10000).optional(),
 });
 export type CreateIntegrationInput = z.infer<typeof createIntegrationSchema>;
 
@@ -56,6 +56,7 @@ export type SafeIntegration = {
   provider: string;
   name: string;
   enabled: boolean;
+  priority: number;
   createdAt: string;
   updatedAt: string;
   /** Non-secret config values, echoed as-is (e.g. baseUrl, model, url). */
@@ -107,6 +108,7 @@ export function toSafeIntegration(row: Integration): SafeIntegration {
     provider: row.provider,
     name: row.name,
     enabled: row.enabled,
+    priority: row.priority,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     configHints,

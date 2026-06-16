@@ -1,9 +1,10 @@
-﻿"use client";
+"use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { motion } from "framer-motion";
 import { useProject } from "@/lib/store/project";
 import {
   ApiClientError,
@@ -15,8 +16,6 @@ import {
 import {
   Search,
   PenLine,
-  Calendar,
-  Sliders,
   FolderOpen,
   Settings,
   ChevronDown,
@@ -30,19 +29,24 @@ import {
   Layers,
   Bot,
   Plug,
-  BookOpen,
-  FileText,
-  PenTool,
-  SearchCode,
-  GitPullRequest,
-  Sparkles,
-  Palette,
+  Brain,
+  Sliders,
   LogOut,
   Plus,
   Check,
   Loader2,
   X,
+  BarChart3,
 } from "lucide-react";
+
+// Custom event name for opening the command palette.
+// Listeners (e.g. the CommandPalette component) should subscribe to this event.
+export const OPEN_COMMAND_PALETTE_EVENT = "app:open-command-palette";
+
+/** Dispatch a custom event to open the command palette. */
+function openCommandPalette() {
+  window.dispatchEvent(new CustomEvent(OPEN_COMMAND_PALETTE_EVENT));
+}
 
 /** Compact relative time label for thread list items. */
 function relativeTime(iso: string): string {
@@ -63,26 +67,56 @@ function relativeTime(iso: string): string {
 
 const workspaceLinks = [
   { href: "/dashboard/editor", icon: Code, label: "Editor" },
-  { href: "/dashboard/composer", icon: Layers, label: "Composer" },
+  { href: "/dashboard/composer", icon: Layers, label: "Review" },
   { href: "/dashboard/terminal", icon: Terminal, label: "Terminal" },
   { href: "/dashboard/git", icon: GitBranch, label: "Git" },
   { href: "/dashboard/extensions", icon: Puzzle, label: "Extensions" },
 ];
 
 const aiLinks = [
-  { href: "/dashboard/agents", icon: Bot, label: "Background Agents" },
-  { href: "/dashboard/artifacts", icon: Sparkles, label: "Artifacts" },
-  { href: "/dashboard/design", icon: Palette, label: "Design" },
-  { href: "/dashboard/canvas", icon: PenTool, label: "Canvas" },
-  { href: "/dashboard/review", icon: GitPullRequest, label: "Diff Review" },
-  { href: "/dashboard/search", icon: SearchCode, label: "Search" },
+  { href: "/dashboard/agents", icon: Bot, label: "Agents" },
+  { href: "/dashboard/fusion/library", icon: Sliders, label: "Fusion" },
 ];
 
-const configLinks = [
-  { href: "/dashboard/knowledge", icon: BookOpen, label: "Knowledge" },
-  { href: "/dashboard/rules", icon: FileText, label: "Rules" },
-  { href: "/dashboard/integrations", icon: Plug, label: "Integrations" },
+const platformLinks = [
+  { href: "/dashboard/context", icon: Brain, label: "Context" },
+  { href: "/dashboard/integrations", icon: Plug, label: "Providers" },
+  { href: "/dashboard/usage", icon: BarChart3, label: "Analytics" },
 ];
+
+function SidebarLink({
+  href,
+  icon: Icon,
+  label,
+  isActive,
+}: {
+  href: string;
+  icon: React.ElementType;
+  label: string;
+  isActive: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`group relative flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium transition-colors ${
+        isActive
+          ? "text-slate-900 dark:text-white"
+          : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+      }`}
+    >
+      {isActive && (
+        <motion.div
+          layoutId="sidebar-active"
+          className="absolute inset-0 rounded-xl bg-white shadow-[0_2px_8px_rgba(0,0,0,0.04),0_0_0_1px_rgba(0,0,0,0.02)] dark:bg-white/10 dark:shadow-none"
+          initial={false}
+          transition={{ type: "spring" as const, stiffness: 350, damping: 30 }}
+        />
+      )}
+      <Icon size={16} className={`relative z-10 transition-colors ${isActive ? "text-stone-900 dark:text-white" : "group-hover:text-slate-700 dark:group-hover:text-slate-300"}`} />
+      <span className="relative z-10">{label}</span>
+    </Link>
+  );
+}
 
 function NewProjectModal({
   onClose,
@@ -120,21 +154,21 @@ function NewProjectModal({
       />
       <form
         onSubmit={submit}
-        className="animate-scale-in relative w-full max-w-sm overflow-hidden rounded-2xl border border-gray-200/80 bg-white/95 shadow-2xl backdrop-blur-xl"
+        className="animate-scale-in relative w-full max-w-sm overflow-hidden rounded-2xl border border-border/80 bg-surface/95 shadow-2xl backdrop-blur-xl"
       >
-        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-          <h2 className="text-sm font-semibold text-gray-900">New project</h2>
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <h2 className="text-sm font-semibold text-foreground">New project</h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="rounded p-1 text-text-muted hover:bg-surface-soft hover:text-text-secondary"
           >
             <X size={14} />
           </button>
         </div>
         <div className="space-y-4 p-4">
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">
+            <label className="mb-1 block text-xs font-medium text-text-secondary">
               Project name
             </label>
             <input
@@ -142,11 +176,11 @@ function NewProjectModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="my-app"
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">
+            <label className="mb-1 block text-xs font-medium text-text-secondary">
               Template
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -157,8 +191,8 @@ function NewProjectModal({
                   onClick={() => setTemplate(t)}
                   className={`rounded-lg border px-3 py-2 text-sm capitalize transition-colors ${
                     template === t
-                      ? "border-blue-400 bg-blue-50 text-blue-700"
-                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                      ? "border-accent bg-accent-light text-accent"
+                      : "border-border text-text-secondary hover:bg-surface-soft"
                   }`}
                 >
                   {t}
@@ -168,18 +202,18 @@ function NewProjectModal({
           </div>
           {error && <p className="text-xs text-red-600">{error}</p>}
         </div>
-        <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-4 py-3">
+        <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100"
+            className="rounded-lg px-3 py-1.5 text-sm text-text-secondary hover:bg-surface-soft"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={!name.trim() || submitting}
-            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
           >
             {submitting && <Loader2 size={14} className="animate-spin" />}
             Create
@@ -190,7 +224,11 @@ function NewProjectModal({
   );
 }
 
-export default function Sidebar() {
+/**
+ * Inner sidebar component that uses useSearchParams().
+ * Extracted so it can be wrapped in a Suspense boundary.
+ */
+function SidebarContent() {
   const pathname = usePathname();
   const [reposOpen, setReposOpen] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
@@ -201,8 +239,10 @@ export default function Sidebar() {
     activeWorkspace,
     activeProject,
     loading,
+    error,
     setActiveProject,
     createNewProject,
+    refresh,
   } = useProject();
 
   const router = useRouter();
@@ -213,21 +253,30 @@ export default function Sidebar() {
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [threadsLoading, setThreadsLoading] = useState(false);
   const [creatingChat, setCreatingChat] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+
+  const fetchIdRef = useRef(0);
 
   const loadThreads = useCallback(async () => {
     if (!activeProjectId) {
       setThreads([]);
       return;
     }
+    const currentFetchId = ++fetchIdRef.current;
     setThreadsLoading(true);
     try {
       const { threads: t } = await listThreads(activeProjectId);
-      setThreads(t);
+      if (fetchIdRef.current === currentFetchId) {
+        setThreads(t);
+      }
     } catch {
-      // Non-fatal: leave the list empty if threads can't be loaded.
-      setThreads([]);
+      if (fetchIdRef.current === currentFetchId) {
+        setThreads([]);
+      }
     } finally {
-      setThreadsLoading(false);
+      if (fetchIdRef.current === currentFetchId) {
+        setThreadsLoading(false);
+      }
     }
   }, [activeProjectId]);
 
@@ -236,65 +285,78 @@ export default function Sidebar() {
     void loadThreads();
   }, [loadThreads]);
 
-  const handleNewChat = async () => {
+  // Auto-clear chat error after a few seconds
+  useEffect(() => {
+    if (!chatError) return;
+    const timer = setTimeout(() => setChatError(null), 4000);
+    return () => clearTimeout(timer);
+  }, [chatError]);
+
+  const handleNewChat = useCallback(async () => {
     if (!activeProjectId || creatingChat) return;
     setCreatingChat(true);
+    setChatError(null);
     try {
       const { thread } = await createThread(activeProjectId);
       setThreads((prev) => [thread, ...prev]);
       router.push(`/dashboard/chat?thread=${thread.id}`);
-    } catch {
-      // ignore; user can retry
+    } catch (err) {
+      const message =
+        err instanceof ApiClientError
+          ? err.message
+          : "Failed to create chat. Please try again.";
+      console.warn("[Sidebar] handleNewChat failed:", message);
+      setChatError(message);
     } finally {
       setCreatingChat(false);
     }
-  };
+  }, [activeProjectId, creatingChat, router]);
 
-  const handleCreate = async (name: string, template: ProjectTemplate) => {
+  const handleCreate = useCallback(async (name: string, template: ProjectTemplate) => {
     await createNewProject({ name, template });
-  };
+  }, [createNewProject]);
 
   if (collapsed) {
     return (
-      <aside className="animate-slide-in-left flex h-screen w-12 flex-col items-center border-r border-[#E5E7EB]/60 bg-white/80 py-3 backdrop-blur-xl">
+      <aside className="animate-slide-in-left flex h-screen w-12 flex-col items-center border-r border-border/60 bg-surface/80 py-3 backdrop-blur-xl">
         <button
           onClick={() => setCollapsed(false)}
-          className="mb-3 rounded-lg p-2 text-gray-400 transition-all duration-200 hover:bg-gray-100 hover:text-gray-600"
-          title="Expand sidebar"
+          className="mb-3 rounded-lg p-2 text-text-muted transition-all duration-200 hover:bg-surface-soft hover:text-text-secondary"
+          title="Expand sidebar" aria-label="Expand sidebar"
         >
           <ChevronRight size={16} />
         </button>
-        <Link href="/dashboard" className="mb-1 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="New Agent">
+        <Link href="/dashboard" className="mb-1 rounded-lg p-2 text-text-muted hover:bg-surface-soft hover:text-text-secondary" title="New Agent" aria-label="New Agent">
           <PenLine size={16} />
         </Link>
-        <button className="mb-1 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="Search (Ctrl+K)">
+        <button onClick={openCommandPalette} className="mb-1 rounded-lg p-2 text-text-muted hover:bg-surface-soft hover:text-text-secondary" title="Search (Ctrl+K)" aria-label="Search">
           <Search size={16} />
         </button>
         {workspaceLinks.map((link) => (
-          <Link key={link.href} href={link.href} className={`mb-1 rounded-lg p-2 ${pathname === link.href ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"}`} title={link.label}>
+          <Link key={link.href} href={link.href} className={`mb-1 rounded-lg p-2 ${pathname === link.href ? "bg-surface-soft text-foreground" : "text-text-muted hover:bg-surface-soft hover:text-text-secondary"}`} title={link.label} aria-label={link.label}>
             <link.icon size={16} />
           </Link>
         ))}
-        <div className="my-1 h-px w-6 bg-gray-200" />
+        <div className="my-1 h-px w-6 bg-surface-soft" />
         {aiLinks.map((link) => (
-          <Link key={link.href} href={link.href} className={`mb-1 rounded-lg p-2 ${pathname === link.href ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"}`} title={link.label}>
+          <Link key={link.href} href={link.href} className={`mb-1 rounded-lg p-2 ${pathname?.startsWith(link.href.split("?")[0]) ? "bg-surface-soft text-foreground" : "text-text-muted hover:bg-surface-soft hover:text-text-secondary"}`} title={link.label} aria-label={link.label}>
             <link.icon size={16} />
           </Link>
         ))}
-        <div className="my-1 h-px w-6 bg-gray-200" />
-        {configLinks.map((link) => (
-          <Link key={link.href} href={link.href} className={`mb-1 rounded-lg p-2 ${pathname === link.href ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"}`} title={link.label}>
+        <div className="my-1 h-px w-6 bg-surface-soft" />
+        {platformLinks.map((link) => (
+          <Link key={link.href} href={link.href} className={`mb-1 rounded-lg p-2 ${pathname === link.href ? "bg-surface-soft text-foreground" : "text-text-muted hover:bg-surface-soft hover:text-text-secondary"}`} title={link.label} aria-label={link.label}>
             <link.icon size={16} />
           </Link>
         ))}
         <div className="flex-1" />
-        <Link href="/dashboard/settings" className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="Settings">
+        <Link href="/dashboard/settings" className="rounded-lg p-2 text-text-muted hover:bg-surface-soft hover:text-text-secondary" title="Settings" aria-label="Settings">
           <Settings size={16} />
         </Link>
         <button
           onClick={() => signOut({ callbackUrl: "/" })}
-          className="mt-1 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-          title="Sign out"
+          className="mt-1 rounded-lg p-2 text-text-muted hover:bg-surface-soft hover:text-text-secondary"
+          title="Sign out" aria-label="Sign out"
         >
           <LogOut size={16} />
         </button>
@@ -303,127 +365,101 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="animate-slide-in-left flex h-screen w-60 flex-col border-r border-[#E5E7EB]/60 bg-white/80 backdrop-blur-xl">
+    <aside className="relative flex h-screen w-64 flex-col border-r border-border/50 bg-[#FCFBF9] dark:bg-[#121212]">
       {/* Top actions */}
-      <div className="space-y-0.5 p-3">
+      <div className="space-y-1 p-4">
         <button
           onClick={() => setCollapsed(true)}
-          className="mb-2 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          className="group mb-4 flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-white/5 dark:hover:text-slate-200"
         >
-          <ChevronDown size={16} className="-rotate-90" />
-          <span className="text-xs">Collapse</span>
+          <ChevronDown size={16} className="-rotate-90 transition-transform group-hover:-translate-x-0.5" />
+          <span>Collapse Sidebar</span>
         </button>
 
-        <button className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700">
-          <Search size={16} />
+        <button onClick={openCommandPalette} className="group flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-white/5 dark:hover:text-slate-200">
+          <Search size={16} className="transition-colors group-hover:text-slate-700 dark:group-hover:text-slate-300" />
           <span>Search</span>
-          <kbd className="ml-auto rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] text-gray-400">
+          <kbd className="ml-auto rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             Ctrl+K
           </kbd>
         </button>
 
-        <Link
-          href="/dashboard"
-          className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
-            pathname === "/dashboard"
-              ? "bg-gray-100 text-gray-900"
-              : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-          }`}
-        >
-          <PenLine size={16} />
-          <span>New Agent</span>
-          <kbd className="ml-auto rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] text-gray-400">
-            Ctrl+N
-          </kbd>
-        </Link>
-
-        <button className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900">
-          <Calendar size={16} />
-          <span>Automations</span>
-        </button>
-
-        <button className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900">
-          <Sliders size={16} />
-          <span>Customize</span>
-        </button>
+        <SidebarLink href="/dashboard" icon={PenLine} label="New Agent" isActive={pathname === "/dashboard"} />
+        <SidebarLink href="/dashboard/chat" icon={MessageSquare} label="Chat" isActive={pathname === "/dashboard/chat"} />
       </div>
 
-      {/* Workspace tools */}
-      <div className="border-t border-gray-100 px-3 py-2">
-        <p className="mb-1 px-3 text-[10px] font-medium uppercase tracking-wider text-gray-400">
-          Workspace
-        </p>
-        {workspaceLinks.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            className={`flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-              pathname === link.href
-                ? "bg-gray-100 text-gray-900"
-                : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-            }`}
+      {/* Project-provider error banner so empty dashboard state is not silent */}
+      {error && !loading && (
+        <div className="mx-3 mb-2 rounded-lg border border-red-200 bg-red-50 p-2 text-[11px] text-red-700">
+          <p className="font-medium">Failed to load workspaces</p>
+          <p className="mt-0.5 line-clamp-2 opacity-80">{error}</p>
+          <button
+            onClick={() => void refresh()}
+            className="mt-1.5 text-[11px] font-medium underline hover:no-underline"
           >
-            <link.icon size={14} />
-            <span>{link.label}</span>
-          </Link>
-        ))}
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Scrollable nav area — wraps all sections so they never overflow */}
+      <div className="flex-1 overflow-y-auto">
+
+      {/* Develop */}
+      <div className="border-t border-border/50 px-3 py-3">
+        <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+          Develop
+        </p>
+        <div className="space-y-0.5">
+          {workspaceLinks.map((link) => (
+            <SidebarLink key={link.href} href={link.href} icon={link.icon} label={link.label} isActive={pathname === link.href} />
+          ))}
+        </div>
       </div>
 
-      {/* AI Tools */}
-      <div className="border-t border-gray-100 px-3 py-2">
-        <p className="mb-1 px-3 text-[10px] font-medium uppercase tracking-wider text-gray-400">
-          AI Tools
+      {/* AI Studio */}
+      <div className="border-t border-border/50 px-3 py-3">
+        <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+          AI Studio
         </p>
-        {aiLinks.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            className={`flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-              pathname === link.href
-                ? "bg-gray-100 text-gray-900"
-                : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-            }`}
-          >
-            <link.icon size={14} />
-            <span>{link.label}</span>
-          </Link>
-        ))}
+        <div className="space-y-0.5">
+          {aiLinks.map((link) => (
+            <SidebarLink
+              key={link.href}
+              href={link.href}
+              icon={link.icon}
+              label={link.label}
+              isActive={!!pathname?.startsWith(link.href.split("?")[0])}
+            />
+          ))}
+        </div>
       </div>
 
-      {/* Configuration */}
-      <div className="border-t border-gray-100 px-3 py-2">
-        <p className="mb-1 px-3 text-[10px] font-medium uppercase tracking-wider text-gray-400">
-          Configuration
+      {/* Platform */}
+      <div className="border-t border-border/50 px-3 py-3">
+        <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+          Platform
         </p>
-        {configLinks.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            className={`flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-              pathname === link.href
-                ? "bg-gray-100 text-gray-900"
-                : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-            }`}
-          >
-            <link.icon size={14} />
-            <span>{link.label}</span>
-          </Link>
-        ))}
+        <div className="space-y-0.5">
+          {platformLinks.map((link) => (
+            <SidebarLink key={link.href} href={link.href} icon={link.icon} label={link.label} isActive={pathname === link.href} />
+          ))}
+        </div>
       </div>
 
       {/* Projects (real workspace + project switcher) */}
-      <div className="border-t border-gray-100 px-3 py-2">
+      <div className="border-t border-border px-3 py-2">
         <div className="flex items-center justify-between px-3">
           <button
             onClick={() => setReposOpen(!reposOpen)}
-            className="flex items-center gap-1 py-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400 hover:text-gray-600"
+            className="flex items-center gap-1 py-1.5 text-[10px] font-medium uppercase tracking-wider text-text-muted hover:text-text-secondary"
           >
             {reposOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             {activeWorkspace ? activeWorkspace.name : "Projects"}
           </button>
           <button
             onClick={() => setShowNewProject(true)}
-            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="rounded p-1 text-text-muted hover:bg-surface-soft hover:text-text-secondary"
             title="New project"
           >
             <Plus size={12} />
@@ -433,13 +469,13 @@ export default function Sidebar() {
           <div className="mt-1 space-y-0.5">
             {loading && projects.length === 0 ? (
               <div className="space-y-1 px-3 py-1">
-                <div className="h-5 w-full animate-pulse rounded bg-gray-100" />
-                <div className="h-5 w-2/3 animate-pulse rounded bg-gray-100" />
+                <div className="h-5 w-full animate-pulse rounded bg-surface-soft" />
+                <div className="h-5 w-2/3 animate-pulse rounded bg-surface-soft" />
               </div>
             ) : projects.length === 0 ? (
               <button
                 onClick={() => setShowNewProject(true)}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-text-muted hover:bg-surface-soft hover:text-text-secondary"
               >
                 <Plus size={14} />
                 <span>Create a project</span>
@@ -453,8 +489,8 @@ export default function Sidebar() {
                     onClick={() => setActiveProject(project.id)}
                     className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-sm transition-colors ${
                       isActive
-                        ? "text-gray-900"
-                        : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                        ? "text-foreground"
+                        : "text-text-muted hover:bg-surface-soft hover:text-text-secondary"
                     }`}
                   >
                     <FolderOpen size={14} className="shrink-0" />
@@ -471,15 +507,15 @@ export default function Sidebar() {
       </div>
 
       {/* Chat history (real threads for the active project) */}
-      <div className="flex-1 overflow-y-auto border-t border-gray-100 px-3 py-2">
+      <div className="border-t border-border px-3 py-2">
         <div className="flex items-center justify-between px-3">
-          <p className="py-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400">
+          <p className="py-1.5 text-[10px] font-medium uppercase tracking-wider text-text-muted">
             Chats
           </p>
           <button
             onClick={handleNewChat}
             disabled={!activeProjectId || creatingChat}
-            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-40"
+            className="rounded p-1 text-text-muted hover:bg-surface-soft hover:text-text-secondary disabled:opacity-40"
             title="New chat"
           >
             {creatingChat ? (
@@ -490,21 +526,27 @@ export default function Sidebar() {
           </button>
         </div>
 
+        {chatError && (
+          <p className="mx-3 mb-1 rounded bg-red-50 px-2 py-1 text-xs text-red-600">
+            {chatError}
+          </p>
+        )}
+
         {!activeProjectId ? (
-          <p className="px-3 py-2 text-xs text-gray-400">
+          <p className="px-3 py-2 text-xs text-text-muted">
             Select a project to see chats.
           </p>
         ) : threadsLoading && threads.length === 0 ? (
           <div className="space-y-1 px-3 py-1">
-            <div className="h-6 w-full animate-pulse rounded bg-gray-100" />
-            <div className="h-6 w-4/5 animate-pulse rounded bg-gray-100" />
-            <div className="h-6 w-2/3 animate-pulse rounded bg-gray-100" />
+            <div className="h-6 w-full animate-pulse rounded bg-surface-soft" />
+            <div className="h-6 w-4/5 animate-pulse rounded bg-surface-soft" />
+            <div className="h-6 w-2/3 animate-pulse rounded bg-surface-soft" />
           </div>
         ) : threads.length === 0 ? (
           <button
             onClick={handleNewChat}
             disabled={creatingChat}
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-40"
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-muted hover:bg-surface-soft hover:text-text-secondary disabled:opacity-40"
           >
             <Plus size={14} className="shrink-0" />
             <span>Start a new chat</span>
@@ -521,16 +563,16 @@ export default function Sidebar() {
                   href={`/dashboard/chat?thread=${thread.id}`}
                   className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                     isActive
-                      ? "bg-gray-100 text-gray-900"
-                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                      ? "bg-surface-soft text-foreground"
+                      : "text-text-muted hover:bg-surface-soft hover:text-text-secondary"
                   }`}
                 >
                   <MessageSquare
                     size={14}
-                    className="shrink-0 text-gray-400"
+                    className="shrink-0 text-text-muted"
                   />
                   <span className="flex-1 truncate">{thread.title}</span>
-                  <span className="shrink-0 text-[10px] text-gray-400">
+                  <span className="shrink-0 text-[10px] text-text-muted">
                     {relativeTime(thread.updatedAt)}
                   </span>
                 </Link>
@@ -540,11 +582,13 @@ export default function Sidebar() {
         )}
       </div>
 
+      </div>{/* end scrollable nav area */}
+
       {/* Bottom */}
-      <div className="border-t border-gray-200 p-3">
+      <div className="border-t border-border p-3">
         <div className="mb-2 flex items-center gap-2 px-3">
-          <Keyboard size={12} className="text-gray-400" />
-          <span className="text-[10px] text-gray-400">
+          <Keyboard size={12} className="text-text-muted" />
+          <span className="text-[10px] text-text-muted">
             Ctrl+K for commands
           </span>
         </div>
@@ -552,24 +596,24 @@ export default function Sidebar() {
           href="/dashboard/settings"
           className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-colors ${
             pathname === "/dashboard/settings"
-              ? "bg-gray-100"
-              : "hover:bg-gray-100"
+              ? "bg-surface-soft"
+              : "hover:bg-surface-soft"
           }`}
         >
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-600">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-light text-xs font-bold text-accent">
             T
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-gray-900">
+            <p className="truncate text-sm font-medium text-foreground">
               Teskel Dev
             </p>
-            <p className="text-[11px] text-gray-400">Pro Plan</p>
+            <p className="text-[11px] text-text-muted">Pro Plan</p>
           </div>
-          <Settings size={14} className="text-gray-400" />
+          <Settings size={14} className="text-text-muted" />
         </Link>
         <button
           onClick={() => signOut({ callbackUrl: "/" })}
-          className="mt-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+          className="mt-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-text-muted transition-colors hover:bg-surface-soft hover:text-text-secondary"
           title="Sign out"
         >
           <LogOut size={14} />
@@ -584,5 +628,25 @@ export default function Sidebar() {
         />
       )}
     </aside>
+  );
+}
+
+/**
+ * Default export wraps SidebarContent in a Suspense boundary
+ * because useSearchParams() requires it in Next.js App Router.
+ */
+export default function Sidebar() {
+  return (
+    <Suspense
+      fallback={
+        <aside className="flex h-screen w-60 flex-col border-r border-border/60 bg-surface/80 backdrop-blur-xl">
+          <div className="flex flex-1 items-center justify-center">
+            <Loader2 size={20} className="animate-spin text-text-muted" />
+          </div>
+        </aside>
+      }
+    >
+      <SidebarContent />
+    </Suspense>
   );
 }

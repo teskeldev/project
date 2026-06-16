@@ -5,6 +5,7 @@ import {
   requireUser,
   validateBody,
   ApiError,
+  NO_STORE_HEADERS,
   type SessionUser,
 } from "@/lib/api";
 import { encryptJson } from "@/lib/crypto";
@@ -16,6 +17,7 @@ import {
   createIntegrationSchema,
   toSafeIntegration,
 } from "@/lib/integrations/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 /**
  * Ensure the user is a member of the workspace. Throws 403 otherwise.
@@ -44,14 +46,39 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const workspaceId = searchParams.get("workspaceId")?.trim() || undefined;
 
-    // The set of workspaces this user belongs to.
-    const memberships = await prisma.workspaceMember.findMany({
-      where: { userId: user.id },
-      select: { workspaceId: true },
-    });
-    const memberWorkspaceIds = memberships.map((m) => m.workspaceId);
+    // The set of workspaces this user belongs to (used for the
+    // workspaceId-not-supplied branch and the authz check below). We resolve
+    // it via a single JOINed query so the two-round "memberships first, then
+    // integrations" waterfall becomes a single round trip.
+    const [rows, memberWorkspaceIds] = await Promise.all([
+      prisma.integration.findMany({
+        where: workspaceId
+          ? { workspaceId }
+          : {
+              workspace: {
+                members: { some: { userId: user.id } },
+              },
+            },
+        orderBy: { createdAt: "asc" },
+      }),
+      workspaceId
+        ? prisma.workspaceMember
+            .findUnique({
+              where: {
+                workspaceId_userId: { workspaceId, userId: user.id },
+              },
+              select: { workspaceId: true },
+            })
+            .then((m) => (m ? [m.workspaceId] : []))
+        : prisma.workspaceMember
+            .findMany({
+              where: { userId: user.id },
+              select: { workspaceId: true },
+            })
+            .then((rows) => rows.map((m) => m.workspaceId)),
+    ]);
 
-    if (workspaceId && !memberWorkspaceIds.includes(workspaceId)) {
+    if (workspaceId && memberWorkspaceIds.length === 0) {
       throw new ApiError(
         "You do not have access to this workspace",
         403,
@@ -59,14 +86,10 @@ export async function GET(req: Request) {
       );
     }
 
-    const rows = await prisma.integration.findMany({
-      where: {
-        workspaceId: workspaceId ? workspaceId : { in: memberWorkspaceIds },
-      },
-      orderBy: { createdAt: "asc" },
-    });
-
-    return apiSuccess({ integrations: rows.map(toSafeIntegration) });
+    return apiSuccess(
+      { integrations: rows.map(toSafeIntegration) },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (err) {
     return handleApiError(err);
   }
@@ -78,12 +101,23 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const user = await requireUser();
-    const { workspaceId, provider, name, config } = await validateBody(
+    const { workspaceId, provider, name, config, priority } = await validateBody(
       req,
       createIntegrationSchema
     );
 
-    await requireWorkspaceMember(user, workspaceId);
+    await enforceRateLimit(`integrations:create:${workspaceId}`, 10, 60_000);
+
+    const member = await requireWorkspaceMember(user, workspaceId);
+
+    // Role check: only ADMIN or OWNER can manage integrations
+    if (member.role !== "ADMIN" && member.role !== "OWNER") {
+      throw new ApiError(
+        "Only admins and owners can manage integrations",
+        403,
+        "FORBIDDEN"
+      );
+    }
 
     // Validate the config shape for this specific provider.
     let parsedConfig: Record<string, unknown>;
@@ -100,7 +134,7 @@ export async function POST(req: Request) {
     const encryptedConfig = encryptJson(parsedConfig);
 
     const created = await prisma.integration.create({
-      data: { workspaceId, provider, name, encryptedConfig, enabled: true },
+      data: { workspaceId, provider, name, encryptedConfig, enabled: true, ...(priority !== undefined ? { priority } : {}) },
     });
 
     return apiSuccess(

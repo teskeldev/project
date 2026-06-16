@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import DOMPurify from "isomorphic-dompurify";
 import {
   Send,
   Smartphone,
@@ -21,6 +22,7 @@ import {
   Palette,
   Loader2,
   AlertCircle,
+  Save,
   Check,
 } from "lucide-react";
 import { useProject } from "@/lib/store/project";
@@ -32,6 +34,12 @@ import {
   type DesignSession,
   type DesignVersion,
 } from "@/lib/client/design";
+import { createArtifact } from "@/lib/client/artifacts";
+import { FusionPicker } from "@/components/fusion/FusionPicker";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
 type ViewMode = "preview" | "code" | "split";
 type DeviceSize = "mobile" | "tablet" | "desktop";
@@ -52,7 +60,25 @@ const templates = [
   { id: "pricing", label: "Pricing Table", icon: Palette, prompt: "Create a pricing table with 3 tiers (Free, Pro, Enterprise) with features list, prices, and CTA buttons. Highlight the Pro tier." },
 ];
 
+/**
+ * Sanitize HTML content for safe iframe rendering.
+ * Uses DOMPurify with an allowlist of safe tags/attributes and an explicit
+ * denylist of dangerous elements and event handler attributes.
+ * The iframe uses sandbox="allow-scripts" without allow-same-origin,
+ * which prevents access to parent origin cookies/storage.
+ */
+function sanitizeHtmlContent(html: string): string {
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ["div", "span", "p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "a", "img", "button", "input", "label", "form", "table", "thead", "tbody", "tr", "td", "th", "br", "hr", "strong", "em", "b", "i", "code", "pre", "blockquote", "section", "article", "nav", "header", "footer", "main", "aside"],
+    ALLOWED_ATTR: ["class", "id", "href", "src", "alt", "title", "type", "value", "placeholder", "name", "for", "data-*"],
+    ALLOW_DATA_ATTR: true,
+    FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "svg", "math"],
+    FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onfocus", "onblur", "style"],
+  });
+}
+
 function buildSrcdoc(code: string): string {
+  const sanitizedCode = sanitizeHtmlContent(code);
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -62,7 +88,7 @@ function buildSrcdoc(code: string): string {
   <style>body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }</style>
 </head>
 <body>
-  <div id="root">${code}</div>
+  <div id="root">${sanitizedCode}</div>
   <script>
     // Simple JSX-like rendering: if the code looks like a component, try to render it
     // For now we just display the HTML/JSX directly
@@ -72,7 +98,9 @@ function buildSrcdoc(code: string): string {
 }
 
 export default function DesignPage() {
-  const { activeProject } = useProject();
+  const { activeProject, activeWorkspace } = useProject();
+  const projectId = activeProject?.id ?? null;
+  const [designFusionId, setDesignFusionId] = useState<string | null>(null);
 
   const [viewMode, setViewMode] = useState<ViewMode>("preview");
   const [device, setDevice] = useState<DeviceSize>("desktop");
@@ -92,6 +120,8 @@ export default function DesignPage() {
   const [streamingCode, setStreamingCode] = useState("");
   const [currentCode, setCurrentCode] = useState("");
   const [copied, setCopied] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   // Error state
   const [aiNotConfigured, setAiNotConfigured] = useState(false);
@@ -108,13 +138,13 @@ export default function DesignPage() {
 
   // Load sessions when project changes
   useEffect(() => {
-    if (!activeProject) return;
+    if (!projectId) return;
 
     let cancelled = false;
 
     async function loadSessions() {
       try {
-        const { sessions: list } = await listDesignSessions(activeProject!.id);
+        const { sessions: list } = await listDesignSessions(projectId!);
         if (cancelled) return;
         setSessions(list);
 
@@ -122,7 +152,7 @@ export default function DesignPage() {
         if (list.length > 0) {
           setActiveSessionId(list[0].id);
         } else {
-          const { session } = await createDesignSession(activeProject!.id, "Design Session");
+          const { session } = await createDesignSession(projectId!, "Design Session");
           if (cancelled) return;
           setSessions([session as DesignSession & { _count: { versions: number } }]);
           setActiveSessionId(session.id);
@@ -136,7 +166,7 @@ export default function DesignPage() {
 
     loadSessions();
     return () => { cancelled = true; };
-  }, [activeProject]);
+  }, [projectId]);
 
   // Load session detail when active session changes
   useEffect(() => {
@@ -206,7 +236,7 @@ export default function DesignPage() {
     let accumulated = "";
 
     await streamDesignGeneration(
-      { sessionId: activeSessionId, prompt, signal: controller.signal },
+      { sessionId: activeSessionId, prompt, fusionId: designFusionId ?? undefined, signal: controller.signal },
       {
         onDelta(content) {
           accumulated += content;
@@ -252,7 +282,7 @@ export default function DesignPage() {
     );
 
     abortRef.current = null;
-  }, [input, activeSessionId, isGenerating]);
+  }, [input, activeSessionId, isGenerating, designFusionId]);
 
   const handleStop = () => {
     abortRef.current?.abort();
@@ -294,6 +324,35 @@ export default function DesignPage() {
     setActiveVersionId(null);
   };
 
+  const handleSaveArtifact = async () => {
+    if (!activeProject || !currentCode || saving) return;
+    setSaving(true);
+    setSaved(false);
+    try {
+      const activeVersion = versions.find((v) => v.id === activeVersionId);
+      const title = activeVersion
+        ? activeVersion.prompt.slice(0, 60)
+        : "Design Component";
+      await createArtifact(activeProject.id, {
+        title,
+        type: "WEBAPP",
+        content: currentCode,
+        language: "tsx",
+        metadata: {
+          source: "design",
+          sessionId: activeSessionId,
+          versionId: activeVersionId,
+        },
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      setError("Failed to save artifact");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const displayCode = isGenerating ? streamingCode : currentCode;
   const deviceWidth = device === "mobile" ? "max-w-[375px]" : device === "tablet" ? "max-w-[768px]" : "max-w-full";
 
@@ -302,9 +361,9 @@ export default function DesignPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <Sparkles size={48} className="mx-auto mb-4 text-gray-300" />
-          <h2 className="text-lg font-semibold text-gray-900">No Project Selected</h2>
-          <p className="mt-2 text-sm text-gray-500">
+          <Sparkles size={48} className="mx-auto mb-4 text-text-muted" />
+          <h2 className="text-lg font-semibold text-foreground">No Project Selected</h2>
+          <p className="mt-2 text-sm text-text-secondary">
             Select a project to start designing with AI.
           </p>
         </div>
@@ -317,17 +376,14 @@ export default function DesignPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center max-w-md">
-          <AlertCircle size={48} className="mx-auto mb-4 text-amber-400" />
-          <h2 className="text-lg font-semibold text-gray-900">AI Not Configured</h2>
-          <p className="mt-2 text-sm text-gray-500">
+          <AlertCircle size={48} className="mx-auto mb-4 text-warning" />
+          <h2 className="text-lg font-semibold text-foreground">AI Not Configured</h2>
+          <p className="mt-2 text-sm text-text-secondary">
             To use Teskel Design, you need to configure an AI provider with an API key.
           </p>
-          <a
-            href="/dashboard/integrations"
-            className="mt-4 inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            Go to Integrations
-          </a>
+          <Button asChild className="mt-4 bg-accent hover:bg-accent-hover text-white">
+            <Link href="/dashboard/integrations">Go to Integrations</Link>
+          </Button>
         </div>
       </div>
     );
@@ -336,34 +392,38 @@ export default function DesignPage() {
   return (
     <div className="flex h-full">
       {/* Left panel - Chat */}
-      <div className="flex w-[380px] flex-col border-r border-gray-100">
+      <div className="flex w-[380px] flex-col border-r border-border">
         {/* Chat header */}
-        <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div className="flex items-center gap-2">
-            <Sparkles size={16} className="text-blue-600" />
-            <h2 className="text-[14px] font-semibold text-gray-900">Teskel Design</h2>
+            <Sparkles size={16} className="text-accent" />
+            <h2 className="text-[14px] font-semibold text-foreground">Teskel Design</h2>
           </div>
           <div className="flex items-center gap-1">
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setShowTemplates(!showTemplates)}
-              className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              className="h-7 w-7 text-text-muted hover:text-text-secondary"
               title="Templates"
             >
               <Layout size={14} />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setShowVersions(!showVersions)}
-              className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              className="h-7 w-7 text-text-muted hover:text-text-secondary"
               title="Version history"
             >
               <History size={14} />
-            </button>
+            </Button>
             {/* Session selector */}
             {sessions.length > 1 && (
               <select
                 value={activeSessionId ?? ""}
                 onChange={(e) => setActiveSessionId(e.target.value)}
-                className="ml-2 rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-600"
+                className="ml-2 rounded-md border border-border bg-surface px-2 py-1 text-[11px] text-text-secondary"
               >
                 {sessions.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -377,20 +437,20 @@ export default function DesignPage() {
 
         {/* Templates panel */}
         {showTemplates && (
-          <div className="border-b border-gray-100 bg-gray-50 p-3">
-            <p className="mb-2 text-[11px] font-medium text-gray-500">Quick Start Templates</p>
+          <div className="border-b border-border bg-surface-soft p-3">
+            <p className="mb-2 text-[11px] font-medium text-text-secondary">Quick Start Templates</p>
             <div className="grid grid-cols-3 gap-2">
               {templates.map((t) => (
                 <button
                   key={t.id}
-                  className="flex flex-col items-center gap-1 rounded-lg border border-gray-200 bg-white p-2 text-center transition-all hover:border-blue-200 hover:shadow-sm"
+                  className="flex flex-col items-center gap-1 rounded-lg border border-border bg-surface p-2 text-center transition-all hover:border-accent hover:shadow-sm"
                   onClick={() => {
                     setInput(t.prompt);
                     setShowTemplates(false);
                   }}
                 >
-                  <t.icon size={16} className="text-gray-500" />
-                  <span className="text-[10px] text-gray-600">{t.label}</span>
+                  <t.icon size={16} className="text-text-secondary" />
+                  <span className="text-[10px] text-text-secondary">{t.label}</span>
                 </button>
               ))}
             </div>
@@ -399,10 +459,10 @@ export default function DesignPage() {
 
         {/* Version history panel */}
         {showVersions && (
-          <div className="border-b border-gray-100 bg-gray-50 p-3">
-            <p className="mb-2 text-[11px] font-medium text-gray-500">Version History</p>
+          <div className="border-b border-border bg-surface-soft p-3">
+            <p className="mb-2 text-[11px] font-medium text-text-secondary">Version History</p>
             {versions.length === 0 ? (
-              <p className="text-[11px] text-gray-400">No versions yet. Generate a design to get started.</p>
+              <p className="text-[11px] text-text-muted">No versions yet. Generate a design to get started.</p>
             ) : (
               <div className="max-h-[200px] space-y-1 overflow-auto">
                 {versions.map((v, idx) => (
@@ -410,16 +470,16 @@ export default function DesignPage() {
                     key={v.id}
                     onClick={() => handleVersionClick(v)}
                     className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition-colors ${
-                      activeVersionId === v.id ? "bg-blue-50 ring-1 ring-blue-200" : "hover:bg-white"
+                      activeVersionId === v.id ? "bg-accent-light ring-1 ring-accent" : "hover:bg-surface"
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className={`h-2 w-2 shrink-0 rounded-full ${activeVersionId === v.id ? "bg-blue-500" : "bg-gray-300"}`} />
-                      <span className="truncate text-[12px] text-gray-700">
+                      <div className={`h-2 w-2 shrink-0 rounded-full ${activeVersionId === v.id ? "bg-accent" : "bg-text-muted"}`} />
+                      <span className="truncate text-[12px] text-foreground">
                         {v.prompt.length > 40 ? v.prompt.slice(0, 40) + "..." : v.prompt}
                       </span>
                     </div>
-                    <span className="ml-2 shrink-0 text-[10px] text-gray-400">
+                    <span className="ml-2 shrink-0 text-[10px] text-text-muted">
                       v{versions.length - idx}
                     </span>
                   </button>
@@ -433,13 +493,13 @@ export default function DesignPage() {
         <div className="flex-1 space-y-4 overflow-auto p-4">
           {loadingSession ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 size={20} className="animate-spin text-gray-400" />
+              <Loader2 size={20} className="animate-spin text-text-muted" />
             </div>
           ) : messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Sparkles size={32} className="mb-3 text-gray-300" />
-              <p className="text-[13px] font-medium text-gray-600">Start designing</p>
-              <p className="mt-1 text-[12px] text-gray-400">
+              <Sparkles size={32} className="mb-3 text-text-muted" />
+              <p className="text-[13px] font-medium text-text-secondary">Start designing</p>
+              <p className="mt-1 text-[12px] text-text-muted">
                 Describe a UI component and Teskel will generate it for you.
               </p>
             </div>
@@ -449,8 +509,8 @@ export default function DesignPage() {
                 <div
                   className={`max-w-[85%] rounded-xl px-4 py-2.5 ${
                     msg.role === "user"
-                      ? "bg-gray-900 text-[13px] text-white"
-                      : "border border-gray-100 bg-white text-[13px] text-gray-700"
+                      ? "bg-primary text-[13px] text-background"
+                      : "border border-border bg-surface text-[13px] text-foreground"
                   }`}
                 >
                   {msg.role === "user" ? (
@@ -460,20 +520,20 @@ export default function DesignPage() {
                       {msg.isStreaming && !msg.content && (
                         <div className="flex items-center gap-2">
                           <Loader2 size={12} className="animate-spin" />
-                          <span className="text-[12px] text-gray-400">Generating...</span>
+                          <span className="text-[12px] text-text-muted">Generating...</span>
                         </div>
                       )}
                       {msg.content && (
-                        <div className="flex items-center gap-1.5 rounded-md bg-blue-50 px-2 py-1">
+                        <div className="flex items-center gap-1.5 rounded-md bg-accent-light px-2 py-1">
                           {msg.isStreaming ? (
-                            <Loader2 size={12} className="animate-spin text-blue-600" />
+                            <Loader2 size={12} className="animate-spin text-accent" />
                           ) : (
-                            <Eye size={12} className="text-blue-600" />
+                            <Eye size={12} className="text-accent" />
                           )}
-                          <span className="text-[11px] font-medium text-blue-700">
+                          <span className="text-[11px] font-medium text-accent">
                             {msg.isStreaming ? "Generating design..." : "Design generated"}
                           </span>
-                          {!msg.isStreaming && <ChevronRight size={12} className="ml-auto text-blue-400" />}
+                          {!msg.isStreaming && <ChevronRight size={12} className="ml-auto text-accent/60" />}
                         </div>
                       )}
                     </div>
@@ -487,15 +547,29 @@ export default function DesignPage() {
 
         {/* Error display */}
         {error && (
-          <div className="mx-3 mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
-            <p className="text-[12px] text-red-700">{error}</p>
-          </div>
+          <Card className="mx-3 mb-2 border-red-200 bg-red-50">
+            <CardContent className="px-3 py-2">
+              <p className="text-[12px] text-red-700">{error}</p>
+            </CardContent>
+          </Card>
         )}
 
         {/* Input */}
-        <div className="border-t border-gray-100 p-3">
-          <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
-            <input
+        <div className="border-t border-border p-3">
+          <div className="mb-1.5">
+            <FusionPicker
+              workspaceId={activeWorkspace?.id}
+              value={designFusionId}
+              onChange={setDesignFusionId}
+              className="w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-[12px] focus:outline-none"
+            />
+          </div>
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2">
+            <label htmlFor="design-prompt-input" className="sr-only">
+              Design prompt
+            </label>
+            <Input
+              id="design-prompt-input"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
@@ -505,28 +579,31 @@ export default function DesignPage() {
                 }
               }}
               placeholder="Describe your design..."
-              className="flex-1 text-[13px] text-gray-900 outline-none placeholder:text-gray-400"
+              className="flex-1 border-none shadow-none text-[13px] h-auto px-0 py-0 focus-visible:ring-0 focus-visible:ring-offset-0"
               disabled={isGenerating}
             />
             {isGenerating ? (
-              <button
+              <Button
+                variant="destructive"
+                size="icon"
                 onClick={handleStop}
-                className="rounded-md bg-red-600 p-1.5 text-white transition-colors hover:bg-red-700"
+                className="h-7 w-7"
                 title="Stop generation"
               >
                 <Square size={14} />
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button
+                size="icon"
                 onClick={handleSend}
                 disabled={!input.trim()}
-                className="rounded-md bg-gray-900 p-1.5 text-white transition-colors hover:bg-gray-800 disabled:opacity-40"
+                className="h-7 w-7"
               >
                 <Send size={14} />
-              </button>
+              </Button>
             )}
           </div>
-          <p className="mt-1.5 text-center text-[10px] text-gray-400">
+          <p className="mt-1.5 text-center text-[10px] text-text-muted">
             Tip: Be specific about colors, layout, and interactions
           </p>
         </div>
@@ -535,87 +612,110 @@ export default function DesignPage() {
       {/* Right panel - Preview */}
       <div className="flex flex-1 flex-col">
         {/* Preview toolbar */}
-        <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2">
+        <div className="flex items-center justify-between border-b border-border px-4 py-2">
           <div className="flex items-center gap-1">
-            <button
+            <Button
+              variant={viewMode === "preview" ? "default" : "ghost"}
+              size="sm"
               onClick={() => setViewMode("preview")}
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
-                viewMode === "preview" ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100"
-              }`}
+              className="gap-1.5 text-[12px]"
             >
               <Eye size={13} />
               Preview
-            </button>
-            <button
+            </Button>
+            <Button
+              variant={viewMode === "code" ? "default" : "ghost"}
+              size="sm"
               onClick={() => setViewMode("code")}
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
-                viewMode === "code" ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100"
-              }`}
+              className="gap-1.5 text-[12px]"
             >
               <Code size={13} />
               Code
-            </button>
-            <button
+            </Button>
+            <Button
+              variant={viewMode === "split" ? "default" : "ghost"}
+              size="sm"
               onClick={() => setViewMode("split")}
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
-                viewMode === "split" ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100"
-              }`}
+              className="gap-1.5 text-[12px]"
             >
               <Layout size={13} />
               Split
-            </button>
+            </Button>
           </div>
 
           {/* Device size */}
-          <div className="flex items-center gap-1 rounded-lg border border-gray-200 p-1">
-            <button
+          <div className="flex items-center gap-1 rounded-lg border border-border p-1">
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setDevice("mobile")}
-              className={`rounded-md p-1.5 transition-colors ${device === "mobile" ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:text-gray-600"}`}
+              className={`h-7 w-7 ${device === "mobile" ? "bg-surface-soft text-foreground" : "text-text-muted hover:text-text-secondary"}`}
               title="Mobile (375px)"
             >
               <Smartphone size={14} />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setDevice("tablet")}
-              className={`rounded-md p-1.5 transition-colors ${device === "tablet" ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:text-gray-600"}`}
+              className={`h-7 w-7 ${device === "tablet" ? "bg-surface-soft text-foreground" : "text-text-muted hover:text-text-secondary"}`}
               title="Tablet (768px)"
             >
               <Tablet size={14} />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setDevice("desktop")}
-              className={`rounded-md p-1.5 transition-colors ${device === "desktop" ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:text-gray-600"}`}
+              className={`h-7 w-7 ${device === "desktop" ? "bg-surface-soft text-foreground" : "text-text-muted hover:text-text-secondary"}`}
               title="Desktop (full)"
             >
               <Monitor size={14} />
-            </button>
+            </Button>
           </div>
 
           {/* Actions */}
           <div className="flex items-center gap-1">
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={handleReset}
-              className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              className="h-7 w-7 text-text-muted hover:text-text-secondary"
               title="New session"
             >
               <RotateCcw size={14} />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={handleCopy}
-              className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              className="h-7 w-7 text-text-muted hover:text-text-secondary"
               title="Copy code"
               disabled={!displayCode}
             >
-              {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
-            </button>
-            <button
+              {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={handleDownload}
-              className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              className="h-7 w-7 text-text-muted hover:text-text-secondary"
               title="Download as .tsx"
               disabled={!currentCode}
             >
               <Download size={14} />
-            </button>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSaveArtifact}
+              className="gap-1 text-[12px] text-text-muted hover:text-text-secondary"
+              title="Save as Artifact"
+              disabled={!currentCode || saving}
+            >
+              {saving ? <Loader2 size={14} className="animate-spin" /> : saved ? <Check size={14} className="text-success" /> : <Save size={14} />}
+              <span className="hidden sm:inline">{saved ? "Saved" : "Save Artifact"}</span>
+            </Button>
           </div>
         </div>
 
@@ -623,23 +723,23 @@ export default function DesignPage() {
         <div className="flex flex-1 overflow-hidden">
           {/* Preview */}
           {(viewMode === "preview" || viewMode === "split") && (
-            <div className={`flex flex-1 items-start justify-center overflow-auto bg-[#F7F7F5] p-6 ${viewMode === "split" ? "border-r border-gray-100" : ""}`}>
+            <div className={`flex flex-1 items-start justify-center overflow-auto bg-background p-6 ${viewMode === "split" ? "border-r border-border" : ""}`}>
               {displayCode ? (
-                <div className={`${deviceWidth} w-full mx-auto overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-all duration-300`}>
+                <Card className={`${deviceWidth} w-full mx-auto overflow-hidden transition-all duration-300`}>
                   <iframe
                     srcDoc={buildSrcdoc(displayCode)}
                     className="h-[600px] w-full border-0"
                     sandbox="allow-scripts"
                     title="Design Preview"
                   />
-                </div>
+                </Card>
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-center">
-                  <Eye size={32} className="mb-3 text-gray-300" />
-                  <p className="text-[13px] text-gray-500">
+                  <Eye size={32} className="mb-3 text-text-muted" />
+                  <p className="text-[13px] text-text-secondary">
                     Your design preview will appear here
                   </p>
-                  <p className="mt-1 text-[11px] text-gray-400">
+                  <p className="mt-1 text-[11px] text-text-muted">
                     Describe a component in the chat to generate it
                   </p>
                 </div>
@@ -649,25 +749,27 @@ export default function DesignPage() {
 
           {/* Code view */}
           {(viewMode === "code" || viewMode === "split") && (
-            <div className="flex flex-1 flex-col overflow-hidden bg-[#0B0F19]">
-              <div className="flex items-center justify-between border-b border-gray-800 px-4 py-2">
-                <span className="text-[11px] text-gray-400">Component.tsx</span>
-                <button
+            <div className="flex flex-1 flex-col overflow-hidden bg-editor-bg">
+              <div className="flex items-center justify-between border-b border-editor-border px-4 py-2">
+                <span className="text-[11px] text-text-muted">Component.tsx</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={handleCopy}
-                  className="rounded p-1 text-gray-500 hover:bg-gray-800 hover:text-gray-300"
+                  className="h-6 w-6 text-text-muted hover:text-text-secondary hover:bg-editor-border"
                   disabled={!displayCode}
                 >
-                  {copied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
-                </button>
+                  {copied ? <Check size={12} className="text-success" /> : <Copy size={12} />}
+                </Button>
               </div>
               <div className="flex-1 overflow-auto">
                 {displayCode ? (
-                  <pre className="p-4 font-mono text-[11px] leading-5 text-gray-300 whitespace-pre-wrap">
+                  <pre className="p-4 font-mono text-[11px] leading-5 text-text-secondary whitespace-pre-wrap">
                     {displayCode}
                   </pre>
                 ) : (
                   <div className="flex items-center justify-center py-20">
-                    <p className="text-[12px] text-gray-500">No code generated yet</p>
+                    <p className="text-[12px] text-text-muted">No code generated yet</p>
                   </div>
                 )}
               </div>

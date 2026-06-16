@@ -40,7 +40,7 @@ export type CreateFileNodeInput = z.infer<typeof createFileNodeSchema>;
 /** Save file content (editor Save). */
 export const saveFileSchema = z.object({
   path: z.string().min(1, "path is required"),
-  content: z.string(),
+  content: z.string().max(2 * 1024 * 1024),
 });
 export type SaveFileInput = z.infer<typeof saveFileSchema>;
 
@@ -82,16 +82,25 @@ export type CreateMessageInput = z.infer<typeof createMessageSchema>;
 /** Streaming chat request. */
 export const chatStreamSchema = z.object({
   threadId: z.string().min(1, "threadId is required"),
-  content: z.string().min(1, "content is required"),
-  selectedPaths: z.array(z.string()).optional(),
+  content: z.string().min(1, "content is required").max(64000),
+  selectedPaths: z.array(z.string()).max(100).optional(),
+  model: z.string().optional(),
+  provider: z.string().optional(),
+  fusionId: z.string().optional(),
+  useQualityEngine: z.boolean().optional(),
+  qualityLevel: z.enum(["fast", "balanced", "maximum"]).optional(),
 });
 export type ChatStreamInput = z.infer<typeof chatStreamSchema>;
 
 /** Generate a structured changeset from a natural-language instruction. */
 export const generateChangeSetSchema = z.object({
   projectId: z.string().min(1, "projectId is required"),
-  instruction: z.string().min(1, "instruction is required"),
+  instruction: z.string().min(1, "instruction is required").max(8000),
   selectedPaths: z.array(z.string()).optional(),
+  model: z.string().optional(),
+  provider: z.string().optional(),
+  fusionId: z.string().optional(),
+  useQualityEngine: z.boolean().optional(),
 });
 export type GenerateChangeSetInput = z.infer<typeof generateChangeSetSchema>;
 

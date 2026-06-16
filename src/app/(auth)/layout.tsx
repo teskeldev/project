@@ -1,7 +1,9 @@
+import type { ReactNode } from "react";
+
 export default function AuthLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-[#F7F7F5] px-4">

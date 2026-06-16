@@ -1,153 +1,178 @@
 "use client";
 
-import Link from "next/link";
+import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import { useRef, useState } from "react";
 
 export default function EditorDemo() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  // 3D Parallax Perspective Tilt values
+  const mouseX = useMotionValue(0.5);
+  const mouseY = useMotionValue(0.5);
+  
+  const springConfig = { damping: 20, stiffness: 100, mass: 0.5 };
+  const smoothMouseX = useSpring(mouseX, springConfig);
+  const smoothMouseY = useSpring(mouseY, springConfig);
+
+  const rotateY = useTransform(smoothMouseX, [0, 1], [-6, 6]);
+  const rotateX = useTransform(smoothMouseY, [0, 1], [6, -6]);
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    // Normalize coordinates between 0 and 1
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    mouseX.set(x);
+    mouseY.set(y);
+  };
+
+  const handleMouseLeave = () => {
+    mouseX.set(0.5);
+    mouseY.set(0.5);
+  };
+
+  // Agent State Machine simulation
+  const [phase, setPhase] = useState(0);
+
   return (
-    <section className="px-6 py-20 md:py-28">
+    <section className="relative overflow-visible px-6 py-20 pb-32 md:py-24 bg-[#F7F7F5] perspective-1000">
       <div className="mx-auto max-w-[1100px]">
-        {/* Section: Agents */}
-        <div className="grid items-center gap-12 lg:grid-cols-2">
-          <div>
-            <h2 className="text-[1.75rem] font-medium leading-tight tracking-tight text-[#0F172A] md:text-[2.25rem]">
-              Agents turn ideas into code
-            </h2>
-            <p className="mt-4 max-w-lg text-[15px] leading-relaxed text-[#64748B]">
-              Accelerate development by handing off tasks to Teskel, while you focus on making decisions.
-            </p>
-            <Link href="/#product" className="mt-6 inline-flex items-center gap-1.5 text-[15px] font-medium text-[#0F172A] hover:text-[#3B82F6]">
-              Learn about agentic development <span className="text-gray-400">&rarr;</span>
-            </Link>
+        
+        {/* Floating 3D IDE Sandbox */}
+        <motion.div
+          ref={containerRef}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+          style={{ rotateX, rotateY, transformPerspective: 1200 }}
+          initial={{ opacity: 0, y: 100, scale: 0.9 }}
+          whileInView={{ opacity: 1, y: 0, scale: 1 }}
+          viewport={{ once: true, margin: "-100px" }}
+          onViewportEnter={() => {
+            // Trigger State-Machine
+            setTimeout(() => setPhase(1), 800); // Terminal logs start
+            setTimeout(() => setPhase(2), 2200); // Code writing starts
+            setTimeout(() => setPhase(3), 3500); // Ghost autocomplete slides in
+          }}
+          transition={{ type: "spring", stiffness: 100, damping: 25, mass: 0.8 }}
+          className="relative mx-auto max-w-5xl overflow-hidden rounded-[20px] border border-white/60 bg-white/40 shadow-[0_0_0_1px_rgba(255,255,255,0.7)_inset,0_1px_2px_rgba(0,0,0,0.01),0_8px_32px_rgba(0,0,0,0.03),0_24px_64px_rgba(17,24,39,0.06)] backdrop-blur-2xl will-change-transform"
+        >
+          {/* MacOS Title Bar */}
+          <div className="flex items-center justify-between border-b border-black/[0.04] bg-white/50 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <div className="h-3 w-3 rounded-full bg-[#FF5F56] shadow-sm border border-black/10" />
+              <div className="h-3 w-3 rounded-full bg-[#FFBD2E] shadow-sm border border-black/10" />
+              <div className="h-3 w-3 rounded-full bg-[#27C93F] shadow-sm border border-black/10" />
+            </div>
+            {/* Premium AI Selector */}
+            <div className="flex items-center gap-2 rounded-md border border-black/[0.04] bg-white/80 px-3 py-1 shadow-sm">
+              <div className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-600"></span>
+              </div>
+              <span className="text-[11px] font-bold tracking-wide text-slate-700">Teskel-Flash v2</span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="ml-1 text-slate-400"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <div className="w-[60px]" />
           </div>
 
-          {/* IDE demo */}
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-[#0B0F19] shadow-lg">
-            {/* Title bar */}
-            <div className="flex items-center justify-between border-b border-gray-800 bg-[#0D1117] px-4 py-2.5">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-1.5">
-                  <div className="h-2.5 w-2.5 rounded-full bg-[#FF5F57]" />
-                  <div className="h-2.5 w-2.5 rounded-full bg-[#FEBC2E]" />
-                  <div className="h-2.5 w-2.5 rounded-full bg-[#28C840]" />
+          {/* Dual Panel Architecture */}
+          <div className="flex h-[450px] md:h-[500px]">
+            {/* Phase 1: Agent Reasoning Terminal */}
+            <div className="hidden w-[280px] flex-col border-r border-black/[0.04] bg-slate-50/50 p-5 md:flex relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-transparent to-slate-50/80 z-10 pointer-events-none" />
+              <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">Agent Reasoning</p>
+              
+              <div className="mt-5 space-y-3 font-mono text-[11px] text-slate-500">
+                <div className="text-blue-600 font-semibold mb-4 text-[12px] font-sans">
+                  &quot;Build a layout component using Framer Motion.&quot;
                 </div>
-                <span className="text-[11px] text-gray-500">Teskel</span>
+                
+                {phase >= 1 && (
+                  <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}>
+                    <span className="text-slate-400">❯</span> Scanning AST...
+                  </motion.div>
+                )}
+                {phase >= 1 && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
+                    <span className="text-emerald-500">✓</span> 337 files synchronized.
+                  </motion.div>
+                )}
+                {phase >= 1 && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }}>
+                    <span className="text-slate-400">❯</span> Locating motion utilities...
+                  </motion.div>
+                )}
+                {phase >= 2 && (
+                  <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="mt-4 rounded-xl border border-blue-500/10 bg-white p-3 shadow-sm text-slate-600 font-sans">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-[8px] text-blue-600">✨</div>
+                      <span className="font-semibold text-[11px]">Executing Plan</span>
+                    </div>
+                    Writing <span className="font-mono text-blue-500">Layout.tsx</span>
+                  </motion.div>
+                )}
               </div>
             </div>
 
-            {/* Tabs */}
-            <div className="flex border-b border-gray-800 bg-[#0D1117]">
-              <div className="border-b border-b-blue-500 bg-[#0B0F19] px-4 py-2 text-[12px] text-white">
-                feature-prd.md
-              </div>
-              <div className="px-4 py-2 text-[12px] text-gray-500">
-                presence.ts
-              </div>
-            </div>
-
-            {/* Content split */}
-            <div className="flex">
-              {/* Editor content */}
-              <div className="flex-1 p-5 font-mono text-[12px] leading-6 text-gray-300">
-                <p className="text-white font-semibold text-[14px] font-sans">Mission Control Interface</p>
-                <p className="mt-3 text-gray-400 font-sans text-[12px] leading-relaxed">
-                  A grid view of all open windows as scaled previews, allowing quick selection to bring any window to front.
-                </p>
-                <p className="mt-4 text-white font-medium text-[13px] font-sans">Trigger</p>
-                <p className="mt-1 text-gray-400 font-sans text-[12px]">
-                  Menu item in MenuBar.tsx (View &gt; Mission Control), hotkey F3.
-                </p>
-                <p className="mt-4 text-white font-medium text-[13px] font-sans">View Behavior</p>
-                <p className="mt-1 text-gray-400 font-sans text-[12px]">
-                  Overlay existing windows into a grid of live previews with spring-based layout animations.
-                </p>
-              </div>
-
-              {/* Plan panel */}
-              <div className="w-[220px] border-l border-gray-800 p-4">
-                <p className="text-[11px] font-semibold text-gray-400">Plans</p>
-                <div className="mt-3 space-y-2">
-                  <p className="text-[11px] font-medium text-gray-300">3 Tasks</p>
-                  <div className="rounded bg-gray-800/50 px-2.5 py-2 text-[11px] text-gray-400">
-                    Add multiplayer mode to useAppStore.ts
+            {/* Simulated AI Cognition (Code Editor) */}
+            <div className="relative flex-1 bg-white/60 p-6 font-mono text-[13px] leading-[1.8] text-slate-600 overflow-hidden">
+              <div className="text-slate-400">{"// Layout.tsx"}</div>
+              
+              {phase >= 2 && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                  <div className="mt-4">
+                    <span className="text-purple-600">import</span> {"{"} motion {"}"} <span className="text-purple-600">from</span> <span className="text-emerald-600">&quot;framer-motion&quot;</span>;
                   </div>
-                  <div className="rounded bg-gray-800/50 px-2.5 py-2 text-[11px] text-gray-400">
-                    Create MissionControlView.tsx
-                  </div>
-                  <div className="rounded bg-gray-800/50 px-2.5 py-2 text-[11px] text-gray-400">
-                    Update AppManager.tsx
-                  </div>
-                </div>
-              </div>
-            </div>
+                  <div className="mt-2"><span className="text-purple-600">export default function</span> <span className="text-blue-600">RootLayout</span>({"{"} children {"}"}: {"{"} children: ReactNode {"}"}) {"{"}</div>
+                  <div className="ml-4 mt-2"><span className="text-purple-600">return</span> (</div>
+                  <div className="ml-8 mt-1 text-slate-500">&lt;<span className="text-blue-500">div</span> className=<span className="text-emerald-600">&quot;min-h-screen&quot;</span>&gt;</div>
+                  <div className="ml-12 mt-1 text-slate-500">&lt;<span className="text-blue-500">Sidebar</span> /&gt;</div>
+                </motion.div>
+              )}
 
-            {/* Input bar */}
-            <div className="border-t border-gray-800 bg-[#0D1117] px-4 py-3">
-              <div className="flex items-center justify-between rounded-lg border border-gray-700 bg-[#0B0F19] px-3 py-2">
-                <span className="text-[12px] text-gray-500">Plan, search, build anything...</span>
-                <div className="flex items-center gap-2">
-                  <span className="rounded bg-gray-800 px-2 py-0.5 text-[10px] text-gray-400">Plan</span>
-                  <span className="text-[10px] text-gray-500">Composer 2.5</span>
-                </div>
-              </div>
+              {/* Phase 3: Simulated Magic Autocomplete */}
+              {phase >= 3 && (
+                <motion.div 
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ type: "spring", stiffness: 100, damping: 15 }}
+                  className="ml-12 mt-2 flex items-center gap-2 relative"
+                >
+                  {/* Radiant Pulse Wave */}
+                  <motion.div 
+                    initial={{ left: 0, width: 0, opacity: 1 }}
+                    animate={{ left: "100%", opacity: 0 }}
+                    transition={{ duration: 1.5, ease: "easeOut" }}
+                    className="absolute top-0 bottom-0 w-20 bg-gradient-to-r from-transparent via-blue-400/30 to-transparent blur-md z-10"
+                  />
+                  
+                  {/* Ghost Text */}
+                  <div className="rounded-md border border-blue-200/50 bg-blue-50/40 py-1 pl-2 pr-3 text-slate-400 italic relative overflow-hidden">
+                    <span className="text-blue-500/80">&lt;motion.main</span>
+                    <div className="ml-4">initial={"{{ opacity: 0, y: 20 }}"}</div>
+                    <div className="ml-4">animate={"{{ opacity: 1, y: 0 }}"}</div>
+                    <div className="ml-4">className=<span className="text-emerald-600/60">&quot;flex-1 p-6&quot;</span></div>
+                    <span className="text-blue-500/80">&gt;</span>
+                    <div className="ml-4 text-slate-500">{"{children}"}</div>
+                    <span className="text-blue-500/80">&lt;/motion.main&gt;</span>
+                  </div>
+                  <div className="rounded-md border border-black/[0.05] bg-white px-2 py-0.5 text-[10px] font-bold text-blue-600 shadow-sm relative z-20">
+                    TAB
+                  </div>
+                </motion.div>
+              )}
+              
+              {phase >= 2 && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5 }}>
+                  <div className="ml-8 mt-2 text-slate-500">&lt;/<span className="text-blue-500">div</span>&gt;</div>
+                  <div className="ml-4">);</div>
+                  <div>{"}"}</div>
+                </motion.div>
+              )}
             </div>
           </div>
-        </div>
-
-        {/* Section: Tab autocomplete */}
-        <div className="mt-24 grid items-center gap-12 lg:grid-cols-2">
-          {/* Editor with ghost text */}
-          <div className="order-2 overflow-hidden rounded-xl border border-gray-200 bg-[#0B0F19] shadow-lg lg:order-1">
-            <div className="flex items-center gap-4 border-b border-gray-800 bg-[#0D1117] px-4 py-2.5">
-              <div className="flex items-center gap-1.5">
-                <div className="h-2.5 w-2.5 rounded-full bg-[#FF5F57]" />
-                <div className="h-2.5 w-2.5 rounded-full bg-[#FEBC2E]" />
-                <div className="h-2.5 w-2.5 rounded-full bg-[#28C840]" />
-              </div>
-              <span className="text-[11px] text-gray-500">Teskel</span>
-            </div>
-
-            <div className="flex border-b border-gray-800">
-              <div className="border-b border-b-blue-500 bg-[#0B0F19] px-4 py-2 text-[12px] text-white">Dashboard.tsx</div>
-              <div className="px-4 py-2 text-[12px] text-gray-500">SupportChat.tsx</div>
-            </div>
-
-            <div className="p-5 font-mono text-[12px] leading-7">
-              <div><span className="text-green-400">&quot;use client&quot;</span>;</div>
-              <div className="mt-1"><span className="text-purple-400">import</span> React, {"{ useState }"} <span className="text-purple-400">from</span> <span className="text-green-400">&quot;react&quot;</span>;</div>
-              <div><span className="text-purple-400">import</span> Navigation <span className="text-purple-400">from</span> <span className="text-green-400">&quot;./Navigation&quot;</span>;</div>
-              <div><span className="text-purple-400">import</span> SupportChat <span className="text-purple-400">from</span> <span className="text-green-400">&quot;./SupportChat&quot;</span>;</div>
-              <div className="mt-2"><span className="text-blue-400">export default function</span> <span className="text-yellow-300">Dashboard</span>() {"{"}</div>
-              <div className="ml-4"><span className="text-purple-400">const</span> [activeTab, setActiveTab] = <span className="text-yellow-300">useState</span>(<span className="text-green-400">&quot;support&quot;</span>);</div>
-              <div className="ml-4 mt-1"><span className="text-purple-400">return</span> (</div>
-              <div className="ml-8"><span className="text-gray-300">&lt;div className=&quot;flex h-[600px] border rounded-lg&quot;&gt;</span></div>
-              <div className="ml-12"><span className="text-gray-300">&lt;div className=&quot;w-64 border-r&quot;&gt;</span></div>
-
-              {/* Ghost suggestion */}
-              <div className="ml-16 flex items-center gap-3">
-                <span className="text-gray-600">&lt;Navigation activeTab={"{activeTab}"} /&gt;</span>
-                <span className="rounded border border-gray-700 bg-gray-800 px-2 py-0.5 text-[10px] font-medium text-blue-400">Tab</span>
-              </div>
-
-              <div className="ml-12"><span className="text-gray-300">&lt;/div&gt;</span></div>
-              <div className="ml-8"><span className="text-gray-300">&lt;/div&gt;</span></div>
-              <div className="ml-4">);</div>
-              <div>{"}"}</div>
-            </div>
-          </div>
-
-          {/* Description */}
-          <div className="order-1 lg:order-2">
-            <h2 className="text-[1.75rem] font-medium leading-tight tracking-tight text-[#0F172A] md:text-[2.25rem]">
-              Magically accurate autocomplete
-            </h2>
-            <p className="mt-4 max-w-lg text-[15px] leading-relaxed text-[#64748B]">
-              Our specialized Tab model predicts your next action with striking speed and precision.
-            </p>
-            <Link href="/#product" className="mt-6 inline-flex items-center gap-1.5 text-[15px] font-medium text-[#0F172A] hover:text-[#3B82F6]">
-              Learn about Tab <span className="text-gray-400">&rarr;</span>
-            </Link>
-          </div>
-        </div>
+        </motion.div>
       </div>
     </section>
   );

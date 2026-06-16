@@ -1,5 +1,6 @@
 ﻿import { prisma } from "@/lib/db";
 import { apiSuccess, handleApiError, requireUser } from "@/lib/api";
+import { withRouteMetrics } from "@/lib/observability/metrics";
 
 /**
  * GET /api/dashboard/summary?projectId=
@@ -38,7 +39,7 @@ function countDirty(status: DirtyShape): number {
   return 0;
 }
 
-export async function GET(req: Request) {
+export const GET = withRouteMetrics("/api/dashboard/summary", async (req: Request) => {
   try {
     const user = await requireUser();
     const { searchParams } = new URL(req.url);
@@ -208,4 +209,4 @@ export async function GET(req: Request) {
   } catch (err) {
     return handleApiError(err);
   }
-}
+});

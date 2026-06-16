@@ -7,7 +7,48 @@
     "category": "Languages",
     "icon": "\ud83d\udc0d",
     "installs": "98M",
-    "rating": 4.8
+    "rating": 4.8,
+    "hooks": [
+      {
+        "type": "command",
+        "config": {
+          "label": "Python: Select Interpreter",
+          "description": "Choose the Python interpreter for this workspace",
+          "action": "notify:Python interpreter configured via workspace settings",
+          "icon": "\ud83d\udc0d"
+        }
+      },
+      {
+        "type": "command",
+        "config": {
+          "label": "Python: Run File",
+          "description": "Run the current Python file",
+          "action": "notify:Use the terminal to run Python files",
+          "icon": "\u25b6\ufe0f",
+          "keybinding": "Ctrl+F5"
+        }
+      },
+      {
+        "type": "statusBar",
+        "config": {
+          "text": "\ud83d\udc0d Python 3.11",
+          "tooltip": "Python language support active",
+          "position": "left",
+          "priority": 10
+        }
+      },
+      {
+        "type": "fileIcon",
+        "config": {
+          "patterns": {
+            "*.py": "\ud83d\udc0d",
+            "*.pyi": "\ud83d\udc0d",
+            "requirements.txt": "\ud83d\udce6",
+            "Pipfile": "\ud83d\udce6"
+          }
+        }
+      }
+    ]
   },
   {
     "registryId": "dbaeumer.vscode-eslint",
@@ -17,7 +58,43 @@
     "category": "Linters",
     "icon": "\ud83d\udcdd",
     "installs": "32M",
-    "rating": 4.7
+    "rating": 4.7,
+    "hooks": [
+      {
+        "type": "command",
+        "config": {
+          "label": "ESLint: Fix All Auto-fixable Problems",
+          "description": "Automatically fix all ESLint issues in the current file",
+          "action": "notify:ESLint auto-fix applied to current file",
+          "icon": "\ud83d\udcdd",
+          "keybinding": "Ctrl+Shift+E"
+        }
+      },
+      {
+        "type": "command",
+        "config": {
+          "label": "ESLint: Show Output Channel",
+          "description": "View ESLint diagnostics output",
+          "action": "notify:ESLint output channel opened"
+        }
+      },
+      {
+        "type": "statusBar",
+        "config": {
+          "text": "\u2713 ESLint",
+          "tooltip": "ESLint is active - no issues found",
+          "position": "right",
+          "priority": 5
+        }
+      },
+      {
+        "type": "linter",
+        "config": {
+          "languages": ["javascript", "typescript", "jsx", "tsx"],
+          "configFile": ".eslintrc"
+        }
+      }
+    ]
   },
   {
     "registryId": "esbenp.prettier-vscode",
@@ -27,7 +104,51 @@
     "category": "Formatters",
     "icon": "\ud83c\udfa8",
     "installs": "42M",
-    "rating": 4.6
+    "rating": 4.6,
+    "hooks": [
+      {
+        "type": "command",
+        "config": {
+          "label": "Format Document with Prettier",
+          "description": "Format the current file using Prettier",
+          "action": "notify:Prettier formatting is configured via .prettierrc",
+          "icon": "\ud83c\udfa8",
+          "keybinding": "Shift+Alt+F"
+        }
+      },
+      {
+        "type": "command",
+        "config": {
+          "label": "Prettier: Create Configuration File",
+          "description": "Generate a .prettierrc configuration file",
+          "action": "notify:Create a .prettierrc file in your project root"
+        }
+      },
+      {
+        "type": "statusBar",
+        "config": {
+          "text": "\ud83c\udfa8 Prettier",
+          "tooltip": "Prettier is active - formatting on save enabled",
+          "position": "right",
+          "priority": 4
+        }
+      },
+      {
+        "type": "formatter",
+        "config": {
+          "languages": ["javascript", "typescript", "css", "html", "json", "markdown"],
+          "configFile": ".prettierrc"
+        }
+      },
+      {
+        "type": "editorAction",
+        "config": {
+          "label": "Format",
+          "icon": "\ud83c\udfa8",
+          "action": "notify:Document formatted with Prettier"
+        }
+      }
+    ]
   },
   {
     "registryId": "bradlc.vscode-tailwindcss",
@@ -37,7 +158,44 @@
     "category": "Styling",
     "icon": "\ud83c\udf0a",
     "installs": "12M",
-    "rating": 4.9
+    "rating": 4.9,
+    "hooks": [
+      {
+        "type": "command",
+        "config": {
+          "label": "Tailwind CSS: Show Output",
+          "description": "View Tailwind CSS IntelliSense diagnostics",
+          "action": "notify:Tailwind CSS IntelliSense is active",
+          "icon": "\ud83c\udf0a"
+        }
+      },
+      {
+        "type": "command",
+        "config": {
+          "label": "Tailwind CSS: Sort Classes",
+          "description": "Sort Tailwind CSS classes in the current file",
+          "action": "notify:Tailwind classes sorted according to recommended order"
+        }
+      },
+      {
+        "type": "statusBar",
+        "config": {
+          "text": "\ud83c\udf0a Tailwind",
+          "tooltip": "Tailwind CSS IntelliSense active",
+          "position": "right",
+          "priority": 3
+        }
+      },
+      {
+        "type": "fileIcon",
+        "config": {
+          "patterns": {
+            "tailwind.config.*": "\ud83c\udf0a",
+            "postcss.config.*": "\ud83c\udf0a"
+          }
+        }
+      }
+    ]
   },
   {
     "registryId": "eamodio.gitlens",
@@ -47,7 +205,51 @@
     "category": "Git",
     "icon": "\ud83d\udd0d",
     "installs": "28M",
-    "rating": 4.5
+    "rating": 4.5,
+    "hooks": [
+      {
+        "type": "command",
+        "config": {
+          "label": "GitLens: Open File History",
+          "description": "View the commit history for the current file",
+          "action": "/dashboard/git",
+          "icon": "\ud83d\udd0d"
+        }
+      },
+      {
+        "type": "command",
+        "config": {
+          "label": "GitLens: Toggle Line Blame",
+          "description": "Show or hide inline git blame annotations",
+          "action": "notify:Git blame annotations toggled"
+        }
+      },
+      {
+        "type": "command",
+        "config": {
+          "label": "GitLens: Compare Branch",
+          "description": "Compare current branch with another branch",
+          "action": "/dashboard/git"
+        }
+      },
+      {
+        "type": "statusBar",
+        "config": {
+          "text": "\ud83d\udd0d GitLens",
+          "tooltip": "GitLens - Git supercharged",
+          "position": "left",
+          "priority": 8
+        }
+      },
+      {
+        "type": "editorAction",
+        "config": {
+          "label": "Blame",
+          "icon": "\ud83d\udd0d",
+          "action": "notify:Showing git blame for current file"
+        }
+      }
+    ]
   },
   {
     "registryId": "ms-azuretools.vscode-docker",
@@ -57,7 +259,46 @@
     "category": "DevOps",
     "icon": "\ud83d\udc33",
     "installs": "18M",
-    "rating": 4.4
+    "rating": 4.4,
+    "hooks": [
+      {
+        "type": "command",
+        "config": {
+          "label": "Docker: Build Image",
+          "description": "Build a Docker image from a Dockerfile",
+          "action": "notify:Run 'docker build' in the terminal to build your image",
+          "icon": "\ud83d\udc33"
+        }
+      },
+      {
+        "type": "command",
+        "config": {
+          "label": "Docker: Compose Up",
+          "description": "Start Docker Compose services",
+          "action": "notify:Run 'docker compose up' in the terminal"
+        }
+      },
+      {
+        "type": "statusBar",
+        "config": {
+          "text": "\ud83d\udc33 Docker",
+          "tooltip": "Docker extension active",
+          "position": "left",
+          "priority": 6
+        }
+      },
+      {
+        "type": "fileIcon",
+        "config": {
+          "patterns": {
+            "Dockerfile": "\ud83d\udc33",
+            "docker-compose.yml": "\ud83d\udc33",
+            "docker-compose.yaml": "\ud83d\udc33",
+            ".dockerignore": "\ud83d\udc33"
+          }
+        }
+      }
+    ]
   },
   {
     "registryId": "rangav.vscode-thunder-client",
@@ -67,7 +308,43 @@
     "category": "Testing",
     "icon": "\u26a1",
     "installs": "8M",
-    "rating": 4.7
+    "rating": 4.7,
+    "hooks": [
+      {
+        "type": "command",
+        "config": {
+          "label": "Thunder Client: New Request",
+          "description": "Create a new API request",
+          "action": "notify:Open Thunder Client to create API requests",
+          "icon": "\u26a1"
+        }
+      },
+      {
+        "type": "command",
+        "config": {
+          "label": "Thunder Client: View Collections",
+          "description": "Browse saved API request collections",
+          "action": "notify:Thunder Client collections are stored in your workspace"
+        }
+      },
+      {
+        "type": "statusBar",
+        "config": {
+          "text": "\u26a1 Thunder",
+          "tooltip": "Thunder Client - REST API testing",
+          "position": "right",
+          "priority": 2
+        }
+      },
+      {
+        "type": "editorAction",
+        "config": {
+          "label": "Send Request",
+          "icon": "\u26a1",
+          "action": "notify:Send the current request with Thunder Client"
+        }
+      }
+    ]
   },
   {
     "registryId": "prisma.prisma",
@@ -77,7 +354,51 @@
     "category": "Database",
     "icon": "\ud83d\udc8e",
     "installs": "5M",
-    "rating": 4.8
+    "rating": 4.8,
+    "hooks": [
+      {
+        "type": "command",
+        "config": {
+          "label": "Prisma: Generate Client",
+          "description": "Run prisma generate to update the Prisma Client",
+          "action": "notify:Run 'npx prisma generate' in the terminal",
+          "icon": "\ud83d\udc8e"
+        }
+      },
+      {
+        "type": "command",
+        "config": {
+          "label": "Prisma: Open Studio",
+          "description": "Launch Prisma Studio for database browsing",
+          "action": "notify:Run 'npx prisma studio' in the terminal"
+        }
+      },
+      {
+        "type": "statusBar",
+        "config": {
+          "text": "\ud83d\udc8e Prisma",
+          "tooltip": "Prisma language support active",
+          "position": "right",
+          "priority": 3
+        }
+      },
+      {
+        "type": "fileIcon",
+        "config": {
+          "patterns": {
+            "*.prisma": "\ud83d\udc8e",
+            "schema.prisma": "\ud83d\udc8e"
+          }
+        }
+      },
+      {
+        "type": "formatter",
+        "config": {
+          "languages": ["prisma"],
+          "configFile": "schema.prisma"
+        }
+      }
+    ]
   },
   {
     "registryId": "usernamehw.errorlens",
@@ -87,7 +408,27 @@
     "category": "Utilities",
     "icon": "\ud83d\udd26",
     "installs": "9M",
-    "rating": 4.6
+    "rating": 4.6,
+    "hooks": [
+      {
+        "type": "command",
+        "config": {
+          "label": "Error Lens: Toggle Inline Diagnostics",
+          "description": "Show or hide inline error/warning messages",
+          "action": "notify:Error Lens inline diagnostics toggled",
+          "icon": "\ud83d\udd26"
+        }
+      },
+      {
+        "type": "statusBar",
+        "config": {
+          "text": "\ud83d\udd26 0 errors",
+          "tooltip": "Error Lens - no diagnostics",
+          "position": "left",
+          "priority": 9
+        }
+      }
+    ]
   },
   {
     "registryId": "rust-lang.rust-analyzer",
@@ -97,7 +438,46 @@
     "category": "Languages",
     "icon": "\u2699\ufe0f",
     "installs": "6M",
-    "rating": 4.9
+    "rating": 4.9,
+    "hooks": [
+      {
+        "type": "command",
+        "config": {
+          "label": "Rust Analyzer: Restart Server",
+          "description": "Restart the Rust Analyzer language server",
+          "action": "notify:Rust Analyzer server restarted",
+          "icon": "\u2699\ufe0f"
+        }
+      },
+      {
+        "type": "command",
+        "config": {
+          "label": "Rust: Cargo Build",
+          "description": "Run cargo build for the current project",
+          "action": "notify:Run 'cargo build' in the terminal",
+          "keybinding": "Ctrl+Shift+B"
+        }
+      },
+      {
+        "type": "statusBar",
+        "config": {
+          "text": "\u2699\ufe0f rust-analyzer",
+          "tooltip": "Rust Analyzer is running",
+          "position": "left",
+          "priority": 10
+        }
+      },
+      {
+        "type": "fileIcon",
+        "config": {
+          "patterns": {
+            "*.rs": "\u2699\ufe0f",
+            "Cargo.toml": "\ud83d\udce6",
+            "Cargo.lock": "\ud83d\udd12"
+          }
+        }
+      }
+    ]
   },
   {
     "registryId": "golang.go",
@@ -107,7 +487,45 @@
     "category": "Languages",
     "icon": "\ud83d\udc39",
     "installs": "14M",
-    "rating": 4.7
+    "rating": 4.7,
+    "hooks": [
+      {
+        "type": "command",
+        "config": {
+          "label": "Go: Test Current File",
+          "description": "Run tests in the current Go file",
+          "action": "notify:Run 'go test' in the terminal",
+          "icon": "\ud83d\udc39"
+        }
+      },
+      {
+        "type": "command",
+        "config": {
+          "label": "Go: Generate Interface Stubs",
+          "description": "Generate method stubs for an interface",
+          "action": "notify:Interface stubs generated"
+        }
+      },
+      {
+        "type": "statusBar",
+        "config": {
+          "text": "\ud83d\udc39 Go 1.21",
+          "tooltip": "Go language support active",
+          "position": "left",
+          "priority": 10
+        }
+      },
+      {
+        "type": "fileIcon",
+        "config": {
+          "patterns": {
+            "*.go": "\ud83d\udc39",
+            "go.mod": "\ud83d\udce6",
+            "go.sum": "\ud83d\udd12"
+          }
+        }
+      }
+    ]
   },
   {
     "registryId": "ms-vscode.vscode-typescript-next",
@@ -117,7 +535,45 @@
     "category": "Languages",
     "icon": "\ud83d\udcd8",
     "installs": "4M",
-    "rating": 4.3
+    "rating": 4.3,
+    "hooks": [
+      {
+        "type": "command",
+        "config": {
+          "label": "TypeScript: Restart TS Server",
+          "description": "Restart the TypeScript language server",
+          "action": "notify:TypeScript server restarted",
+          "icon": "\ud83d\udcd8"
+        }
+      },
+      {
+        "type": "command",
+        "config": {
+          "label": "TypeScript: Go to Source Definition",
+          "description": "Navigate to the source definition of a symbol",
+          "action": "notify:Use Ctrl+Click to go to definition"
+        }
+      },
+      {
+        "type": "statusBar",
+        "config": {
+          "text": "\ud83d\udcd8 TS 5.4-nightly",
+          "tooltip": "TypeScript Nightly build active",
+          "position": "left",
+          "priority": 10
+        }
+      },
+      {
+        "type": "fileIcon",
+        "config": {
+          "patterns": {
+            "*.ts": "\ud83d\udcd8",
+            "*.tsx": "\ud83d\udcd8",
+            "tsconfig.json": "\u2699\ufe0f"
+          }
+        }
+      }
+    ]
   },
   {
     "registryId": "github.copilot",
@@ -127,7 +583,44 @@
     "category": "AI",
     "icon": "\ud83e\udd16",
     "installs": "15M",
-    "rating": 4.6
+    "rating": 4.6,
+    "hooks": [
+      {
+        "type": "command",
+        "config": {
+          "label": "Copilot: Toggle Suggestions",
+          "description": "Enable or disable Copilot inline suggestions",
+          "action": "notify:Copilot suggestions toggled",
+          "icon": "\ud83e\udd16"
+        }
+      },
+      {
+        "type": "command",
+        "config": {
+          "label": "Copilot: Open Chat",
+          "description": "Open Copilot Chat for AI assistance",
+          "action": "/dashboard/chat",
+          "icon": "\ud83e\udd16"
+        }
+      },
+      {
+        "type": "statusBar",
+        "config": {
+          "text": "\ud83e\udd16 Copilot",
+          "tooltip": "GitHub Copilot is active",
+          "position": "right",
+          "priority": 1
+        }
+      },
+      {
+        "type": "editorAction",
+        "config": {
+          "label": "Ask Copilot",
+          "icon": "\ud83e\udd16",
+          "action": "/dashboard/chat"
+        }
+      }
+    ]
   },
   {
     "registryId": "formulahendry.auto-rename-tag",
@@ -137,7 +630,27 @@
     "category": "Utilities",
     "icon": "\ud83c\udff7\ufe0f",
     "installs": "16M",
-    "rating": 4.4
+    "rating": 4.4,
+    "hooks": [
+      {
+        "type": "command",
+        "config": {
+          "label": "Auto Rename Tag: Toggle",
+          "description": "Enable or disable automatic tag renaming",
+          "action": "notify:Auto Rename Tag toggled",
+          "icon": "\ud83c\udff7\ufe0f"
+        }
+      },
+      {
+        "type": "statusBar",
+        "config": {
+          "text": "\ud83c\udff7\ufe0f Tags",
+          "tooltip": "Auto Rename Tag is active",
+          "position": "right",
+          "priority": 1
+        }
+      }
+    ]
   },
   {
     "registryId": "christian-kohler.path-intellisense",
@@ -147,7 +660,27 @@
     "category": "Utilities",
     "icon": "\ud83d\udcc2",
     "installs": "11M",
-    "rating": 4.5
+    "rating": 4.5,
+    "hooks": [
+      {
+        "type": "command",
+        "config": {
+          "label": "Path Intellisense: Configure Mappings",
+          "description": "Set up path aliases for autocomplete",
+          "action": "notify:Configure path mappings in your tsconfig or jsconfig",
+          "icon": "\ud83d\udcc2"
+        }
+      },
+      {
+        "type": "statusBar",
+        "config": {
+          "text": "\ud83d\udcc2 Paths",
+          "tooltip": "Path Intellisense active",
+          "position": "right",
+          "priority": 1
+        }
+      }
+    ]
   },
   {
     "registryId": "pkief.material-icon-theme",
@@ -157,7 +690,46 @@
     "category": "Themes",
     "icon": "\ud83c\udf08",
     "installs": "20M",
-    "rating": 4.8
+    "rating": 4.8,
+    "hooks": [
+      {
+        "type": "command",
+        "config": {
+          "label": "Material Icons: Change Folder Theme",
+          "description": "Switch between folder icon styles",
+          "action": "notify:Folder icon theme updated",
+          "icon": "\ud83c\udf08"
+        }
+      },
+      {
+        "type": "fileIcon",
+        "config": {
+          "patterns": {
+            "*.js": "\ud83d\udfe8",
+            "*.ts": "\ud83d\udfe6",
+            "*.tsx": "\ud83d\udfe6",
+            "*.jsx": "\ud83d\udfe8",
+            "*.css": "\ud83d\udfea",
+            "*.html": "\ud83d\udfe7",
+            "*.json": "\ud83d\udfe2",
+            "*.md": "\u2b1c",
+            "*.svg": "\ud83d\udfe0",
+            "*.png": "\ud83d\uddbc\ufe0f",
+            "*.yml": "\u2699\ufe0f",
+            "*.yaml": "\u2699\ufe0f",
+            "*.env": "\ud83d\udd12",
+            "*.lock": "\ud83d\udd12"
+          }
+        }
+      },
+      {
+        "type": "theme",
+        "config": {
+          "name": "Material Icon Theme",
+          "type": "fileIcon"
+        }
+      }
+    ]
   },
   {
     "registryId": "streetsidesoftware.code-spell-checker",
@@ -167,7 +739,42 @@
     "category": "Linters",
     "icon": "\ud83d\udcda",
     "installs": "10M",
-    "rating": 4.5
+    "rating": 4.5,
+    "hooks": [
+      {
+        "type": "command",
+        "config": {
+          "label": "Spell Checker: Add Word to Dictionary",
+          "description": "Add the current word to the workspace dictionary",
+          "action": "notify:Word added to workspace dictionary",
+          "icon": "\ud83d\udcda"
+        }
+      },
+      {
+        "type": "command",
+        "config": {
+          "label": "Spell Checker: Toggle for File",
+          "description": "Enable or disable spell checking for the current file",
+          "action": "notify:Spell checking toggled for current file"
+        }
+      },
+      {
+        "type": "statusBar",
+        "config": {
+          "text": "\ud83d\udcda Spell",
+          "tooltip": "Code Spell Checker is active",
+          "position": "right",
+          "priority": 2
+        }
+      },
+      {
+        "type": "linter",
+        "config": {
+          "languages": ["*"],
+          "configFile": "cspell.json"
+        }
+      }
+    ]
   },
   {
     "registryId": "ms-vscode-remote.remote-ssh",
@@ -177,6 +784,34 @@
     "category": "DevOps",
     "icon": "\ud83d\udd10",
     "installs": "13M",
-    "rating": 4.3
+    "rating": 4.3,
+    "hooks": [
+      {
+        "type": "command",
+        "config": {
+          "label": "Remote-SSH: Connect to Host",
+          "description": "Connect to a remote machine via SSH",
+          "action": "notify:Configure SSH hosts in your ~/.ssh/config",
+          "icon": "\ud83d\udd10"
+        }
+      },
+      {
+        "type": "command",
+        "config": {
+          "label": "Remote-SSH: Open Configuration File",
+          "description": "Edit your SSH configuration",
+          "action": "notify:SSH config is at ~/.ssh/config"
+        }
+      },
+      {
+        "type": "statusBar",
+        "config": {
+          "text": "\ud83d\udd10 SSH",
+          "tooltip": "Remote SSH - connect to remote hosts",
+          "position": "left",
+          "priority": 7
+        }
+      }
+    ]
   }
 ]

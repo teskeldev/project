@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -22,6 +22,11 @@ import {
   type RegistryExtension,
   type InstalledExtension,
 } from "@/lib/client/extensions";
+import { invalidateExtensionCache } from "@/lib/client/extensionRuntime";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 
 type ExtTab = "marketplace" | "installed";
 type SortKey = "installs" | "rating" | "name";
@@ -36,6 +41,7 @@ function parseInstalls(s: string): number {
 
 export default function ExtensionsPage() {
   const { activeWorkspace } = useProject();
+  const workspaceId = activeWorkspace?.id ?? null;
   const [tab, setTab] = useState<ExtTab>("marketplace");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string | null>(null);
@@ -56,8 +62,8 @@ export default function ExtensionsPage() {
     try {
       const [registryRes, installedRes] = await Promise.all([
         fetchRegistry(),
-        activeWorkspace
-          ? listInstalled(activeWorkspace.id)
+        workspaceId
+          ? listInstalled(workspaceId)
           : Promise.resolve({ extensions: [] as InstalledExtension[] }),
       ]);
       setRegistry(registryRes.extensions);
@@ -67,7 +73,7 @@ export default function ExtensionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeWorkspace]);
+  }, [workspaceId]);
 
   useEffect(() => {
     void fetchData();
@@ -129,24 +135,26 @@ export default function ExtensionsPage() {
   // Install handler
   const handleInstall = useCallback(
     async (ext: RegistryExtension) => {
-      if (!activeWorkspace) return;
+      if (!workspaceId) return;
       setActionLoading(ext.registryId);
       try {
         const { extension } = await installExtension({
-          workspaceId: activeWorkspace.id,
+          workspaceId,
           registryId: ext.registryId,
           name: ext.name,
           author: ext.author,
           version: "1.0.0",
         });
         setInstalled((prev) => [...prev, extension]);
+        invalidateExtensionCache();
+        window.dispatchEvent(new Event("extensions-changed"));
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to install extension");
       } finally {
         setActionLoading(null);
       }
     },
-    [activeWorkspace]
+    [workspaceId]
   );
 
   // Uninstall handler
@@ -158,6 +166,8 @@ export default function ExtensionsPage() {
       try {
         await uninstallExtension(ext.id);
         setInstalled((prev) => prev.filter((e) => e.id !== ext.id));
+        invalidateExtensionCache();
+        window.dispatchEvent(new Event("extensions-changed"));
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to uninstall extension");
       } finally {
@@ -171,23 +181,23 @@ export default function ExtensionsPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <Puzzle size={48} className="mx-auto mb-4 text-gray-300" />
-          <p className="text-gray-500">Select a workspace to browse extensions</p>
+          <Puzzle size={48} className="mx-auto mb-4 text-[var(--text-muted)]" />
+          <p className="text-[var(--text-secondary)]">Select a workspace to browse extensions</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full flex-col bg-white">
+    <div className="flex h-full flex-col bg-[var(--surface)]">
       {/* Header */}
-      <div className="border-b border-gray-200 px-6 py-4">
+      <div className="border-b border-[var(--border)] px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Puzzle size={20} className="text-blue-500" />
-            <h1 className="text-lg font-semibold text-gray-900">Extensions</h1>
+            <Puzzle size={20} className="text-[var(--accent)]" />
+            <h1 className="text-lg font-semibold text-[var(--foreground)]">Extensions</h1>
           </div>
-          <div className="flex items-center gap-2 text-xs text-gray-500">
+          <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
             <span>{installed.length} installed</span>
             <span>&middot;</span>
             <span>{registry.length} available</span>
@@ -196,17 +206,17 @@ export default function ExtensionsPage() {
 
         {/* Search */}
         <div className="mt-4 flex items-center gap-3">
-          <div className="flex flex-1 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5">
-            <Search size={16} className="text-gray-400" />
-            <input
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+            <Input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search extensions..."
-              className="flex-1 bg-transparent text-sm placeholder:text-gray-400 focus:outline-none"
+              className="pl-9 pr-8"
             />
             {query && (
-              <button onClick={() => setQuery("")} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--foreground)]">
                 <X size={14} />
               </button>
             )}
@@ -214,19 +224,18 @@ export default function ExtensionsPage() {
 
           {/* Category dropdown */}
           <div className="relative">
-            <button
+            <Button
+              variant={category ? "default" : "outline"}
+              size="sm"
               onClick={() => { setShowCategoryMenu(!showCategoryMenu); setShowSortMenu(false); }}
-              className={`flex items-center gap-1 rounded-lg border px-3 py-2.5 text-xs hover:bg-gray-50 ${
-                category ? "border-blue-300 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600"
-              }`}
             >
               {category || "Category"} <ChevronDown size={12} />
-            </button>
+            </Button>
             {showCategoryMenu && (
-              <div className="absolute right-0 top-full z-10 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+              <div className="absolute right-0 top-full z-10 mt-1 w-44 rounded-lg border border-[var(--border)] bg-[var(--surface)] py-1 shadow-lg">
                 <button
                   onClick={() => { setCategory(null); setShowCategoryMenu(false); }}
-                  className={`w-full px-3 py-1.5 text-left text-xs hover:bg-gray-50 ${!category ? "font-medium text-blue-600" : "text-gray-600"}`}
+                  className={`w-full px-3 py-1.5 text-left text-xs hover:bg-[var(--surface-soft)] ${!category ? "font-medium text-[var(--accent)]" : "text-[var(--text-secondary)]"}`}
                 >
                   All Categories
                 </button>
@@ -234,7 +243,7 @@ export default function ExtensionsPage() {
                   <button
                     key={cat}
                     onClick={() => { setCategory(cat); setShowCategoryMenu(false); }}
-                    className={`w-full px-3 py-1.5 text-left text-xs hover:bg-gray-50 ${category === cat ? "font-medium text-blue-600" : "text-gray-600"}`}
+                    className={`w-full px-3 py-1.5 text-left text-xs hover:bg-[var(--surface-soft)] ${category === cat ? "font-medium text-[var(--accent)]" : "text-[var(--text-secondary)]"}`}
                   >
                     {cat}
                   </button>
@@ -245,20 +254,21 @@ export default function ExtensionsPage() {
 
           {/* Sort dropdown */}
           <div className="relative">
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => { setShowSortMenu(!showSortMenu); setShowCategoryMenu(false); }}
-              className="flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-2.5 text-xs text-gray-600 hover:bg-gray-50"
             >
               <TrendingUp size={12} /> Sort
-            </button>
+            </Button>
             {showSortMenu && (
-              <div className="absolute right-0 top-full z-10 mt-1 w-36 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+              <div className="absolute right-0 top-full z-10 mt-1 w-36 rounded-lg border border-[var(--border)] bg-[var(--surface)] py-1 shadow-lg">
                 {([["installs", "Most Installs"], ["rating", "Highest Rated"], ["name", "Name (A-Z)"]] as const).map(
                   ([key, label]) => (
                     <button
                       key={key}
                       onClick={() => { setSortKey(key); setShowSortMenu(false); }}
-                      className={`w-full px-3 py-1.5 text-left text-xs hover:bg-gray-50 ${sortKey === key ? "font-medium text-blue-600" : "text-gray-600"}`}
+                      className={`w-full px-3 py-1.5 text-left text-xs hover:bg-[var(--surface-soft)] ${sortKey === key ? "font-medium text-[var(--accent)]" : "text-[var(--text-secondary)]"}`}
                     >
                       {label}
                     </button>
@@ -275,8 +285,8 @@ export default function ExtensionsPage() {
             onClick={() => setTab("marketplace")}
             className={`pb-2 text-sm font-medium ${
               tab === "marketplace"
-                ? "border-b-2 border-blue-500 text-gray-900"
-                : "text-gray-500 hover:text-gray-700"
+                ? "border-b-2 border-[var(--accent)] text-[var(--foreground)]"
+                : "text-[var(--text-secondary)] hover:text-[var(--foreground)]"
             }`}
           >
             Marketplace
@@ -285,8 +295,8 @@ export default function ExtensionsPage() {
             onClick={() => setTab("installed")}
             className={`pb-2 text-sm font-medium ${
               tab === "installed"
-                ? "border-b-2 border-blue-500 text-gray-900"
-                : "text-gray-500 hover:text-gray-700"
+                ? "border-b-2 border-[var(--accent)] text-[var(--foreground)]"
+                : "text-[var(--text-secondary)] hover:text-[var(--foreground)]"
             }`}
           >
             Installed ({installed.length})
@@ -298,7 +308,7 @@ export default function ExtensionsPage() {
       <div className="flex-1 overflow-y-auto p-4">
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 size={24} className="animate-spin text-gray-400" />
+            <Loader2 size={24} className="animate-spin text-[var(--text-muted)]" />
           </div>
         ) : error ? (
           <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-600">
@@ -308,7 +318,7 @@ export default function ExtensionsPage() {
             </button>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="py-16 text-center text-sm text-gray-400">
+          <div className="py-16 text-center text-sm text-[var(--text-muted)]">
             {tab === "installed" ? "No extensions installed yet." : "No extensions match your search."}
           </div>
         ) : (
@@ -318,27 +328,27 @@ export default function ExtensionsPage() {
               const isLoading = actionLoading === ext.registryId;
 
               return (
-                <div
+                <Card
                   key={ext.registryId}
-                  className="flex items-start gap-4 rounded-xl border border-gray-200 p-4 transition-colors hover:border-gray-300"
+                  className="flex items-start gap-4 p-4 transition-colors hover:border-[var(--border-hover)]"
                 >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-2xl">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--surface-soft)] text-2xl">
                     {ext.icon}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-semibold text-gray-900">
+                      <h3 className="text-sm font-semibold text-[var(--foreground)]">
                         {ext.name}
                       </h3>
-                      <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">
+                      <Badge variant="outline" className="text-[10px]">
                         {ext.category}
-                      </span>
+                      </Badge>
                     </div>
-                    <p className="text-[11px] text-gray-500">by {ext.author}</p>
-                    <p className="mt-1 line-clamp-1 text-xs text-gray-600">
+                    <p className="text-[11px] text-[var(--text-secondary)]">by {ext.author}</p>
+                    <p className="mt-1 line-clamp-1 text-xs text-[var(--text-secondary)]">
                       {ext.description}
                     </p>
-                    <div className="mt-2 flex items-center gap-3 text-[11px] text-gray-400">
+                    <div className="mt-2 flex items-center gap-3 text-[11px] text-[var(--text-muted)]">
                       <span className="flex items-center gap-1">
                         <Download size={10} /> {ext.installs}
                       </span>
@@ -349,33 +359,31 @@ export default function ExtensionsPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     {isLoading ? (
-                      <button
-                        disabled
-                        className="flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-400"
-                      >
+                      <Button variant="outline" size="sm" disabled>
                         <Loader2 size={12} className="animate-spin" />
-                      </button>
+                      </Button>
                     ) : isInstalled ? (
-                      <button
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleUninstall(ext.registryId)}
-                        className="flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-50"
                       >
                         <Check size={12} className="text-green-500" />
                         Installed
-                      </button>
+                      </Button>
                     ) : (
-                      <button
+                      <Button
+                        size="sm"
                         onClick={() => handleInstall(ext)}
-                        className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800"
                       >
                         Install
-                      </button>
+                      </Button>
                     )}
-                    <button className="rounded p-1.5 text-gray-400 hover:bg-gray-100">
+                    <Button variant="ghost" size="icon" className="h-7 w-7">
                       <ExternalLink size={14} />
-                    </button>
+                    </Button>
                   </div>
-                </div>
+                </Card>
               );
             })}
           </div>

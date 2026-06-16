@@ -1,4 +1,4 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 import { prisma } from "@/lib/db";
 import {
   apiSuccess,
@@ -6,7 +6,9 @@ import {
   requireUser,
   validateBody,
   ApiError,
+  NO_STORE_HEADERS,
 } from "@/lib/api";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 // GET /api/extensions?workspaceId=
 export async function GET(req: Request) {
@@ -38,7 +40,7 @@ export async function GET(req: Request) {
       orderBy: { createdAt: "desc" },
     });
 
-    return apiSuccess({ extensions });
+    return apiSuccess({ extensions }, { headers: NO_STORE_HEADERS });
   } catch (err) {
     return handleApiError(err);
   }
@@ -58,6 +60,8 @@ export async function POST(req: Request) {
     const user = await requireUser();
     const body = await validateBody(req, installSchema);
 
+    await enforceRateLimit(`extensions:install:${body.workspaceId}`, 10, 60_000);
+
     // Verify workspace membership
     const member = await prisma.workspaceMember.findUnique({
       where: {
@@ -70,6 +74,15 @@ export async function POST(req: Request) {
 
     if (!member) {
       throw new ApiError("You do not have access to this workspace", 403, "FORBIDDEN");
+    }
+
+    // Role check: only ADMIN or OWNER can install extensions
+    if (member.role !== "ADMIN" && member.role !== "OWNER") {
+      throw new ApiError(
+        "Only admins and owners can install extensions",
+        403,
+        "FORBIDDEN"
+      );
     }
 
     const extension = await prisma.extension.create({

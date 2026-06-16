@@ -160,3 +160,7 @@ export function push(projectId: string): Promise<GitRemoteResult> {
 export function pull(projectId: string): Promise<GitRemoteResult> {
   return apiFetch(`${base(projectId)}/pull`, { method: "POST" });
 }
+
+export function generateCommitMessage(projectId: string): Promise<{ message: string }> {
+  return apiFetch(`${base(projectId)}/commit-message`, { method: "POST" });
+}

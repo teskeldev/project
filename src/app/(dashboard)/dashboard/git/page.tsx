@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -19,6 +19,10 @@ import {
   FolderGit2,
   Loader2,
   AlertCircle,
+  ExternalLink,
+  GitMerge,
+  MessageSquare,
+  Sparkles,
 } from "lucide-react";
 import { useProject } from "@/lib/store/project";
 import { ApiClientError } from "@/lib/client/api";
@@ -34,14 +38,47 @@ import {
   getLog,
   getDiff,
   push as apiPush,
+  generateCommitMessage as apiGenerateCommitMessage,
   pull as apiPull,
   type GitStatus,
   type GitFileStatus,
   type GitBranchInfo,
   type GitLogEntry,
 } from "@/lib/client/git";
+import { apiFetch } from "@/lib/client/api";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 
 type GitTab = "changes" | "branches" | "commits" | "prs";
+
+/* -------------------------------------------------------------------------- */
+/* Pull Request types                                                         */
+/* -------------------------------------------------------------------------- */
+
+type PullRequest = {
+  number: number;
+  title: string;
+  body: string | null;
+  state: "open" | "closed";
+  merged: boolean;
+  htmlUrl: string;
+  author: string;
+  head: { ref: string; sha: string };
+  base: { ref: string; sha: string };
+  createdAt: string;
+  updatedAt: string;
+  draft: boolean;
+  additions: number;
+  deletions: number;
+  changedFiles: number;
+  comments: number;
+};
+
+/* -------------------------------------------------------------------------- */
+/* Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
 
 /** Human-friendly single-letter status + colour for a changed file. */
 function statusBadge(f: GitFileStatus, staged: boolean): {
@@ -57,11 +94,11 @@ function statusBadge(f: GitFileStatus, staged: boolean): {
     case "D":
       return { letter: "D", className: "text-red-600" };
     case "R":
-      return { letter: "R", className: "text-blue-600" };
+      return { letter: "R", className: "text-accent" };
     case "?":
       return { letter: "U", className: "text-green-600" };
     default:
-      return { letter: code || "?", className: "text-gray-500" };
+      return { letter: code || "?", className: "text-[var(--text-secondary)]" };
   }
 }
 
@@ -100,12 +137,25 @@ export default function GitPage() {
   const [newBranchName, setNewBranchName] = useState("");
   const [creatingBranch, setCreatingBranch] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   // Selected file diff.
   const [diffPath, setDiffPath] = useState<string | null>(null);
   const [diffStaged, setDiffStaged] = useState(false);
   const [diffText, setDiffText] = useState<string | null>(null);
   const [diffLoading, setDiffLoading] = useState(false);
+
+  // Pull Requests state
+  const [pullRequests, setPullRequests] = useState<PullRequest[]>([]);
+  const [prsLoading, setPrsLoading] = useState(false);
+  const [prsError, setPrsError] = useState<string | null>(null);
+  const [showCreatePr, setShowCreatePr] = useState(false);
+  const [prTitle, setPrTitle] = useState("");
+  const [prBody, setPrBody] = useState("");
+  const [prBase, setPrBase] = useState("main");
+  const [prCreating, setPrCreating] = useState(false);
+  const [selectedPr, setSelectedPr] = useState<PullRequest | null>(null);
+  const [merging, setMerging] = useState(false);
 
   const refreshAll = useCallback(async () => {
     if (!projectId) return;
@@ -143,6 +193,24 @@ export default function GitPage() {
     }
   }, [projectId]);
 
+  const refreshPRs = useCallback(async () => {
+    if (!projectId) return;
+    setPrsLoading(true);
+    setPrsError(null);
+    try {
+      const data = await apiFetch<{ pullRequests: PullRequest[] }>(
+        `/api/projects/${encodeURIComponent(projectId)}/git/pull-request`
+      );
+      setPullRequests(data.pullRequests);
+    } catch (err) {
+      setPrsError(
+        err instanceof ApiClientError ? err.message : "Failed to load pull requests"
+      );
+    } finally {
+      setPrsLoading(false);
+    }
+  }, [projectId]);
+
   useEffect(() => {
     setIsRepo(null);
     setStatus(null);
@@ -150,6 +218,12 @@ export default function GitPage() {
     setDiffText(null);
     void refreshAll();
   }, [refreshAll]);
+
+  useEffect(() => {
+    if (activeTab === "prs" && projectId) {
+      void refreshPRs();
+    }
+  }, [activeTab, projectId, refreshPRs]);
 
   const handleInit = useCallback(async () => {
     if (!projectId) return;
@@ -230,6 +304,22 @@ export default function GitPage() {
       }
     }, "Commit created");
 
+  const handleGenerateMessage = useCallback(async () => {
+    if (!projectId || generating) return;
+    setGenerating(true);
+    setError(null);
+    try {
+      const { message } = await apiGenerateCommitMessage(projectId);
+      setCommitMessage(message);
+    } catch (err) {
+      setError(
+        err instanceof ApiClientError ? err.message : "Failed to generate commit message"
+      );
+    } finally {
+      setGenerating(false);
+    }
+  }, [projectId, generating]);
+
   const handleCreateBranch = () =>
     runAction(async () => {
       if (!projectId) return;
@@ -296,6 +386,58 @@ export default function GitPage() {
     [projectId]
   );
 
+  const handleCreatePR = async () => {
+    if (!projectId || !prTitle.trim() || !currentBranch) return;
+    setPrCreating(true);
+    setError(null);
+    try {
+      await apiFetch(
+        `/api/projects/${encodeURIComponent(projectId)}/git/pull-request`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            title: prTitle.trim(),
+            body: prBody.trim() || undefined,
+            head: currentBranch,
+            base: prBase.trim() || "main",
+          }),
+        }
+      );
+      setPrTitle("");
+      setPrBody("");
+      setShowCreatePr(false);
+      setActionMsg("Pull request created");
+      void refreshPRs();
+    } catch (err) {
+      setError(
+        err instanceof ApiClientError ? err.message : "Failed to create PR"
+      );
+    } finally {
+      setPrCreating(false);
+    }
+  };
+
+  const handleMergePR = async (prNumber: number) => {
+    if (!projectId) return;
+    setMerging(true);
+    setError(null);
+    try {
+      await apiFetch(
+        `/api/projects/${encodeURIComponent(projectId)}/git/pull-request/${prNumber}`,
+        { method: "POST" }
+      );
+      setActionMsg("Pull request merged");
+      setSelectedPr(null);
+      void refreshPRs();
+    } catch (err) {
+      setError(
+        err instanceof ApiClientError ? err.message : "Failed to merge PR"
+      );
+    } finally {
+      setMerging(false);
+    }
+  };
+
   const stagedCount = status?.staged.length ?? 0;
   const unstagedAll = useMemo(
     () => [...(status?.unstaged ?? []), ...(status?.untracked ?? [])],
@@ -320,10 +462,10 @@ export default function GitPage() {
   // ----------------------------- empty state -----------------------------
   if (!activeProject) {
     return (
-      <div className="flex h-full flex-col items-center justify-center bg-white text-center">
-        <FolderGit2 size={32} className="mb-3 text-gray-300" />
-        <p className="text-sm font-medium text-gray-700">No project selected</p>
-        <p className="mt-1 text-xs text-gray-400">
+      <div className="flex h-full flex-col items-center justify-center bg-[var(--surface)] text-center">
+        <FolderGit2 size={32} className="mb-3 text-[var(--text-muted)]" />
+        <p className="text-sm font-medium text-[var(--foreground)]">No project selected</p>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
           Choose a project to manage source control.
         </p>
       </div>
@@ -331,42 +473,43 @@ export default function GitPage() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-white">
+    <div className="flex h-full flex-col bg-[var(--surface)]">
       {/* Top bar */}
-      <div className="flex h-11 items-center justify-between border-b border-gray-200 px-4">
+      <div className="flex h-11 items-center justify-between border-b border-[var(--border)] px-4">
         <div className="flex items-center gap-3">
-          <GitBranch size={16} className="text-blue-500" />
-          <span className="text-sm font-medium text-gray-900">
+          <GitBranch size={16} className="text-accent" />
+          <span className="text-sm font-medium text-[var(--foreground)]">
             Source Control
           </span>
           {isRepo && (
-            <div className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1">
-              <GitBranch size={12} className="text-gray-500" />
-              <span className="text-xs font-medium text-gray-700">
+            <div className="flex items-center gap-1 rounded-lg border border-[var(--border)] px-2 py-1">
+              <GitBranch size={12} className="text-[var(--text-secondary)]" />
+              <span className="text-xs font-medium text-[var(--foreground)]">
                 {currentBranch ?? "(detached)"}
               </span>
-              <ChevronDown size={12} className="text-gray-400" />
+              <ChevronDown size={12} className="text-[var(--text-muted)]" />
             </div>
           )}
         </div>
         <div className="flex items-center gap-1">
-          <button
+          <Button
             onClick={() => void refreshAll()}
             disabled={loading || busy}
-            className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+            variant="ghost"
+            size="icon"
             title="Refresh"
           >
             <RefreshCw
               size={14}
               className={loading ? "animate-spin" : undefined}
             />
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Alerts */}
       {error && (
-        <div className="flex items-center gap-2 border-b border-red-100 bg-red-50 px-4 py-2 text-xs text-red-700">
+        <div className="flex items-center gap-2 border-b border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">
           <AlertCircle size={13} />
           <span className="flex-1">{error}</span>
           <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600">
@@ -375,10 +518,10 @@ export default function GitPage() {
         </div>
       )}
       {actionMsg && !error && (
-        <div className="flex items-center gap-2 border-b border-blue-100 bg-blue-50 px-4 py-2 text-xs text-blue-700">
+        <div className="flex items-center gap-2 border-b border-accent bg-accent-light px-4 py-2 text-xs text-accent">
           <Check size={13} />
           <span className="flex-1">{actionMsg}</span>
-          <button onClick={() => setActionMsg(null)} className="text-blue-400 hover:text-blue-600">
+          <button onClick={() => setActionMsg(null)} className="text-accent hover:text-accent">
             <X size={12} />
           </button>
         </div>
@@ -387,18 +530,18 @@ export default function GitPage() {
       {/* Not-a-repo CTA */}
       {isRepo === false && (
         <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-          <FolderGit2 size={36} className="mb-4 text-gray-300" />
-          <p className="text-sm font-medium text-gray-800">
+          <FolderGit2 size={36} className="mb-4 text-[var(--text-muted)]" />
+          <p className="text-sm font-medium text-[var(--foreground)]">
             No git repository
           </p>
-          <p className="mt-1 max-w-xs text-xs text-gray-400">
+          <p className="mt-1 max-w-xs text-xs text-[var(--text-muted)]">
             This project isn&apos;t under version control yet. Initialise a git
             repository to start tracking changes.
           </p>
-          <button
+          <Button
             onClick={() => void handleInit()}
             disabled={busy}
-            className="mt-4 flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+            className="mt-4"
           >
             {busy ? (
               <Loader2 size={14} className="animate-spin" />
@@ -406,14 +549,14 @@ export default function GitPage() {
               <FolderGit2 size={14} />
             )}
             Initialize Git repository
-          </button>
+          </Button>
         </div>
       )}
 
       {/* Loading (initial) */}
       {isRepo === null && loading && (
         <div className="flex flex-1 items-center justify-center">
-          <Loader2 size={20} className="animate-spin text-gray-300" />
+          <Loader2 size={20} className="animate-spin text-[var(--text-muted)]" />
         </div>
       )}
 
@@ -421,15 +564,15 @@ export default function GitPage() {
       {isRepo === true && (
         <>
           {/* Tabs */}
-          <div className="flex border-b border-gray-200 px-4">
+          <div className="flex border-b border-[var(--border)] px-4">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-xs font-medium transition-colors ${
                   activeTab === tab.id
-                    ? "border-blue-500 text-gray-900"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
+                    ? "border-[var(--accent)] text-[var(--foreground)]"
+                    : "border-transparent text-[var(--text-secondary)] hover:text-[var(--foreground)]"
                 }`}
               >
                 <tab.icon size={14} />
@@ -449,37 +592,56 @@ export default function GitPage() {
                       value={commitMessage}
                       onChange={(e) => setCommitMessage(e.target.value)}
                       placeholder="Commit message..."
-                      className="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-300 focus:outline-none"
+                      className="w-full resize-none rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--text-muted)] focus:border-[var(--border-focus,var(--accent))] focus:outline-none"
                       rows={2}
                     />
+                    <div className="mt-1 flex justify-end">
+                      <Button
+                        onClick={() => void handleGenerateMessage()}
+                        disabled={generating || busy || stagedCount === 0}
+                        variant="ghost"
+                        size="sm"
+                        title="Generate commit message with AI"
+                      >
+                        {generating ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <Sparkles size={12} />
+                        )}
+                        {generating ? "Generating..." : "Generate"}
+                      </Button>
+                    </div>
                     <div className="mt-2 flex items-center gap-2">
-                      <button
+                      <Button
                         onClick={() => void handleCommit()}
                         disabled={busy || stagedCount === 0 || !commitMessage.trim()}
-                        className="flex-1 rounded-lg bg-gray-900 py-2 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+                        className="flex-1"
+                        size="sm"
                       >
-                        <Check size={12} className="mr-1.5 inline" />
+                        <Check size={12} />
                         Commit ({stagedCount} staged)
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         onClick={() => void handlePush()}
                         disabled={busy}
-                        className="rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                        variant="outline"
+                        size="sm"
                       >
-                        <ArrowUp size={12} className="mr-1 inline" />
+                        <ArrowUp size={12} />
                         Push
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         onClick={() => void handlePull()}
                         disabled={busy}
-                        className="rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                        variant="outline"
+                        size="sm"
                       >
-                        <ArrowDown size={12} className="mr-1 inline" />
+                        <ArrowDown size={12} />
                         Pull
-                      </button>
+                      </Button>
                     </div>
                     {(status?.ahead || status?.behind) && (
-                      <div className="mt-2 flex items-center gap-3 text-[11px] text-gray-400">
+                      <div className="mt-2 flex items-center gap-3 text-[11px] text-[var(--text-muted)]">
                         {status.ahead > 0 && (
                           <span className="flex items-center gap-0.5 text-green-600">
                             <ArrowUp size={10} />
@@ -499,16 +661,16 @@ export default function GitPage() {
                   {/* Staged */}
                   <div className="mb-4">
                     <div className="mb-2 flex items-center gap-2">
-                      <ChevronDown size={14} className="text-gray-400" />
-                      <span className="text-xs font-semibold text-gray-700">
+                      <ChevronDown size={14} className="text-[var(--text-muted)]" />
+                      <span className="text-xs font-semibold text-[var(--foreground)]">
                         Staged Changes
                       </span>
-                      <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700">
+                      <Badge variant="success" className="text-[10px]">
                         {stagedCount}
-                      </span>
+                      </Badge>
                     </div>
                     {stagedCount === 0 && (
-                      <p className="px-3 py-1 text-[12px] text-gray-400">
+                      <p className="px-3 py-1 text-[12px] text-[var(--text-muted)]">
                         Nothing staged.
                       </p>
                     )}
@@ -517,8 +679,8 @@ export default function GitPage() {
                       return (
                         <div
                           key={`s-${f.path}`}
-                          className={`group flex items-center gap-2 rounded-lg px-3 py-1.5 hover:bg-gray-50 ${
-                            diffPath === f.path && diffStaged ? "bg-gray-100" : ""
+                          className={`group flex items-center gap-2 rounded-lg px-3 py-1.5 hover:bg-[var(--surface-soft)] ${
+                            diffPath === f.path && diffStaged ? "bg-[var(--surface-soft)]" : ""
                           }`}
                         >
                           <span className={`text-[10px] font-bold ${badge.className}`}>
@@ -526,7 +688,7 @@ export default function GitPage() {
                           </span>
                           <button
                             onClick={() => void openDiff(f.path, true)}
-                            className="flex-1 truncate text-left text-[13px] text-gray-700 hover:text-gray-900"
+                            className="flex-1 truncate text-left text-[13px] text-[var(--foreground)] hover:text-[var(--foreground)]"
                             title={f.path}
                           >
                             {f.path}
@@ -534,7 +696,7 @@ export default function GitPage() {
                           <button
                             onClick={() => void handleUnstage(f.path)}
                             disabled={busy}
-                            className="rounded p-1 text-gray-400 opacity-0 hover:bg-gray-200 group-hover:opacity-100 disabled:opacity-50"
+                            className="rounded p-1 text-[var(--text-muted)] opacity-0 hover:bg-[var(--border)] group-hover:opacity-100 disabled:opacity-50"
                             title="Unstage file"
                           >
                             <X size={12} />
@@ -547,18 +709,18 @@ export default function GitPage() {
                   {/* Unstaged + untracked */}
                   <div>
                     <div className="mb-2 flex items-center gap-2">
-                      <ChevronDown size={14} className="text-gray-400" />
-                      <span className="text-xs font-semibold text-gray-700">
+                      <ChevronDown size={14} className="text-[var(--text-muted)]" />
+                      <span className="text-xs font-semibold text-[var(--foreground)]">
                         Changes
                       </span>
-                      <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+                      <Badge variant="outline" className="text-[10px]">
                         {unstagedAll.length}
-                      </span>
+                      </Badge>
                       {unstagedAll.length > 0 && (
                         <button
                           onClick={() => void handleStageAll()}
                           disabled={busy}
-                          className="ml-auto rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600 disabled:opacity-50"
+                          className="ml-auto rounded p-1 text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-secondary)] disabled:opacity-50"
                           title="Stage all"
                         >
                           <Plus size={13} />
@@ -566,7 +728,7 @@ export default function GitPage() {
                       )}
                     </div>
                     {unstagedAll.length === 0 && (
-                      <p className="px-3 py-1 text-[12px] text-gray-400">
+                      <p className="px-3 py-1 text-[12px] text-[var(--text-muted)]">
                         No changes.
                       </p>
                     )}
@@ -575,8 +737,8 @@ export default function GitPage() {
                       return (
                         <div
                           key={`u-${f.path}`}
-                          className={`group flex items-center gap-2 rounded-lg px-3 py-1.5 hover:bg-gray-50 ${
-                            diffPath === f.path && !diffStaged ? "bg-gray-100" : ""
+                          className={`group flex items-center gap-2 rounded-lg px-3 py-1.5 hover:bg-[var(--surface-soft)] ${
+                            diffPath === f.path && !diffStaged ? "bg-[var(--surface-soft)]" : ""
                           }`}
                         >
                           <span className={`text-[10px] font-bold ${badge.className}`}>
@@ -584,7 +746,7 @@ export default function GitPage() {
                           </span>
                           <button
                             onClick={() => void openDiff(f.path, false)}
-                            className="flex-1 truncate text-left text-[13px] text-gray-700 hover:text-gray-900"
+                            className="flex-1 truncate text-left text-[13px] text-[var(--foreground)] hover:text-[var(--foreground)]"
                             title={f.path}
                           >
                             {f.path}
@@ -592,7 +754,7 @@ export default function GitPage() {
                           <button
                             onClick={() => void handleStage(f.path)}
                             disabled={busy}
-                            className="rounded p-1 text-gray-400 opacity-0 hover:bg-gray-200 group-hover:opacity-100 disabled:opacity-50"
+                            className="rounded p-1 text-[var(--text-muted)] opacity-0 hover:bg-[var(--border)] group-hover:opacity-100 disabled:opacity-50"
                             title="Stage file"
                           >
                             <Plus size={12} />
@@ -606,14 +768,14 @@ export default function GitPage() {
 
               {activeTab === "branches" && (
                 <div className="p-4">
-                  <div className="mb-4 flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
-                    <Search size={14} className="text-gray-400" />
+                  <div className="mb-4 flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2">
+                    <Search size={14} className="text-[var(--text-muted)]" />
                     <input
                       type="text"
                       value={branchFilter}
                       onChange={(e) => setBranchFilter(e.target.value)}
                       placeholder="Filter branches..."
-                      className="flex-1 bg-transparent text-sm placeholder:text-gray-400 focus:outline-none"
+                      className="flex-1 bg-transparent text-sm text-[var(--foreground)] placeholder:text-[var(--text-muted)] focus:outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -621,37 +783,39 @@ export default function GitPage() {
                       <div
                         key={b.name}
                         className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 ${
-                          b.current ? "bg-blue-50" : "hover:bg-gray-50"
+                          b.current ? "bg-accent-light" : "hover:bg-[var(--surface-soft)]"
                         }`}
                       >
                         <GitBranch
                           size={14}
-                          className={b.current ? "text-blue-500" : "text-gray-400"}
+                          className={b.current ? "text-accent" : "text-[var(--text-muted)]"}
                         />
                         <span
                           className={`flex-1 truncate text-sm ${
-                            b.current ? "font-medium text-gray-900" : "text-gray-700"
+                            b.current ? "font-medium text-[var(--foreground)]" : "text-[var(--foreground)]"
                           }`}
                         >
                           {b.name}
                         </span>
                         {b.current ? (
-                          <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">
+                          <Badge variant="default" className="text-[10px]">
                             current
-                          </span>
+                          </Badge>
                         ) : (
-                          <button
+                          <Button
                             onClick={() => void handleCheckout(b.name)}
                             disabled={busy}
-                            className="rounded border border-gray-200 px-2 py-0.5 text-[10px] text-gray-600 opacity-0 hover:bg-gray-50 group-hover:opacity-100 disabled:opacity-50"
+                            variant="outline"
+                            size="sm"
+                            className="opacity-0 group-hover:opacity-100 text-[10px]"
                           >
                             Checkout
-                          </button>
+                          </Button>
                         )}
                       </div>
                     ))}
                     {filteredBranches.length === 0 && (
-                      <p className="px-3 py-2 text-[12px] text-gray-400">
+                      <p className="px-3 py-2 text-[12px] text-[var(--text-muted)]">
                         No branches match.
                       </p>
                     )}
@@ -659,7 +823,7 @@ export default function GitPage() {
 
                   {creatingBranch ? (
                     <div className="mt-4 flex items-center gap-2">
-                      <input
+                      <Input
                         autoFocus
                         type="text"
                         value={newBranchName}
@@ -672,33 +836,36 @@ export default function GitPage() {
                           }
                         }}
                         placeholder="new-branch-name"
-                        className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-xs focus:border-gray-300 focus:outline-none"
+                        className="flex-1 text-xs"
                       />
-                      <button
+                      <Button
                         onClick={() => void handleCreateBranch()}
                         disabled={busy || !newBranchName.trim()}
-                        className="rounded-lg bg-gray-900 px-3 py-2 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+                        size="sm"
                       >
                         Create
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         onClick={() => {
                           setCreatingBranch(false);
                           setNewBranchName("");
                         }}
-                        className="rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600 hover:bg-gray-50"
+                        variant="outline"
+                        size="sm"
                       >
                         Cancel
-                      </button>
+                      </Button>
                     </div>
                   ) : (
-                    <button
+                    <Button
                       onClick={() => setCreatingBranch(true)}
-                      className="mt-4 flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-xs text-gray-600 hover:bg-gray-50"
+                      variant="outline"
+                      size="sm"
+                      className="mt-4"
                     >
                       <Plus size={14} />
                       Create branch
-                    </button>
+                    </Button>
                   )}
                 </div>
               )}
@@ -706,7 +873,7 @@ export default function GitPage() {
               {activeTab === "commits" && (
                 <div className="p-4">
                   {commits.length === 0 ? (
-                    <p className="px-3 py-2 text-[12px] text-gray-400">
+                    <p className="px-3 py-2 text-[12px] text-[var(--text-muted)]">
                       No commits yet.
                     </p>
                   ) : (
@@ -714,16 +881,16 @@ export default function GitPage() {
                       {commits.map((c) => (
                         <div
                           key={c.hash}
-                          className="flex items-start gap-3 rounded-lg px-3 py-3 hover:bg-gray-50"
+                          className="flex items-start gap-3 rounded-lg px-3 py-3 hover:bg-[var(--surface-soft)]"
                         >
-                          <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-100">
-                            <GitCommit size={12} className="text-gray-500" />
+                          <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--surface-soft)]">
+                            <GitCommit size={12} className="text-[var(--text-secondary)]" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-gray-900">
+                            <p className="truncate text-sm font-medium text-[var(--foreground)]">
                               {c.message}
                             </p>
-                            <div className="mt-1 flex items-center gap-3 text-[11px] text-gray-400">
+                            <div className="mt-1 flex items-center gap-3 text-[11px] text-[var(--text-muted)]">
                               <span className="flex items-center gap-1">
                                 <User size={10} /> {c.author}
                               </span>
@@ -735,7 +902,7 @@ export default function GitPage() {
                               )}
                             </div>
                           </div>
-                          <code className="mt-1 rounded bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">
+                          <code className="mt-1 rounded bg-[var(--surface-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
                             {c.shortHash}
                           </code>
                         </div>
@@ -746,32 +913,274 @@ export default function GitPage() {
               )}
 
               {activeTab === "prs" && (
-                <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-                  {/* TODO(phase-future): real PR integration once a remote /
-                      GitHub connection is configured in Integrations. We do NOT
-                      fabricate PR data here. */}
-                  <GitPullRequest size={32} className="mb-3 text-gray-300" />
-                  <p className="text-sm font-medium text-gray-700">
-                    No pull requests
-                  </p>
-                  <p className="mt-1 max-w-xs text-xs text-gray-400">
-                    Connect a remote/GitHub in Integrations to manage pull
-                    requests from here.
-                  </p>
+                <div className="p-4">
+                  {/* PR Detail View */}
+                  {selectedPr ? (
+                    <div>
+                      <button
+                        onClick={() => setSelectedPr(null)}
+                        className="mb-4 flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-[var(--foreground)]"
+                      >
+                        ← Back to list
+                      </button>
+                      <Card>
+                        <CardContent className="p-5">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <h3 className="text-base font-semibold text-[var(--foreground)]">
+                                #{selectedPr.number} {selectedPr.title}
+                              </h3>
+                              <div className="mt-2 flex items-center gap-3 text-xs text-[var(--text-secondary)]">
+                                <span className="flex items-center gap-1">
+                                  <User size={11} /> {selectedPr.author}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Clock size={11} /> {relativeTime(selectedPr.createdAt)}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <GitBranch size={11} /> {selectedPr.head.ref} → {selectedPr.base.ref}
+                                </span>
+                              </div>
+                            </div>
+                            <Badge
+                              variant={
+                                selectedPr.merged
+                                  ? "default"
+                                  : selectedPr.state === "open"
+                                  ? "success"
+                                  : "destructive"
+                              }
+                              className={selectedPr.merged ? "bg-purple-100 text-purple-700" : ""}
+                            >
+                              {selectedPr.merged ? "Merged" : selectedPr.state}
+                            </Badge>
+                          </div>
+
+                          {selectedPr.body && (
+                            <p className="mt-4 whitespace-pre-wrap text-sm text-[var(--text-secondary)]">
+                              {selectedPr.body}
+                            </p>
+                          )}
+
+                          <div className="mt-4 flex items-center gap-4 text-xs text-[var(--text-secondary)]">
+                            <span className="text-green-600">+{selectedPr.additions}</span>
+                            <span className="text-red-600">-{selectedPr.deletions}</span>
+                            <span>{selectedPr.changedFiles} files</span>
+                            <span className="flex items-center gap-1">
+                              <MessageSquare size={11} /> {selectedPr.comments}
+                            </span>
+                          </div>
+
+                          <div className="mt-5 flex items-center gap-3">
+                            {selectedPr.state === "open" && !selectedPr.merged && (
+                              <Button
+                                onClick={() => void handleMergePR(selectedPr.number)}
+                                disabled={merging}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                {merging ? (
+                                  <Loader2 size={13} className="animate-spin" />
+                                ) : (
+                                  <GitMerge size={13} />
+                                )}
+                                Merge Pull Request
+                              </Button>
+                            )}
+                            <Button asChild variant="outline" size="sm">
+                              <a
+                                href={selectedPr.htmlUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <ExternalLink size={12} />
+                                View on GitHub
+                              </a>
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Create PR form */}
+                      {showCreatePr && (
+                        <Card className="mb-6 bg-[var(--surface-soft)]">
+                          <CardContent className="p-4">
+                            <h3 className="mb-3 text-sm font-semibold text-[var(--foreground)]">
+                              Create Pull Request
+                            </h3>
+                            <div className="space-y-3">
+                              <Input
+                                type="text"
+                                value={prTitle}
+                                onChange={(e) => setPrTitle(e.target.value)}
+                                placeholder="PR title..."
+                              />
+                              <textarea
+                                value={prBody}
+                                onChange={(e) => setPrBody(e.target.value)}
+                                placeholder="Description (optional)..."
+                                className="w-full resize-none rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--text-muted)] focus:border-[var(--border-focus,var(--accent))] focus:outline-none"
+                                rows={3}
+                              />
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                                  <GitBranch size={12} />
+                                  <span className="font-medium">{currentBranch}</span>
+                                  <span>→</span>
+                                  <Input
+                                    type="text"
+                                    value={prBase}
+                                    onChange={(e) => setPrBase(e.target.value)}
+                                    className="w-24 text-xs"
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  onClick={() => void handleCreatePR()}
+                                  disabled={prCreating || !prTitle.trim()}
+                                  className="bg-green-600 hover:bg-green-700"
+                                  size="sm"
+                                >
+                                  {prCreating ? (
+                                    <Loader2 size={13} className="animate-spin" />
+                                  ) : (
+                                    <GitPullRequest size={13} />
+                                  )}
+                                  Create PR
+                                </Button>
+                                <Button
+                                  onClick={() => setShowCreatePr(false)}
+                                  variant="outline"
+                                  size="sm"
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {/* Header */}
+                      <div className="mb-4 flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-[var(--foreground)]">
+                          Open Pull Requests
+                        </h3>
+                        <Button
+                          onClick={() => setShowCreatePr(true)}
+                          disabled={!currentBranch || currentBranch === "main"}
+                          size="sm"
+                          title={
+                            currentBranch === "main"
+                              ? "Switch to a feature branch to create a PR"
+                              : "Create pull request"
+                          }
+                        >
+                          <Plus size={12} />
+                          New PR
+                        </Button>
+                      </div>
+
+                      {/* Loading */}
+                      {prsLoading && (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 size={18} className="animate-spin text-[var(--text-muted)]" />
+                        </div>
+                      )}
+
+                      {/* Error */}
+                      {prsError && !prsLoading && (
+                        <Card className="border-amber-200 bg-amber-50">
+                          <CardContent className="px-4 py-3 text-xs text-amber-700">
+                            <p className="font-medium">Could not load pull requests</p>
+                            <p className="mt-1 text-amber-600">{prsError}</p>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {/* PR List */}
+                      {!prsLoading && !prsError && pullRequests.length === 0 && (
+                        <div className="flex flex-col items-center justify-center py-12 text-center">
+                          <GitPullRequest size={32} className="mb-3 text-[var(--text-muted)]" />
+                          <p className="text-sm font-medium text-[var(--foreground)]">
+                            No open pull requests
+                          </p>
+                          <p className="mt-1 max-w-xs text-xs text-[var(--text-muted)]">
+                            Create a pull request from a feature branch to propose changes.
+                          </p>
+                        </div>
+                      )}
+
+                      {!prsLoading && pullRequests.length > 0 && (
+                        <div className="space-y-2">
+                          {pullRequests.map((pr) => (
+                            <Card
+                              key={pr.number}
+                              className="cursor-pointer transition-colors hover:bg-[var(--surface-soft)]"
+                              onClick={() => setSelectedPr(pr)}
+                            >
+                              <CardContent className="flex items-start gap-3 px-4 py-3">
+                                <GitPullRequest
+                                  size={16}
+                                  className={
+                                    pr.merged
+                                      ? "mt-0.5 text-purple-500"
+                                      : pr.state === "open"
+                                      ? "mt-0.5 text-green-500"
+                                      : "mt-0.5 text-red-500"
+                                  }
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-sm font-medium text-[var(--foreground)]">
+                                    {pr.title}
+                                  </p>
+                                  <div className="mt-1 flex items-center gap-3 text-[11px] text-[var(--text-muted)]">
+                                    <span>#{pr.number}</span>
+                                    <span className="flex items-center gap-1">
+                                      <User size={10} /> {pr.author}
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      <Clock size={10} /> {relativeTime(pr.createdAt)}
+                                    </span>
+                                    {pr.draft && (
+                                      <Badge variant="outline" className="text-[10px]">
+                                        Draft
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
+                                  <span className="text-green-600">+{pr.additions}</span>
+                                  <span className="text-red-600">-{pr.deletions}</span>
+                                  {pr.comments > 0 && (
+                                    <span className="flex items-center gap-0.5">
+                                      <MessageSquare size={10} /> {pr.comments}
+                                    </span>
+                                  )}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
             </div>
 
             {/* Diff panel */}
             {(activeTab === "changes") && diffPath && (
-              <div className="hidden w-1/2 flex-col border-l border-gray-200 md:flex">
-                <div className="flex h-9 items-center justify-between border-b border-gray-200 px-3">
-                  <span className="truncate text-[12px] font-medium text-gray-600">
+              <div className="hidden w-1/2 flex-col border-l border-[var(--border)] md:flex">
+                <div className="flex h-9 items-center justify-between border-b border-[var(--border)] px-3">
+                  <span className="truncate text-[12px] font-medium text-[var(--text-secondary)]">
                     {diffPath}
                     {diffStaged && (
-                      <span className="ml-2 rounded bg-green-100 px-1.5 py-0.5 text-[10px] text-green-700">
+                      <Badge variant="success" className="ml-2 text-[10px]">
                         staged
-                      </span>
+                      </Badge>
                     )}
                   </span>
                   <button
@@ -779,33 +1188,33 @@ export default function GitPage() {
                       setDiffPath(null);
                       setDiffText(null);
                     }}
-                    className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                    className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-secondary)]"
                   >
                     <X size={12} />
                   </button>
                 </div>
-                <div className="flex-1 overflow-auto bg-gray-50 p-3 font-mono text-[12px] leading-relaxed">
+                <div className="flex-1 overflow-auto bg-[var(--surface-soft)] p-3 font-mono text-[12px] leading-relaxed">
                   {diffLoading ? (
-                    <div className="flex items-center gap-2 text-gray-400">
+                    <div className="flex items-center gap-2 text-[var(--text-muted)]">
                       <Loader2 size={14} className="animate-spin" />
                       Loading diff...
                     </div>
                   ) : diffText ? (
                     <pre className="whitespace-pre-wrap break-all">
                       {diffText.split("\n").map((line, i) => {
-                        let cls = "text-gray-600";
+                        let cls = "text-[var(--text-secondary)]";
                         if (line.startsWith("+") && !line.startsWith("+++"))
                           cls = "bg-green-50 text-green-700";
                         else if (line.startsWith("-") && !line.startsWith("---"))
                           cls = "bg-red-50 text-red-700";
-                        else if (line.startsWith("@@")) cls = "text-blue-500";
+                        else if (line.startsWith("@@")) cls = "text-accent";
                         else if (
                           line.startsWith("diff ") ||
                           line.startsWith("index ") ||
                           line.startsWith("+++") ||
                           line.startsWith("---")
                         )
-                          cls = "text-gray-400";
+                          cls = "text-[var(--text-muted)]";
                         return (
                           <div key={i} className={cls}>
                             {line || " "}
@@ -814,7 +1223,7 @@ export default function GitPage() {
                       })}
                     </pre>
                   ) : (
-                    <p className="text-gray-400">
+                    <p className="text-[var(--text-muted)]">
                       No diff available (binary or untracked file).
                     </p>
                   )}

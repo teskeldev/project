@@ -3,6 +3,7 @@ import {
   apiSuccess,
   handleApiError,
   requireProjectAccess,
+  requireRole,
   validateBody,
   ApiError,
 } from "@/lib/api";
@@ -27,7 +28,8 @@ export async function PATCH(req: Request, ctx: RouteContext) {
       throw new ApiError("File change not found", 404, "NOT_FOUND");
     }
 
-    await requireProjectAccess(existing.changeSet.projectId);
+    const { member } = await requireProjectAccess(existing.changeSet.projectId);
+    requireRole(member);
 
     if (existing.changeSet.status === "APPLIED") {
       throw new ApiError(

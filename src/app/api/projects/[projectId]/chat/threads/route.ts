@@ -6,6 +6,7 @@ import {
   validateBody,
 } from "@/lib/api";
 import { createThreadSchema } from "@/lib/validators";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 type RouteContext = { params: Promise<{ projectId: string }> };
 
@@ -18,6 +19,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
     const threads = await prisma.chatThread.findMany({
       where: { projectId },
       orderBy: { updatedAt: "desc" },
+      take: 100, // Limit to recent 100 threads for sidebar rendering performance
       select: {
         id: true,
         title: true,
@@ -39,6 +41,7 @@ export async function POST(req: Request, ctx: RouteContext) {
   try {
     const { projectId } = await ctx.params;
     const { user } = await requireProjectAccess(projectId);
+    await enforceRateLimit(`chat:threads:create:${user.id}`, 30, 60_000);
     const { title } = await validateBody(req, createThreadSchema);
 
     const thread = await prisma.chatThread.create({

@@ -9,11 +9,20 @@ async function main() {
   // Demo user
   const user = await prisma.user.upsert({
     where: { email: "demo@teskel.dev" },
-    update: {},
+    update: {
+      preferences: {
+        onboardingCompleted: true,
+        onboardingCompletedAt: new Date().toISOString(),
+      },
+    },
     create: {
       email: "demo@teskel.dev",
       name: "Demo User",
       passwordHash,
+      preferences: {
+        onboardingCompleted: true,
+        onboardingCompletedAt: new Date().toISOString(),
+      },
     },
   });
 

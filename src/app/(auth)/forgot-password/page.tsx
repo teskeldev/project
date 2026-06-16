@@ -1,12 +1,66 @@
-﻿"use client";
+"use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, AlertCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle } from "lucide-react";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startCooldown = useCallback(() => {
+    setCooldown(60);
+    cooldownRef.current = setInterval(() => {
+      setCooldown((prev) => {
+        if (prev <= 1) {
+          if (cooldownRef.current) clearInterval(cooldownRef.current);
+          cooldownRef.current = null;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (cooldownRef.current) clearInterval(cooldownRef.current);
+    };
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok || !json?.success) {
+        setError(json?.error?.message || "Something went wrong. Please try again.");
+        setLoading(false);
+        startCooldown();
+        return;
+      }
+
+      setSubmitted(true);
+      startCooldown();
+    } catch {
+      setError("Something went wrong. Please try again.");
+      setLoading(false);
+      startCooldown();
+    }
+  };
 
   if (submitted) {
     return (
@@ -30,15 +84,15 @@ export default function ForgotPasswordPage() {
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-50">
-            <AlertCircle className="text-amber-600" size={24} />
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-50">
+            <CheckCircle className="text-green-600" size={24} />
           </div>
           <h1 className="mb-2 text-2xl font-semibold text-gray-900">
-            Not available yet
+            Check your email
           </h1>
           <p className="mb-6 text-sm text-gray-500">
-            Password reset is not yet available. Please contact support or create
-            a new account.
+            If an account with <strong>{email}</strong> exists, we&apos;ve sent a
+            password reset link. Please check your inbox and spam folder.
           </p>
           <Link
             href="/login"
@@ -73,24 +127,20 @@ export default function ForgotPasswordPage() {
       </div>
 
       <div className="rounded-2xl border border-gray-200/80 bg-white/80 p-8 shadow-lg shadow-gray-200/50 backdrop-blur-sm transition-all duration-500">
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-700">
-          Password reset is not yet available. This feature is coming soon.
-        </div>
-
         <h1 className="mb-2 text-2xl font-semibold text-gray-900">
           Reset your password
         </h1>
         <p className="mb-6 text-sm text-gray-500">
-          This feature is currently under development.
+          Enter your email address and we&apos;ll send you a link to reset your
+          password.
         </p>
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setSubmitted(true);
-          }}
-          className="flex flex-col gap-4"
-        >
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          {error && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-600">
+              {error}
+            </div>
+          )}
           <div>
             <label
               htmlFor="email"
@@ -104,17 +154,21 @@ export default function ForgotPasswordPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60"
               required
-              disabled
+              disabled={loading || cooldown > 0}
+              className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60"
             />
           </div>
           <button
             type="submit"
-            disabled
-            className="mt-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white opacity-50 cursor-not-allowed"
+            disabled={loading || cooldown > 0}
+            className="mt-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Not Available Yet
+            {loading
+              ? "Sending..."
+              : cooldown > 0
+                ? `Try again in ${cooldown}s`
+                : "Send reset link"}
           </button>
         </form>
       </div>

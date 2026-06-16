@@ -32,7 +32,7 @@ const unique = Date.now();
 const TEST_USER = {
   name: "E2E Smoke",
   email: `e2e+${unique}@teskel.dev`,
-  password: "smoke-test-password-123",
+  password: "Smoke-Test-Password-123",
 };
 const PROJECT_NAME = `e2e-project-${unique}`;
 const FILE_NAME = `hello-${unique}.ts`;
@@ -92,13 +92,14 @@ test.describe("Teskel happy path smoke test", () => {
     // ---- 3 & 4. Create, edit and save a file in the Editor ---------------
     await page.goto("/dashboard/editor");
 
-    // The Explorer panel hosts a "New file" button (title attribute).
+    // The Explorer panel hosts a "New file" button (title attribute) which
+    // reveals an INLINE text input (placeholder "filename"), not a native
+    // prompt. Type the name and press Enter to create the file.
     await page.getByTitle("New file").first().click();
-
-    // File creation uses a window.prompt — handle the native dialog.
-    page.once("dialog", (dialog) => dialog.accept(FILE_NAME));
-    // The prompt is triggered by the click above; if your browser surfaces it
-    // differently, the dialog handler still resolves it.
+    const nameInput = page.getByPlaceholder("filename");
+    await expect(nameInput).toBeVisible({ timeout: 10_000 });
+    await nameInput.fill(FILE_NAME);
+    await nameInput.press("Enter");
 
     // The new file should open as a tab.
     await expect(page.getByText(FILE_NAME, { exact: false })).toBeVisible({

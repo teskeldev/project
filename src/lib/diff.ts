@@ -20,6 +20,9 @@ export type ParsedDiffLine = {
 
 export type DiffStat = { additions: number; deletions: number };
 
+/** Maximum number of lines for O(n²) LCS computation. */
+const MAX_LINES = 2000;
+
 /**
  * Count additions/deletions from a unified diff string. Lines beginning with a
  * single "+" are additions, "-" deletions; the "---"/"+++" file headers are
@@ -79,8 +82,42 @@ export type SideBySideRow = {
 };
 
 /**
+ * Build a simplified side-by-side diff without LCS alignment.
+ * Used as a fallback when files exceed MAX_LINES.
+ */
+function buildSimplifiedSideBySide(
+  a: string[],
+  b: string[]
+): SideBySideRow[] {
+  const rows: SideBySideRow[] = [];
+  let oldNo = 1;
+  let newNo = 1;
+
+  // Show all old lines as removed, then all new lines as added
+  for (let i = 0; i < a.length; i++) {
+    rows.push({
+      left: { lineNumber: oldNo++, content: a[i] },
+      right: { lineNumber: null, content: null },
+      type: "removed",
+    });
+  }
+  for (let j = 0; j < b.length; j++) {
+    rows.push({
+      left: { lineNumber: null, content: null },
+      right: { lineNumber: newNo++, content: b[j] },
+      type: "added",
+    });
+  }
+
+  return rows;
+}
+
+/**
  * Build a side-by-side model from old/new file contents using a simple LCS
  * alignment. Mirrors the server's unifiedDiff semantics so the two views agree.
+ *
+ * For files exceeding MAX_LINES (2000), skips the O(n²) LCS computation and
+ * returns a simplified diff instead.
  */
 export function buildSideBySide(
   oldText: string | null | undefined,
@@ -91,15 +128,20 @@ export function buildSideBySide(
 
   const m = a.length;
   const n = b.length;
-  const lcs: number[][] = Array.from({ length: m + 1 }, () =>
-    new Array<number>(n + 1).fill(0)
-  );
+
+  // Size guard: skip O(n²) LCS for large files
+  if (m > MAX_LINES || n > MAX_LINES) {
+    return buildSimplifiedSideBySide(a, b);
+  }
+
+  const lcs = new Int32Array((m + 1) * (n + 1));
+  const idx = (i: number, j: number) => i * (n + 1) + j;
   for (let i = m - 1; i >= 0; i--) {
     for (let j = n - 1; j >= 0; j--) {
-      lcs[i][j] =
+      lcs[idx(i, j)] =
         a[i] === b[j]
-          ? lcs[i + 1][j + 1] + 1
-          : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+          ? lcs[idx(i + 1, j + 1)] + 1
+          : Math.max(lcs[idx(i + 1, j)], lcs[idx(i, j + 1)]);
     }
   }
 
@@ -133,7 +175,7 @@ export function buildSideBySide(
       });
       i++;
       j++;
-    } else if (lcs[i + 1][j] >= lcs[i][j + 1]) {
+    } else if (lcs[idx(i + 1, j)] >= lcs[idx(i, j + 1)]) {
       pushRemoved();
     } else {
       pushAdded();

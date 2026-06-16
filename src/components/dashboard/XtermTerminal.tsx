@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef } from "react";
 import { Terminal } from "@xterm/xterm";
@@ -47,6 +47,7 @@ export default function XtermTerminal({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
+  const mountedRef = useRef<boolean>(true);
 
   // Mutable terminal state held in refs (not React state) for the line editor.
   const cwdRef = useRef<string>(initialCwd);
@@ -73,12 +74,22 @@ export default function XtermTerminal({
     });
     const fit = new FitAddon();
     term.loadAddon(fit);
+    const tryFit = () => {
+      if (!containerRef.current || containerRef.current.clientWidth === 0) return;
+      try {
+        fit.fit();
+      } catch {
+        /* container may not be measured yet */
+      }
+    };
+
     term.open(containerRef.current);
-    try {
-      fit.fit();
-    } catch {
-      /* container may not be measured yet */
-    }
+    // Defer the first fit until after the DOM is laid out. xterm.js's
+    // Viewport.syncScrollArea reads the parent element's `dimensions` getter
+    // synchronously after `fit()` calls render(), and that getter throws if
+    // the renderer hasn't completed its first measurement yet. requestAnimationFrame
+    // ensures the browser has computed layout and the wrapper has a size.
+    requestAnimationFrame(tryFit);
 
     termRef.current = term;
     fitRef.current = fit;
@@ -193,8 +204,8 @@ export default function XtermTerminal({
           if (c.output) term.write(normalizeOutput(c.output));
           if (c.output && !c.output.endsWith("\n")) term.write("\r\n");
         }
-      } catch {
-        /* ignore history load failures */
+      } catch (err) {
+        console.warn("[XtermTerminal] Failed to load command history:", err);
       }
       term.write(
         `${DIM}Teskel terminal — commands run safely inside the project sandbox.${PROMPT_RESET}\r\n`
@@ -212,15 +223,19 @@ export default function XtermTerminal({
     onRegister(sessionId, handle);
 
     const ro = new ResizeObserver(() => {
-      try {
-        fit.fit();
-      } catch {
-        /* ignore */
-      }
+      // Two animation frames: one for the resize to flush, one for xterm's
+      // internal measurement pipeline. This avoids the "Cannot read properties
+      // of undefined (reading 'dimensions')" crash in Viewport.syncScrollArea.
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          if (mountedRef.current) tryFit();
+        })
+      );
     });
     ro.observe(containerRef.current);
 
     return () => {
+      mountedRef.current = false;
       onRegister(sessionId, null);
       dataDisposable.dispose();
       ro.disconnect();
@@ -236,15 +251,24 @@ export default function XtermTerminal({
   useEffect(() => {
     if (!active) return;
     const id = window.setTimeout(() => {
-      try {
-        fitRef.current?.fit();
-      } catch {
-        /* ignore */
+      if (containerRef.current && containerRef.current.clientWidth > 0) {
+        try {
+          fitRef.current?.fit();
+        } catch {
+          /* ignore */
+        }
       }
       termRef.current?.focus();
-    }, 0);
+    }, 50);
     return () => window.clearTimeout(id);
   }, [active]);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  return (
+    <div
+      ref={containerRef}
+      className="h-full w-full"
+      role="application"
+      aria-label="Terminal"
+    />
+  );
 }

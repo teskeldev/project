@@ -48,18 +48,46 @@ export async function PATCH(
       );
     }
 
-    // Can't demote the last OWNER
+    // Can't demote the last OWNER. Count + update are wrapped in a
+    // transaction with a `not: { id: memberId }` guard so that two
+    // concurrent PATCHes cannot both pass the "only one owner" check and
+    // demote the last owner.
     if (target.role === "OWNER" && role !== "OWNER") {
-      const ownerCount = await prisma.workspaceMember.count({
-        where: { workspaceId: target.workspaceId, role: "OWNER" },
+      const updated = await prisma.$transaction(async (tx) => {
+        const otherOwners = await tx.workspaceMember.count({
+          where: {
+            workspaceId: target.workspaceId,
+            role: "OWNER",
+            id: { not: memberId },
+          },
+        });
+        if (otherOwners < 1) {
+          throw new ApiError(
+            "Cannot demote the last owner",
+            400,
+            "LAST_OWNER"
+          );
+        }
+        return tx.workspaceMember.update({
+          where: { id: memberId },
+          data: { role },
+          include: {
+            user: { select: { id: true, name: true, email: true, image: true } },
+          },
+        });
       });
-      if (ownerCount <= 1) {
-        throw new ApiError(
-          "Cannot demote the last owner",
-          400,
-          "LAST_OWNER"
-        );
-      }
+
+      return apiSuccess({
+        member: {
+          id: updated.id,
+          userId: updated.user.id,
+          name: updated.user.name,
+          email: updated.user.email,
+          image: updated.user.image,
+          role: updated.role,
+          createdAt: updated.createdAt,
+        },
+      });
     }
 
     const updated = await prisma.workspaceMember.update({
@@ -120,21 +148,31 @@ export async function DELETE(
       );
     }
 
-    // Can't remove self if last OWNER
+    // Can't remove self if last OWNER. Count + delete are wrapped in a
+    // transaction with a `not: { id: memberId }` guard so that two
+    // concurrent DELETEs cannot both pass the "only one owner" check and
+    // remove the last owner.
     if (target.userId === user.id && target.role === "OWNER") {
-      const ownerCount = await prisma.workspaceMember.count({
-        where: { workspaceId: target.workspaceId, role: "OWNER" },
+      await prisma.$transaction(async (tx) => {
+        const otherOwners = await tx.workspaceMember.count({
+          where: {
+            workspaceId: target.workspaceId,
+            role: "OWNER",
+            id: { not: memberId },
+          },
+        });
+        if (otherOwners < 1) {
+          throw new ApiError(
+            "Cannot remove yourself as the last owner",
+            400,
+            "LAST_OWNER"
+          );
+        }
+        await tx.workspaceMember.delete({ where: { id: memberId } });
       });
-      if (ownerCount <= 1) {
-        throw new ApiError(
-          "Cannot remove yourself as the last owner",
-          400,
-          "LAST_OWNER"
-        );
-      }
+    } else {
+      await prisma.workspaceMember.delete({ where: { id: memberId } });
     }
-
-    await prisma.workspaceMember.delete({ where: { id: memberId } });
 
     return apiSuccess({ deleted: true, id: memberId });
   } catch (err) {
