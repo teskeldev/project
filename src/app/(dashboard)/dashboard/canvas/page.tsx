@@ -30,6 +30,7 @@ type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 export default function CanvasPage() {
   const { activeProject } = useProject();
+  const projectId = activeProject?.id ?? null;
   const [documents, setDocuments] = useState<DocumentListItem[]>([]);
   const [activeDoc, setActiveDoc] = useState<Document | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,18 +45,18 @@ export default function CanvasPage() {
 
   // Fetch document list
   const fetchDocuments = useCallback(async () => {
-    if (!activeProject) return;
+    if (!projectId) { setLoading(false); return; }
     setLoading(true);
     setError(null);
     try {
-      const { documents: docs } = await listDocuments(activeProject.id);
+      const { documents: docs } = await listDocuments(projectId);
       setDocuments(docs);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load documents");
     } finally {
       setLoading(false);
     }
-  }, [activeProject]);
+  }, [projectId]);
 
   useEffect(() => {
     void fetchDocuments();
@@ -131,10 +132,10 @@ export default function CanvasPage() {
 
   // Create new document
   const handleNewDocument = useCallback(async () => {
-    if (!activeProject) return;
+    if (!projectId) return;
     try {
       const { document } = await createDocument({
-        projectId: activeProject.id,
+        projectId,
         title: "Untitled Document",
       });
       setDocuments((prev) => [
@@ -149,7 +150,7 @@ export default function CanvasPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create document");
     }
-  }, [activeProject]);
+  }, [projectId]);
 
   // Delete document
   const handleDelete = useCallback(async () => {

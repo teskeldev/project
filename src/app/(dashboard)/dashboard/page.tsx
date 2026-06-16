@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import {
   Sparkles,
@@ -38,12 +39,12 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 const suggestions = [
-  { icon: Zap, label: "Build a feature", prompt: "Build a new feature for my project", color: "text-amber-500" },
-  { icon: Bug, label: "Fix a bug", prompt: "Help me debug and fix an issue", color: "text-red-500" },
-  { icon: Palette, label: "Design a component", prompt: "Design and implement a UI component", color: "text-purple-500" },
-  { icon: Database, label: "Set up database", prompt: "Set up database schema and queries", color: "text-accent" },
-  { icon: Shield, label: "Add authentication", prompt: "Implement authentication and authorization", color: "text-green-500" },
-  { icon: Rocket, label: "Deploy project", prompt: "Help me deploy my project to production", color: "text-accent" },
+  { icon: Zap, label: "Build a feature", prompt: "Build a new feature for my project", color: "text-slate-700" },
+  { icon: Bug, label: "Fix a bug", prompt: "Help me debug and fix an issue", color: "text-slate-700" },
+  { icon: Palette, label: "Design a component", prompt: "Design and implement a UI component", color: "text-slate-700" },
+  { icon: Database, label: "Set up database", prompt: "Set up database schema and queries", color: "text-slate-700" },
+  { icon: Shield, label: "Add authentication", prompt: "Implement authentication and authorization", color: "text-slate-700" },
+  { icon: Rocket, label: "Deploy project", prompt: "Help me deploy my project to production", color: "text-slate-700" },
 ];
 
 /** sessionStorage key the chat page can read to prefill the composer. */
@@ -91,42 +92,39 @@ export default function DashboardPage() {
 
   const model = "Auto";
 
-  // Check onboarding status and redirect if not completed
-  useEffect(() => {
-    async function checkOnboarding() {
-      try {
-        const res = await fetch("/api/user/onboarding");
-        const json = await res.json();
-        if (json.success && !json.data.completed) {
-          router.push("/dashboard/onboarding");
-        }
-      } catch {
-        // Non-fatal: if check fails, stay on dashboard
-      }
-    }
-    void checkOnboarding();
-  }, [router]);
+  // Onboarding is now gated server-side by the dashboard layout, so no
+  // client-side check is needed here.
 
   const activeProjectId = activeProject?.id;
 
-  const loadSummary = useCallback(async () => {
+  const loadSummary = useCallback(async (ignoreFlag?: { ignored: boolean }) => {
     setSummaryLoading(true);
     setSummaryError(null);
     try {
       const data = await getDashboardSummary(activeProjectId);
-      setSummary(data);
+      if (ignoreFlag && !ignoreFlag.ignored) {
+        setSummary(data);
+      }
     } catch (err) {
-      setSummaryError(
-        err instanceof ApiClientError ? err.message : "Failed to load dashboard"
-      );
+      if (ignoreFlag && !ignoreFlag.ignored) {
+        setSummaryError(
+          err instanceof ApiClientError ? err.message : "Failed to load dashboard"
+        );
+      }
     } finally {
-      setSummaryLoading(false);
+      if (ignoreFlag && !ignoreFlag.ignored) {
+        setSummaryLoading(false);
+      }
     }
   }, [activeProjectId]);
 
   useEffect(() => {
     if (projectLoading) return;
-    void loadSummary();
+    const ignoreFlag = { ignored: false };
+    void loadSummary(ignoreFlag);
+    return () => {
+      ignoreFlag.ignored = true;
+    };
   }, [projectLoading, loadSummary]);
 
   const startChatWithPrompt = useCallback(
@@ -209,29 +207,39 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="flex h-full flex-col items-center overflow-y-auto bg-surface/50 px-6 py-12 backdrop-blur-sm">
+    <div className="flex h-full flex-col items-center overflow-y-auto px-6 py-12">
       <div className="w-full max-w-2xl">
-        <div className="animate-fade-in-up mb-8 text-center">
-          <div className="mb-4 inline-flex animate-float items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 p-3 shadow-lg shadow-blue-200/50">
-            <Sparkles size={28} className="text-white" />
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 100, damping: 20 }}
+          className="mb-10 text-center"
+        >
+          <div className="mb-5 inline-flex items-center justify-center rounded-2xl bg-slate-900 p-3 shadow-[0_8px_30px_rgba(17,24,39,0.15)] dark:bg-white">
+            <Sparkles size={28} className="text-white dark:text-slate-900" />
           </div>
-          <h1 className="text-2xl font-semibold text-foreground">
+          <h1 className="text-[28px] font-semibold tracking-tight text-slate-900 dark:text-white">
             What do you want to build?
           </h1>
-          <p className="mt-2 text-sm text-text-secondary">
+          <p className="mt-2 text-[14px] text-slate-500 dark:text-slate-400">
             Teskel can write code, fix bugs, run commands, and search the web.
           </p>
-        </div>
+        </motion.div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3.5 shadow-sm transition-all duration-300 focus-within:border-accent focus-within:shadow-lg focus-within:shadow-blue-50">
-            <Plus size={18} className="shrink-0 text-text-muted" />
+        <motion.form 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.1 }}
+          onSubmit={handleSubmit}
+        >
+          <div className="flex items-center gap-2 rounded-[24px] border border-white/60 bg-white/70 px-4 py-4 shadow-[0_0_0_1px_rgba(255,255,255,0.7)_inset,0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-2xl transition-all duration-300 focus-within:border-slate-300 focus-within:shadow-[0_8px_32px_rgba(17,24,39,0.08)] dark:border-white/10 dark:bg-black/50 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
+            <Plus size={20} className="shrink-0 text-slate-400" />
             <input
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder="Ask Teskel anything..."
-              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-text-muted focus:outline-none"
+              className="flex-1 bg-transparent text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-white"
               autoFocus
             />
             <div className="flex items-center gap-2">
@@ -269,26 +277,26 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="mt-2 flex items-center justify-between px-1">
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" className="gap-1 text-[11px] text-text-muted hover:text-text-secondary">
-                <Globe size={12} /> Web
-              </Button>
-              <Button variant="ghost" size="sm" className="gap-1 text-[11px] text-text-muted hover:text-text-secondary">
-                <Code size={12} /> Code
-              </Button>
-              <Button variant="ghost" size="sm" className="gap-1 text-[11px] text-text-muted hover:text-text-secondary">
-                <Terminal size={12} /> Terminal
-              </Button>
-              <Button variant="ghost" size="sm" className="gap-1 text-[11px] text-text-muted hover:text-text-secondary">
-                <FileText size={12} /> Docs
-              </Button>
+          <div className="mt-3 flex items-center justify-between px-2">
+            <div className="flex items-center gap-1.5">
+              <button type="button" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium text-slate-500 transition-colors hover:bg-slate-200/50 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-200">
+                <Globe size={14} /> Web
+              </button>
+              <button type="button" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium text-slate-500 transition-colors hover:bg-slate-200/50 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-200">
+                <Code size={14} /> Code
+              </button>
+              <button type="button" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium text-slate-500 transition-colors hover:bg-slate-200/50 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-200">
+                <Terminal size={14} /> Terminal
+              </button>
+              <button type="button" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium text-slate-500 transition-colors hover:bg-slate-200/50 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-200">
+                <FileText size={14} /> Docs
+              </button>
             </div>
-            <span className="text-[11px] text-text-muted">
+            <span className="text-[12px] font-medium text-slate-400">
               {activeProject ? activeProject.name : "Local"}
             </span>
           </div>
-        </form>
+        </motion.form>
 
         {/* No-project prompt-to-create + submit errors */}
         {needsProject && (
@@ -318,22 +326,25 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="mt-8 grid grid-cols-3 gap-3">
-          {suggestions.map((s, i) => (
-            <Card
-              key={s.label}
-              className="animate-fade-in-up cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-              style={{ animationDelay: `${i * 0.06}s` }}
-            >
-              <button
-                onClick={() => handleSuggestion(s.prompt)}
-                className="group flex w-full items-center gap-3 px-4 py-3 text-left"
+        <div className="mt-10 grid grid-cols-3 gap-3">
+          <AnimatePresence>
+            {suggestions.map((s, i) => (
+              <motion.div
+                key={s.label}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.15 + (i * 0.05) }}
               >
-                <s.icon size={18} className={`${s.color} transition-transform duration-200 group-hover:scale-110`} />
-                <span className="text-xs font-medium text-text-secondary">{s.label}</span>
-              </button>
-            </Card>
-          ))}
+                <button
+                  onClick={() => handleSuggestion(s.prompt)}
+                  className="group flex w-full items-center gap-3 rounded-2xl border border-white/60 bg-white/50 px-4 py-3.5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.02)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-white/80 hover:shadow-[0_8px_20px_rgba(17,24,39,0.06)] dark:border-white/5 dark:bg-white/5 dark:hover:border-white/10 dark:hover:bg-white/10"
+                >
+                  <s.icon size={18} className="text-slate-500 transition-transform duration-300 group-hover:scale-110 group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-white" />
+                  <span className="text-[13px] font-medium text-slate-600 transition-colors group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-white">{s.label}</span>
+                </button>
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </div>
 
         {/* Real activity */}
@@ -540,8 +551,8 @@ function ActivitySection({
             className="flex w-full items-center justify-between px-5 py-4 text-left"
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
-                <Layers size={16} className="text-amber-500" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100">
+                <Layers size={16} className="text-slate-700" />
               </div>
               <div>
                 <p className="text-xs font-medium text-foreground">Pending changes</p>
@@ -561,8 +572,8 @@ function ActivitySection({
             className="flex w-full items-center justify-between px-5 py-4 text-left"
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent-light">
-                <GitBranch size={16} className="text-accent" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100">
+                <GitBranch size={16} className="text-slate-700" />
               </div>
               <div>
                 <p className="text-xs font-medium text-foreground">

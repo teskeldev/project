@@ -8,10 +8,12 @@
  */
 import { z } from "zod";
 import { AI_PROVIDER_REGISTRY, type AiProviderEntry } from "@/lib/ai/provider-registry";
+import { OAUTH_PROVIDER_IDS, OAUTH_PROVIDER_CONFIGS } from "@/lib/integrations/oauth-configs";
 
-/** All connectable providers = AI registry ids + non-AI integrations. */
+/** All connectable providers = AI registry ids + OAuth AI + non-AI integrations. */
 export const SUPPORTED_PROVIDERS = [
   ...AI_PROVIDER_REGISTRY.map((p) => p.id),
+  ...OAUTH_PROVIDER_IDS,
   "github",
   "mcp",
 ] as const;
@@ -42,14 +44,26 @@ const mcpConfigSchema = z.object({
   apiKey: z.string().trim().min(1).optional(),
 });
 
+// OAuth providers store tokens (set server-side via callback/poll routes, not by users directly)
+const oauthConfigSchema = z.object({
+  accessToken: z.string().min(1, "Access token is required"),
+  refreshToken: z.string().optional(),
+  expiresAt: z.number().optional(),
+  scope: z.string().optional(),
+  email: z.string().optional(),
+  copilotToken: z.string().optional(),
+});
+
 export const PROVIDER_CONFIG_SCHEMAS: Record<string, z.ZodTypeAny> = {
   ...Object.fromEntries(AI_PROVIDER_REGISTRY.map((e) => [e.id, aiConfigSchema(e)])),
+  ...Object.fromEntries(OAUTH_PROVIDER_IDS.map((id) => [id, oauthConfigSchema])),
   github: githubConfigSchema,
   mcp: mcpConfigSchema,
 };
 
 export const PROVIDER_SECRET_FIELDS: Record<string, readonly string[]> = {
   ...Object.fromEntries(AI_PROVIDER_REGISTRY.map((e) => [e.id, e.requiresKey ? ["apiKey"] : []])),
+  ...Object.fromEntries(OAUTH_PROVIDER_IDS.map((id) => [id, ["accessToken", "refreshToken", "copilotToken"]])),
   github: ["token"],
   mcp: ["apiKey"],
 };
@@ -86,6 +100,8 @@ export type ProviderMeta = {
   website?: string;
   apiKeyUrl?: string;
   fields: ProviderField[];
+  /** OAuth providers skip the API key form and use OAuthModal instead. */
+  authType?: "oauth";
 };
 
 function aiFields(e: AiProviderEntry): ProviderField[] {
@@ -119,8 +135,23 @@ const AI_CATALOG: ProviderMeta[] = AI_PROVIDER_REGISTRY.map((e) => ({
   fields: aiFields(e),
 }));
 
+const OAUTH_CATALOG: ProviderMeta[] = OAUTH_PROVIDER_IDS.map((id) => {
+  const cfg = OAUTH_PROVIDER_CONFIGS[id];
+  return {
+    id: cfg.id,
+    name: cfg.name,
+    description: cfg.description,
+    category: "OAuth AI",
+    icon: cfg.icon,
+    color: cfg.color,
+    fields: [],
+    authType: "oauth" as const,
+  };
+});
+
 export const PROVIDER_CATALOG: ProviderMeta[] = [
   ...AI_CATALOG,
+  ...OAUTH_CATALOG,
   {
     id: "github",
     name: "GitHub",
@@ -143,10 +174,25 @@ export const PROVIDER_CATALOG: ProviderMeta[] = [
   },
 ];
 
-/** "Coming soon" providers shown in the UI but not yet connectable. */
-export const COMING_SOON_PROVIDERS: Array<{ id: string; name: string; description: string; category: string; icon: string }> = [
-  { id: "gitlab", name: "GitLab", description: "CI/CD pipelines, merge requests, repositories", category: "Tools", icon: "GL" },
-  { id: "linear", name: "Linear", description: "Issue tracking, project management, sprints", category: "Tools", icon: "LN" },
-  { id: "slack", name: "Slack", description: "Send messages, receive notifications, search channels", category: "Tools", icon: "SL" },
-  { id: "notion", name: "Notion", description: "Read docs, create pages, sync knowledge base", category: "Tools", icon: "NT" },
+export type ComingSoonProvider = {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  icon: string;
+  color?: string;
+  authType?: "oauth" | "cookie" | "free";
+};
+
+/** "Coming soon" providers — remaining OAuth AI providers + tool integrations. */
+export const COMING_SOON_PROVIDERS: ComingSoonProvider[] = [
+  // OAuth AI providers not yet implemented (claude-code, github-copilot, kilocode are live)
+  { id: "cursor",     name: "Cursor IDE",  description: "Use your Cursor Pro subscription as an AI provider via OAuth.", category: "OAuth AI", icon: "CU", color: "#00D4AA", authType: "oauth" },
+  { id: "cline",      name: "Cline",       description: "Connect Cline bot via OAuth for AI-assisted coding.",           category: "OAuth AI", icon: "CL", color: "#5B9BD5", authType: "oauth" },
+  { id: "gemini-cli", name: "Gemini CLI",  description: "Free Gemini access via Google Cloud OAuth (no billing).",       category: "OAuth AI", icon: "GC", color: "#4285F4", authType: "oauth" },
+  // Tool integrations
+  { id: "gitlab",  name: "GitLab",  description: "CI/CD pipelines, merge requests, repositories.", category: "Tools", icon: "GL", color: "#FC6D26" },
+  { id: "linear",  name: "Linear",  description: "Issue tracking, project management, sprints.",   category: "Tools", icon: "LN", color: "#5E6AD2" },
+  { id: "slack",   name: "Slack",   description: "Send messages, receive notifications, search channels.", category: "Tools", icon: "SL", color: "#4A154B" },
+  { id: "notion",  name: "Notion",  description: "Read docs, create pages, sync knowledge base.",  category: "Tools", icon: "NT", color: "#000000" },
 ];

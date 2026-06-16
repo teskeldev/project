@@ -83,6 +83,7 @@ function sanitizeHtmlContent(html: string): string {
 
 export default function ArtifactsPage() {
   const { activeProject } = useProject();
+  const projectId = activeProject?.id ?? null;
   const [artifacts, setArtifacts] = useState<ArtifactListItem[]>([]);
   const [activeArtifact, setActiveArtifact] = useState<Artifact | null>(null);
   const [activeType, setActiveType] = useState<ArtifactType | null>(null);
@@ -93,12 +94,12 @@ export default function ArtifactsPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const fetchArtifacts = useCallback(async () => {
-    if (!activeProject) return;
+    if (!projectId) { setLoading(false); return; }
     setLoading(true);
     setError(null);
     try {
       const { artifacts: items } = await listArtifacts(
-        activeProject.id,
+        projectId,
         activeType ?? undefined
       );
       setArtifacts(items);
@@ -107,7 +108,7 @@ export default function ArtifactsPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeProject, activeType]);
+  }, [projectId, activeType]);
 
   useEffect(() => {
     void fetchArtifacts();

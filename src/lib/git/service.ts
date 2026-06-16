@@ -1,4 +1,6 @@
 ﻿import simpleGit, { type SimpleGit, type StatusResult } from "simple-git";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import { getProjectRoot } from "@/lib/storage";
 import { prisma } from "@/lib/db";
 
@@ -97,12 +99,37 @@ export function getGit(storageKey: string): SimpleGit {
 
 /** Whether the project directory is a git work tree. */
 export async function isRepo(storageKey: string): Promise<boolean> {
+  // Hot path: every git command calls this. We cache the result per
+  // storageKey for the lifetime of the process. A workspace doesn't flip
+  // between "is a git repo" and "is not a git repo" during a single session
+  // except on explicit initRepo(); we invalidate on that call below.
+  const cached = isRepoCache.get(storageKey);
+  if (cached !== undefined) return cached;
+  const result = await rawIsRepo(storageKey);
+  isRepoCache.set(storageKey, result);
+  return result;
+}
+
+// Invalidate the isRepo cache for a project. Called by initRepo() after the
+// .git folder is created so subsequent isRepo() lookups return true.
+function invalidateIsRepo(storageKey: string) {
+  isRepoCache.delete(storageKey);
+}
+
+async function rawIsRepo(storageKey: string): Promise<boolean> {
+  // Use a filesystem stat instead of spawning a git CLI. simple-git's
+  // checkIsRepo() spawns `git rev-parse --is-inside-work-tree` which costs
+  // ~50-100ms of process startup. `fs.stat` costs ~1ms.
   try {
-    return await getGit(storageKey).checkIsRepo();
+    const gitDir = path.join(getProjectRoot(storageKey), ".git");
+    const stat = await fs.stat(gitDir);
+    return stat.isDirectory();
   } catch {
     return false;
   }
 }
+
+const isRepoCache = new Map<string, boolean>();
 
 /** Map a simple-git StatusResult into the shape the UI consumes. */
 function mapStatus(s: StatusResult): GitStatus {
@@ -186,9 +213,26 @@ async function upsertGitState(
 
 /** Read status, returning {isRepo:false} when the dir is not a repo. */
 export async function status(storageKey: string): Promise<GitStatusResult> {
-  if (!(await isRepo(storageKey))) return { isRepo: false };
-  const s = await getGit(storageKey).status();
-  return mapStatus(s);
+  // Skip the explicit isRepo() call: getGit(...).status() naturally throws
+  // when the directory is not a git repo. We let it fail fast and translate
+  // to {isRepo: false} here. This saves one process spawn per request.
+  try {
+    const s = await getGit(storageKey).status();
+    return mapStatus(s);
+  } catch (err) {
+    if (isNotARepositoryError(err)) return { isRepo: false };
+    throw err;
+  }
+}
+
+function isNotARepositoryError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    msg.includes("not a git repository") ||
+    msg.includes("Not a git repository") ||
+    msg.includes("does not appear to be a git repository") ||
+    msg.includes("ENOENT") && msg.includes(".git")
+  );
 }
 
 /* -------------------------------- init ----------------------------------- */
@@ -202,6 +246,8 @@ export async function initRepo(
 
   if (!(await git.checkIsRepo())) {
     await git.init(["-b", DEFAULT_BRANCH]);
+    // Cache was seeded against a missing .git folder; refresh it now.
+    invalidateIsRepo(storageKey);
   }
 
   // Set a repo-local identity if none is configured, so a fresh environment

@@ -46,27 +46,45 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const workspaceId = searchParams.get("workspaceId")?.trim() || undefined;
 
-    // The set of workspaces this user belongs to.
-    const memberships = await prisma.workspaceMember.findMany({
-      where: { userId: user.id },
-      select: { workspaceId: true },
-    });
-    const memberWorkspaceIds = memberships.map((m) => m.workspaceId);
+    // The set of workspaces this user belongs to (used for the
+    // workspaceId-not-supplied branch and the authz check below). We resolve
+    // it via a single JOINed query so the two-round "memberships first, then
+    // integrations" waterfall becomes a single round trip.
+    const [rows, memberWorkspaceIds] = await Promise.all([
+      prisma.integration.findMany({
+        where: workspaceId
+          ? { workspaceId }
+          : {
+              workspace: {
+                members: { some: { userId: user.id } },
+              },
+            },
+        orderBy: { createdAt: "asc" },
+      }),
+      workspaceId
+        ? prisma.workspaceMember
+            .findUnique({
+              where: {
+                workspaceId_userId: { workspaceId, userId: user.id },
+              },
+              select: { workspaceId: true },
+            })
+            .then((m) => (m ? [m.workspaceId] : []))
+        : prisma.workspaceMember
+            .findMany({
+              where: { userId: user.id },
+              select: { workspaceId: true },
+            })
+            .then((rows) => rows.map((m) => m.workspaceId)),
+    ]);
 
-    if (workspaceId && !memberWorkspaceIds.includes(workspaceId)) {
+    if (workspaceId && memberWorkspaceIds.length === 0) {
       throw new ApiError(
         "You do not have access to this workspace",
         403,
         "FORBIDDEN"
       );
     }
-
-    const rows = await prisma.integration.findMany({
-      where: {
-        workspaceId: workspaceId ? workspaceId : { in: memberWorkspaceIds },
-      },
-      orderBy: { createdAt: "asc" },
-    });
 
     return apiSuccess(
       { integrations: rows.map(toSafeIntegration) },

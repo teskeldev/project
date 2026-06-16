@@ -1,83 +1,28 @@
 import Stripe from "stripe";
+export { PLAN_CONFIGS, type PlanConfig, type PlanTier } from "@/lib/billing-config";
 
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY ?? "";
 export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "";
 
-if (!STRIPE_SECRET_KEY && process.env.NODE_ENV !== "test") {
-  console.warn("STRIPE_SECRET_KEY environment variable is not set");
+let _stripe: Stripe | undefined;
+
+export function getStripe(): Stripe {
+  if (_stripe) return _stripe;
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error("STRIPE_SECRET_KEY is not configured");
+  _stripe = new Stripe(key, {
+    apiVersion: "2023-10-16" as NonNullable<
+      ConstructorParameters<typeof Stripe>[1]
+    >["apiVersion"],
+    typescript: true,
+  });
+  return _stripe;
 }
 
-export const stripe = new Stripe(STRIPE_SECRET_KEY, {
-  apiVersion: "2023-10-16" as NonNullable<
-    ConstructorParameters<typeof Stripe>[1]
-  >["apiVersion"],
-  typescript: true,
+export const stripe = new Proxy({} as Stripe, {
+  get(_target, prop) {
+    return Reflect.get(getStripe(), prop);
+  },
 });
-
-/* -------------------------------------------------------------------------- */
-/* Plan configuration                                                         */
-/* -------------------------------------------------------------------------- */
-
-export type PlanTier = "FREE" | "PRO" | "TEAM" | "ENTERPRISE";
-
-export interface PlanConfig {
-  tier: PlanTier;
-  name: string;
-  priceId: string | null;
-  limits: {
-    aiTokens: number;
-    computeMinutes: number;
-    storageMb: number;
-    members: number;
-  };
-}
-
-export const PLAN_CONFIGS: Record<PlanTier, PlanConfig> = {
-  FREE: {
-    tier: "FREE",
-    name: "Hobby",
-    priceId: null,
-    limits: {
-      aiTokens: 50_000,
-      computeMinutes: 60,
-      storageMb: 500,
-      members: 1,
-    },
-  },
-  PRO: {
-    tier: "PRO",
-    name: "Pro",
-    priceId: process.env.STRIPE_PRO_PRICE_ID ?? "",
-    limits: {
-      aiTokens: 500_000,
-      computeMinutes: 600,
-      storageMb: 5_000,
-      members: 5,
-    },
-  },
-  TEAM: {
-    tier: "TEAM",
-    name: "Team",
-    priceId: process.env.STRIPE_TEAM_PRICE_ID ?? "",
-    limits: {
-      aiTokens: 2_000_000,
-      computeMinutes: 3_000,
-      storageMb: 50_000,
-      members: 25,
-    },
-  },
-  ENTERPRISE: {
-    tier: "ENTERPRISE",
-    name: "Enterprise",
-    priceId: process.env.STRIPE_ENTERPRISE_PRICE_ID ?? "",
-    limits: {
-      aiTokens: Infinity,
-      computeMinutes: Infinity,
-      storageMb: Infinity,
-      members: Infinity,
-    },
-  },
-};
 
 /* -------------------------------------------------------------------------- */
 /* Customer management                                                        */

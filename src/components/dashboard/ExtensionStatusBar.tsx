@@ -20,13 +20,6 @@ export default function ExtensionStatusBar() {
 
   useEffect(() => {
     void loadHooks();
-
-    // Re-check every 5 seconds to pick up install/uninstall changes
-    const interval = setInterval(() => {
-      void loadHooks();
-    }, 5000);
-
-    return () => clearInterval(interval);
   }, [loadHooks]);
 
   // Listen for custom event dispatched when extensions are installed/uninstalled

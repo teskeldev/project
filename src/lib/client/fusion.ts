@@ -111,17 +111,54 @@ export async function runPlaygroundStream(
   }
 }
 
+// In-memory cache for fusions list, keyed by workspaceId + includeArchived
+let fusionsCache: {
+  key: string;
+  result: { fusions: Fusion[] };
+  at: number;
+} | null = null;
+const CACHE_TTL_MS = 30_000;
+
+export function invalidateFusionsCache(): void {
+  fusionsCache = null;
+}
+
 export const fusionApi = {
   listModels: (ws: string) => apiFetch<{ models: AvailableModel[] }>(`/api/fusion/models${qs(ws)}`),
 
-  listFusions: (ws: string, includeArchived = false) =>
-    apiFetch<{ fusions: Fusion[] }>(`/api/fusion/fusions${qs(ws, includeArchived ? { includeArchived: "true" } : undefined)}`),
+  listFusions: async (ws: string, includeArchived = false) => {
+    const key = `${ws}-${includeArchived}`;
+    const now = Date.now();
+    if (fusionsCache && fusionsCache.key === key && now - fusionsCache.at < CACHE_TTL_MS) {
+      return fusionsCache.result;
+    }
+    const res = await apiFetch<{ fusions: Fusion[] }>(
+      `/api/fusion/fusions${qs(ws, includeArchived ? { includeArchived: "true" } : undefined)}`
+    );
+    fusionsCache = { key, result: res, at: now };
+    return res;
+  },
   getFusion: (ws: string, id: string) => apiFetch<{ fusion: Fusion }>(`/api/fusion/fusions/${id}${qs(ws)}`),
-  createFusion: (ws: string, b: Record<string, unknown>) => send<{ fusion: Fusion }>("/api/fusion/fusions", "POST", { workspaceId: ws, ...b }),
-  updateFusion: (ws: string, id: string, b: Record<string, unknown>) => send<{ fusion: Fusion }>(`/api/fusion/fusions/${id}`, "PATCH", { workspaceId: ws, ...b }),
-  deleteFusion: (ws: string, id: string) => send<{ deleted: boolean }>(`/api/fusion/fusions/${id}`, "DELETE", { workspaceId: ws }),
-  duplicateFusion: (ws: string, id: string) => send<{ fusion: Fusion }>(`/api/fusion/fusions/${id}/duplicate`, "POST", { workspaceId: ws }),
+  createFusion: async (ws: string, b: Record<string, unknown>) => {
+    invalidateFusionsCache();
+    return send<{ fusion: Fusion }>("/api/fusion/fusions", "POST", { workspaceId: ws, ...b });
+  },
+  updateFusion: async (ws: string, id: string, b: Record<string, unknown>) => {
+    invalidateFusionsCache();
+    return send<{ fusion: Fusion }>(`/api/fusion/fusions/${id}`, "PATCH", { workspaceId: ws, ...b });
+  },
+  deleteFusion: async (ws: string, id: string) => {
+    invalidateFusionsCache();
+    return send<{ deleted: boolean }>(`/api/fusion/fusions/${id}`, "DELETE", { workspaceId: ws });
+  },
+  duplicateFusion: async (ws: string, id: string) => {
+    invalidateFusionsCache();
+    return send<{ fusion: Fusion }>(`/api/fusion/fusions/${id}/duplicate`, "POST", { workspaceId: ws });
+  },
 
   listTemplates: () => apiFetch<{ templates: FusionTemplate[] }>("/api/fusion/templates"),
-  useTemplate: (ws: string, id: string) => send<{ fusion: Fusion; warnings: string[] }>(`/api/fusion/templates/${id}/use`, "POST", { workspaceId: ws }),
+  useTemplate: async (ws: string, id: string) => {
+    invalidateFusionsCache();
+    return send<{ fusion: Fusion; warnings: string[] }>(`/api/fusion/templates/${id}/use`, "POST", { workspaceId: ws });
+  },
 };

@@ -167,4 +167,32 @@ export const BUILTIN_COMMANDS: SlashCommandDef[] = [
     ],
     builtin: true,
   },
+  {
+    id: "builtin-fusion",
+    name: "fusion",
+    description: "Run task through Multi-Model Fusion Panel",
+    template: "Solve this task using the Multi-Model Fusion Panel pipeline. Task: {{task}}",
+    variables: [
+      {
+        name: "task",
+        description: "The research or code task to solve",
+        required: true,
+      },
+    ],
+    builtin: true,
+  },
+  {
+    id: "builtin-fusion-compare",
+    name: "fusion-compare",
+    description: "Compare panelist outputs and resolve disagreements",
+    template: "Compare panelist outputs and resolve disagreements for: {{task}}",
+    variables: [
+      {
+        name: "task",
+        description: "The task to compare",
+        required: true,
+      },
+    ],
+    builtin: true,
+  },
 ];

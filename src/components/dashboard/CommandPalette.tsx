@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
   FileText,
@@ -104,6 +105,20 @@ export default function CommandPalette() {
 
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Mirror fast-changing state into refs so the heavy `commands` memo (and
+  // its downstream `filteredCommands`) can stay referentially stable across
+  // keystrokes and busy toggles. Without this, typing a single character
+  // rebuilds the entire command list and re-runs the filter, which makes
+  // the palette noticeably laggy in the dashboard.
+  const queryRef = useRef(query);
+  const busyRef = useRef(busy);
+  useEffect(() => {
+    queryRef.current = query;
+  }, [query]);
+  useEffect(() => {
+    busyRef.current = busy;
+  }, [busy]);
+
   const projectId = activeProject?.id ?? null;
   const hasProject = !!projectId;
 
@@ -200,11 +215,11 @@ export default function CommandPalette() {
   }, [createNewProject, router, close]);
 
   const askAi = useCallback((): void => {
-    const q = query.trim();
+    const q = queryRef.current.trim();
     const qs = q ? `?prompt=${encodeURIComponent(q)}` : "";
     close();
     router.push(`/dashboard/chat${qs}`);
-  }, [query, router, close]);
+  }, [router, close]);
 
   /** Execute an extension command action */
   const executeExtensionAction = useCallback(
@@ -271,6 +286,7 @@ export default function CommandPalette() {
 
   const filteredCommands = useMemo(() => {
     const q = query.toLowerCase();
+    // eslint-disable-next-line react-hooks/refs -- `commands` is a useMemo array, not a ref
     return commands.filter((c) => c.label.toLowerCase().includes(q));
   }, [commands, query]);
 
@@ -329,10 +345,10 @@ export default function CommandPalette() {
       if (result !== "keep-open") {
         // Most actions navigate/close themselves; ensure palette closes for
         // synchronous router pushes that don't call close().
-        if (!busy) close();
+        if (!busyRef.current) close();
       }
     },
-    [hasProject, busy, close]
+    [hasProject, close]
   );
 
   const openFile = useCallback(
@@ -382,30 +398,46 @@ export default function CommandPalette() {
   return (
     <>
       {/* Toast notification rendered via state */}
-      {toast && (
-        <div
-          className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] rounded-lg bg-foreground px-4 py-2 text-sm text-white shadow-lg animate-fade-in"
-          role="status"
-          aria-live="polite"
-        >
-          {toast}
-        </div>
-      )}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="fixed bottom-10 left-1/2 z-[100] -translate-x-1/2 rounded-full border border-slate-200/50 bg-slate-900/90 px-6 py-2.5 text-[13px] font-medium text-white shadow-[0_8px_30px_rgba(17,24,39,0.2)] backdrop-blur-md dark:border-white/10 dark:bg-white dark:text-slate-900"
+            role="status"
+            aria-live="polite"
+          >
+            {toast}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {open && (
-        <div
-          className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh] animate-fade-in"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Command palette"
-        >
+      <AnimatePresence>
+        {open && (
           <div
-            className="absolute inset-0 bg-black/20 backdrop-blur-md"
-            onClick={close}
-            aria-hidden="true"
-          />
-          <div className="animate-scale-in relative w-full max-w-lg overflow-hidden rounded-2xl border border-border/80 bg-surface/95 shadow-2xl backdrop-blur-xl">
-            <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+            className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Command palette"
+          >
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="absolute inset-0 bg-slate-900/10 backdrop-blur-sm dark:bg-black/40"
+              onClick={close}
+              aria-hidden="true"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ type: "spring", stiffness: 350, damping: 30 }}
+              className="relative w-full max-w-2xl overflow-hidden rounded-[24px] border border-white/60 bg-white/70 shadow-[0_0_0_1px_rgba(255,255,255,0.7)_inset,0_16px_40px_rgba(17,24,39,0.1)] backdrop-blur-3xl dark:border-white/10 dark:bg-[#0A0A0A]/80 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_16px_40px_rgba(0,0,0,0.5)]"
+            >
+            <div className="flex items-center gap-3 border-b border-slate-200/50 px-4 py-3.5 dark:border-white/10">
               {mode === "open-file" ? (
                 <button
                   onClick={() => {
@@ -414,13 +446,13 @@ export default function CommandPalette() {
                     setSelectedIndex(0);
                     inputRef.current?.focus();
                   }}
-                  className="text-text-muted hover:text-text-secondary"
+                  className="text-slate-400 hover:text-slate-600 transition-colors dark:hover:text-slate-200"
                   title="Back to commands"
                 >
-                  <ArrowLeft size={16} />
+                  <ArrowLeft size={18} />
                 </button>
               ) : (
-                <Search size={16} className="text-text-muted" />
+                <Search size={18} className="text-slate-400" />
               )}
               <input
                 ref={inputRef}
@@ -436,9 +468,9 @@ export default function CommandPalette() {
                     ? "Search files by path..."
                     : "Type a command or search..."
                 }
-                className="flex-1 bg-transparent text-sm text-foreground placeholder:text-text-muted focus:outline-none"
+                className="flex-1 bg-transparent text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-white"
               />
-              <kbd className="rounded border border-border bg-surface-soft px-1.5 py-0.5 text-[10px] text-text-muted">ESC</kbd>
+              <kbd className="rounded-md border border-slate-200/50 bg-slate-100/50 px-2 py-0.5 text-[11px] font-semibold text-slate-400 dark:border-white/10 dark:bg-white/5">ESC</kbd>
             </div>
 
             {error && (
@@ -542,9 +574,10 @@ export default function CommandPalette() {
                 </>
               )}
             </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
     </>
   );
 }

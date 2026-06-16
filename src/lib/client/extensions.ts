@@ -2,6 +2,7 @@
  * Client helpers for the Extensions API.
  */
 import { apiFetch } from "@/lib/client/api";
+import { invalidateExtensionCache } from "@/lib/client/extensionRuntime";
 
 export type RegistryExtension = {
   registryId: string;
@@ -37,21 +38,25 @@ export function listInstalled(
   );
 }
 
-export function installExtension(input: {
+export async function installExtension(input: {
   workspaceId: string;
   registryId: string;
   name: string;
   author: string;
   version: string;
 }): Promise<{ extension: InstalledExtension }> {
-  return apiFetch("/api/extensions", {
+  const result = await apiFetch<{ extension: InstalledExtension }>("/api/extensions", {
     method: "POST",
     body: JSON.stringify(input),
   });
+  invalidateExtensionCache();
+  return result;
 }
 
-export function uninstallExtension(
+export async function uninstallExtension(
   extensionId: string
 ): Promise<{ deleted: boolean; id: string }> {
-  return apiFetch(`/api/extensions/${extensionId}`, { method: "DELETE" });
+  const result = await apiFetch<{ deleted: boolean; id: string }>(`/api/extensions/${extensionId}`, { method: "DELETE" });
+  invalidateExtensionCache();
+  return result;
 }

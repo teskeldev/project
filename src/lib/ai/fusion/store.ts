@@ -145,9 +145,24 @@ export async function duplicateFusion(workspaceId: string, id: string, createdBy
   const src = await getFusion(workspaceId, id);
   if (!src) throw new Error("Fusion not found");
   // Ensure a unique name within the workspace.
-  let name = `${src.name} copy`;
-  for (let i = 2; await prisma.fusion.findFirst({ where: { workspaceId, name } }); i++) {
-    name = `${src.name} copy ${i}`;
+  // The previous implementation did `await prisma.fusion.findFirst(...)` in a
+  // loop, which is N queries deep. Compute the suffix in memory by listing
+  // existing collisions once.
+  const baseName = `${src.name} copy`;
+  const existing = await prisma.fusion.findMany({
+    where: { workspaceId, name: { startsWith: baseName } },
+    select: { name: true },
+  });
+  const taken = new Set(existing.map((r) => r.name));
+  let name = baseName;
+  if (taken.has(baseName)) {
+    for (let i = 2; ; i++) {
+      const candidate = `${baseName} ${i}`;
+      if (!taken.has(candidate)) {
+        name = candidate;
+        break;
+      }
+    }
   }
   return createFusion(workspaceId, createdById, {
     name,

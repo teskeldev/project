@@ -4,7 +4,7 @@ import {
   requireUser,
   ApiError,
 } from "@/lib/api";
-import { PLAN_CONFIGS, type PlanTier } from "@/lib/stripe";
+import { PLAN_CONFIGS, type PlanTier } from "@/lib/billing-config";
 import { prisma } from "@/lib/db";
 import {
   getCurrentPeriodStart,

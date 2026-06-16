@@ -100,6 +100,15 @@ const nextConfig: NextConfig = {
     root: __dirname,
   },
 
+  // Exclude the local "reference/" folder (third-party repos used as
+  // reference material, not bundled code) from the standalone file trace.
+  // Without this, dynamic path resolution in src/lib/storage.ts and
+  // src/lib/skills-loader.ts pulls every file under reference/ into the
+  // standalone copy and the build fails to assemble a runnable bundle.
+  outputFileTracingExcludes: {
+    "*": ["./reference/**", "./reference/**/*"],
+  },
+
   async headers() {
     return [
       {

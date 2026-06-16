@@ -127,16 +127,9 @@ async function testAnthropic(config: Record<string, unknown>, defaultBaseUrl: st
   });
 
   if ("error" in result) {
-    // Network unavailable: fall back to format validation.
-    if (!apiKey.startsWith("sk-")) {
-      return {
-        ok: false,
-        message: "Key format looks unexpected (expected an 'sk-' prefix).",
-      };
-    }
     return {
       ok: true,
-      message: "Key saved. Could not verify against Anthropic (network unavailable).",
+      message: "Key saved. Could not verify against provider (network unavailable).",
     };
   }
 

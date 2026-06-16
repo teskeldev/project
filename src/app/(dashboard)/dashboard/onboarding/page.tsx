@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles,
@@ -17,7 +18,7 @@ import {
   FolderPlus,
 } from "lucide-react";
 import { useProject } from "@/lib/store/project";
-import { ApiClientError, type ProjectTemplate } from "@/lib/client/api";
+import { ApiClientError, apiFetch, type ProjectTemplate } from "@/lib/client/api";
 
 type OnboardingStep = 1 | 2 | 3 | 4 | 5;
 
@@ -52,7 +53,8 @@ const slideVariants = {
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { projects, activeWorkspace, createNewProject, setActiveProject } = useProject();
+  const { update } = useSession();
+  const { projects, activeWorkspace, createNewProject, setActiveProject, refresh } = useProject();
 
   const [step, setStep] = useState<OnboardingStep>(1);
   const [direction, setDirection] = useState(1);
@@ -79,11 +81,12 @@ export default function OnboardingPage() {
     setSubmitting(true);
     try {
       await fetch("/api/user/onboarding", { method: "POST" });
+      await update({ onboardingCompleted: true });
       router.push("/dashboard");
     } catch {
       router.push("/dashboard");
     }
-  }, [router]);
+  }, [router, update]);
 
   const handleNameSubmit = async () => {
     if (!name.trim()) return;
@@ -97,6 +100,30 @@ export default function OnboardingPage() {
       }).catch(() => {});
       // Update name is best-effort; proceed regardless
       goNext();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleWorkspaceSubmit = async () => {
+    if (activeWorkspace) {
+      goNext();
+      return;
+    }
+    if (!workspaceName.trim()) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await apiFetch("/api/workspaces", {
+        method: "POST",
+        body: JSON.stringify({ name: workspaceName.trim() }),
+      });
+      await refresh(); // Refresh ProjectProvider state to load the new workspace
+      goNext();
+    } catch (err) {
+      setError(
+        err instanceof ApiClientError ? err.message : "Failed to create workspace"
+      );
     } finally {
       setSubmitting(false);
     }
@@ -223,8 +250,15 @@ export default function OnboardingPage() {
                       placeholder="My Workspace"
                       className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-foreground placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
                       autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") void handleWorkspaceSubmit();
+                      }}
                     />
                   </div>
+                )}
+
+                {error && (
+                  <p className="mt-4 text-xs text-red-600">{error}</p>
                 )}
 
                 <div className="mt-6 flex items-center justify-center gap-3">
@@ -236,11 +270,18 @@ export default function OnboardingPage() {
                     Back
                   </button>
                   <button
-                    onClick={goNext}
-                    className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+                    onClick={() => void handleWorkspaceSubmit()}
+                    disabled={(!activeWorkspace && !workspaceName.trim()) || submitting}
+                    className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
                   >
-                    {activeWorkspace ? "Continue" : "Skip for now"}
-                    <ArrowRight size={16} />
+                    {submitting ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <>
+                        {activeWorkspace ? "Continue" : "Create Workspace"}
+                        <ArrowRight size={16} />
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

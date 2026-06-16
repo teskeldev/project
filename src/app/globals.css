@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 /* ==========================================================================
    TESKEL DESIGN SYSTEM — "Living Canvas"
    Light-first. Teal = AI presence. Iris = human. Motion = state.
@@ -9,19 +10,19 @@
 
 :root {
   /* ---- COLOR · canvas & ink ---- */
-  --canvas: #F8F8F6;
+  --canvas: #FDFCFB; /* Alabaster White */
   --surface: #FFFFFF;
-  --surface-soft: #F3F3F0;
+  --surface-soft: #F5F5F4; /* Stone 100 */
   --elevated: #FFFFFF;
-  --ink: #0F172A;
-  --ink-2: #475569;
-  --ink-muted: #94A3B8;
+  --ink: #1C1917; /* Stone 900 */
+  --ink-2: #57534E; /* Stone 600 */
+  --ink-muted: #A8A29E; /* Stone 400 */
 
   /* ---- COLOR · signature semantics ---- */
-  --ai: #10B7A8;            /* AGENT presence — reserve for AI only */
-  --ai-soft: #E7F8F6;
-  --human: #6D5DF6;         /* YOU — reserve for human actions */
-  --human-soft: #EEECFD;
+  --ai: #1C1917;            /* STONE 900 — Deep warm black for AI actions */
+  --ai-soft: #F5F5F4;       /* Stone 100 */
+  --human: #78716C;         /* Stone 500 — Muted earth for human verification */
+  --human-soft: #FAFAF9;    /* Stone 50 */
 
   /* ---- COLOR · state ---- */
   --success: #16A34A;
@@ -75,11 +76,11 @@
      ======================================================================== */
   --background: var(--canvas);
   --foreground: var(--ink);
-  --accent: #3B82F6;
-  --accent-light: #EFF6FF;
-  --accent-hover: #2563EB;
-  --primary: #111827;
-  --primary-hover: #020617;
+  --accent: var(--ai);
+  --accent-light: var(--ai-soft);
+  --accent-hover: #000000; /* Pure Black */
+  --primary: #1C1917;
+  --primary-hover: #000000;
   --text-secondary: var(--ink-2);
   --text-muted: var(--ink-muted);
 }

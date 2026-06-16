@@ -22,6 +22,7 @@ import {
   type RegistryExtension,
   type InstalledExtension,
 } from "@/lib/client/extensions";
+import { invalidateExtensionCache } from "@/lib/client/extensionRuntime";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +41,7 @@ function parseInstalls(s: string): number {
 
 export default function ExtensionsPage() {
   const { activeWorkspace } = useProject();
+  const workspaceId = activeWorkspace?.id ?? null;
   const [tab, setTab] = useState<ExtTab>("marketplace");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string | null>(null);
@@ -60,8 +62,8 @@ export default function ExtensionsPage() {
     try {
       const [registryRes, installedRes] = await Promise.all([
         fetchRegistry(),
-        activeWorkspace
-          ? listInstalled(activeWorkspace.id)
+        workspaceId
+          ? listInstalled(workspaceId)
           : Promise.resolve({ extensions: [] as InstalledExtension[] }),
       ]);
       setRegistry(registryRes.extensions);
@@ -71,7 +73,7 @@ export default function ExtensionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeWorkspace]);
+  }, [workspaceId]);
 
   useEffect(() => {
     void fetchData();
@@ -133,17 +135,18 @@ export default function ExtensionsPage() {
   // Install handler
   const handleInstall = useCallback(
     async (ext: RegistryExtension) => {
-      if (!activeWorkspace) return;
+      if (!workspaceId) return;
       setActionLoading(ext.registryId);
       try {
         const { extension } = await installExtension({
-          workspaceId: activeWorkspace.id,
+          workspaceId,
           registryId: ext.registryId,
           name: ext.name,
           author: ext.author,
           version: "1.0.0",
         });
         setInstalled((prev) => [...prev, extension]);
+        invalidateExtensionCache();
         window.dispatchEvent(new Event("extensions-changed"));
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to install extension");
@@ -151,7 +154,7 @@ export default function ExtensionsPage() {
         setActionLoading(null);
       }
     },
-    [activeWorkspace]
+    [workspaceId]
   );
 
   // Uninstall handler
@@ -163,6 +166,7 @@ export default function ExtensionsPage() {
       try {
         await uninstallExtension(ext.id);
         setInstalled((prev) => prev.filter((e) => e.id !== ext.id));
+        invalidateExtensionCache();
         window.dispatchEvent(new Event("extensions-changed"));
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to uninstall extension");

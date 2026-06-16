@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useProject } from "@/lib/store/project";
 import {
   ApiClientError,
@@ -16,7 +16,6 @@ import {
 import {
   Search,
   PenLine,
-  Sliders,
   FolderOpen,
   Settings,
   ChevronDown,
@@ -30,21 +29,14 @@ import {
   Layers,
   Bot,
   Plug,
-  BookOpen,
-  FileText,
-  PenTool,
-  SearchCode,
-  Sparkles,
-  Palette,
+  Brain,
+  Sliders,
   LogOut,
   Plus,
   Check,
   Loader2,
   X,
-  Webhook,
-  Shield,
-  Zap,
-  TerminalSquare,
+  BarChart3,
 } from "lucide-react";
 
 // Custom event name for opening the command palette.
@@ -75,29 +67,21 @@ function relativeTime(iso: string): string {
 
 const workspaceLinks = [
   { href: "/dashboard/editor", icon: Code, label: "Editor" },
-  { href: "/dashboard/composer", icon: Layers, label: "Code Review" },
+  { href: "/dashboard/composer", icon: Layers, label: "Review" },
   { href: "/dashboard/terminal", icon: Terminal, label: "Terminal" },
   { href: "/dashboard/git", icon: GitBranch, label: "Git" },
   { href: "/dashboard/extensions", icon: Puzzle, label: "Extensions" },
 ];
 
 const aiLinks = [
-  { href: "/dashboard/agents", icon: Bot, label: "Background Agents" },
-  { href: "/dashboard/artifacts", icon: Sparkles, label: "Artifacts" },
-  { href: "/dashboard/design", icon: Palette, label: "Design" },
-  { href: "/dashboard/canvas", icon: PenTool, label: "Canvas" },
-  { href: "/dashboard/search", icon: SearchCode, label: "Search" },
+  { href: "/dashboard/agents", icon: Bot, label: "Agents" },
+  { href: "/dashboard/fusion/library", icon: Sliders, label: "Fusion" },
 ];
 
-const configLinks = [
-  { href: "/dashboard/knowledge", icon: BookOpen, label: "Knowledge" },
-  { href: "/dashboard/rules", icon: FileText, label: "Rules" },
-  { href: "/dashboard/skills", icon: Zap, label: "Skills" },
-  { href: "/dashboard/commands", icon: TerminalSquare, label: "Commands" },
-  { href: "/dashboard/fusion/library", icon: Sliders, label: "Fusion" },
-  { href: "/dashboard/integrations", icon: Plug, label: "Integrations" },
-  { href: "/dashboard/webhooks", icon: Webhook, label: "Webhooks" },
-  { href: "/dashboard/permissions", icon: Shield, label: "Permissions" },
+const platformLinks = [
+  { href: "/dashboard/context", icon: Brain, label: "Context" },
+  { href: "/dashboard/integrations", icon: Plug, label: "Providers" },
+  { href: "/dashboard/usage", icon: BarChart3, label: "Analytics" },
 ];
 
 function SidebarLink({
@@ -255,8 +239,10 @@ function SidebarContent() {
     activeWorkspace,
     activeProject,
     loading,
+    error,
     setActiveProject,
     createNewProject,
+    refresh,
   } = useProject();
 
   const router = useRouter();
@@ -269,20 +255,28 @@ function SidebarContent() {
   const [creatingChat, setCreatingChat] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
 
+  const fetchIdRef = useRef(0);
+
   const loadThreads = useCallback(async () => {
     if (!activeProjectId) {
       setThreads([]);
       return;
     }
+    const currentFetchId = ++fetchIdRef.current;
     setThreadsLoading(true);
     try {
       const { threads: t } = await listThreads(activeProjectId);
-      setThreads(t);
+      if (fetchIdRef.current === currentFetchId) {
+        setThreads(t);
+      }
     } catch {
-      // Non-fatal: leave the list empty if threads can't be loaded.
-      setThreads([]);
+      if (fetchIdRef.current === currentFetchId) {
+        setThreads([]);
+      }
     } finally {
-      setThreadsLoading(false);
+      if (fetchIdRef.current === currentFetchId) {
+        setThreadsLoading(false);
+      }
     }
   }, [activeProjectId]);
 
@@ -298,7 +292,7 @@ function SidebarContent() {
     return () => clearTimeout(timer);
   }, [chatError]);
 
-  const handleNewChat = async () => {
+  const handleNewChat = useCallback(async () => {
     if (!activeProjectId || creatingChat) return;
     setCreatingChat(true);
     setChatError(null);
@@ -316,11 +310,11 @@ function SidebarContent() {
     } finally {
       setCreatingChat(false);
     }
-  };
+  }, [activeProjectId, creatingChat, router]);
 
-  const handleCreate = async (name: string, template: ProjectTemplate) => {
+  const handleCreate = useCallback(async (name: string, template: ProjectTemplate) => {
     await createNewProject({ name, template });
-  };
+  }, [createNewProject]);
 
   if (collapsed) {
     return (
@@ -345,12 +339,12 @@ function SidebarContent() {
         ))}
         <div className="my-1 h-px w-6 bg-surface-soft" />
         {aiLinks.map((link) => (
-          <Link key={link.href} href={link.href} className={`mb-1 rounded-lg p-2 ${pathname === link.href ? "bg-surface-soft text-foreground" : "text-text-muted hover:bg-surface-soft hover:text-text-secondary"}`} title={link.label} aria-label={link.label}>
+          <Link key={link.href} href={link.href} className={`mb-1 rounded-lg p-2 ${pathname?.startsWith(link.href.split("?")[0]) ? "bg-surface-soft text-foreground" : "text-text-muted hover:bg-surface-soft hover:text-text-secondary"}`} title={link.label} aria-label={link.label}>
             <link.icon size={16} />
           </Link>
         ))}
         <div className="my-1 h-px w-6 bg-surface-soft" />
-        {configLinks.map((link) => (
+        {platformLinks.map((link) => (
           <Link key={link.href} href={link.href} className={`mb-1 rounded-lg p-2 ${pathname === link.href ? "bg-surface-soft text-foreground" : "text-text-muted hover:bg-surface-soft hover:text-text-secondary"}`} title={link.label} aria-label={link.label}>
             <link.icon size={16} />
           </Link>
@@ -392,13 +386,29 @@ function SidebarContent() {
 
         <SidebarLink href="/dashboard" icon={PenLine} label="New Agent" isActive={pathname === "/dashboard"} />
         <SidebarLink href="/dashboard/chat" icon={MessageSquare} label="Chat" isActive={pathname === "/dashboard/chat"} />
-        <SidebarLink href="/dashboard/settings" icon={Sliders} label="Customize" isActive={pathname === "/dashboard/settings"} />
       </div>
 
-      {/* Workspace tools */}
+      {/* Project-provider error banner so empty dashboard state is not silent */}
+      {error && !loading && (
+        <div className="mx-3 mb-2 rounded-lg border border-red-200 bg-red-50 p-2 text-[11px] text-red-700">
+          <p className="font-medium">Failed to load workspaces</p>
+          <p className="mt-0.5 line-clamp-2 opacity-80">{error}</p>
+          <button
+            onClick={() => void refresh()}
+            className="mt-1.5 text-[11px] font-medium underline hover:no-underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Scrollable nav area — wraps all sections so they never overflow */}
+      <div className="flex-1 overflow-y-auto">
+
+      {/* Develop */}
       <div className="border-t border-border/50 px-3 py-3">
         <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-          Workspace
+          Develop
         </p>
         <div className="space-y-0.5">
           {workspaceLinks.map((link) => (
@@ -407,25 +417,31 @@ function SidebarContent() {
         </div>
       </div>
 
-      {/* AI Tools */}
+      {/* AI Studio */}
       <div className="border-t border-border/50 px-3 py-3">
         <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-          AI Tools
+          AI Studio
         </p>
         <div className="space-y-0.5">
           {aiLinks.map((link) => (
-            <SidebarLink key={link.href} href={link.href} icon={link.icon} label={link.label} isActive={pathname === link.href} />
+            <SidebarLink
+              key={link.href}
+              href={link.href}
+              icon={link.icon}
+              label={link.label}
+              isActive={!!pathname?.startsWith(link.href.split("?")[0])}
+            />
           ))}
         </div>
       </div>
 
-      {/* Configuration */}
+      {/* Platform */}
       <div className="border-t border-border/50 px-3 py-3">
         <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-          Configuration
+          Platform
         </p>
         <div className="space-y-0.5">
-          {configLinks.map((link) => (
+          {platformLinks.map((link) => (
             <SidebarLink key={link.href} href={link.href} icon={link.icon} label={link.label} isActive={pathname === link.href} />
           ))}
         </div>
@@ -491,7 +507,7 @@ function SidebarContent() {
       </div>
 
       {/* Chat history (real threads for the active project) */}
-      <div className="flex-1 overflow-y-auto border-t border-border px-3 py-2">
+      <div className="border-t border-border px-3 py-2">
         <div className="flex items-center justify-between px-3">
           <p className="py-1.5 text-[10px] font-medium uppercase tracking-wider text-text-muted">
             Chats
@@ -565,6 +581,8 @@ function SidebarContent() {
           </div>
         )}
       </div>
+
+      </div>{/* end scrollable nav area */}
 
       {/* Bottom */}
       <div className="border-t border-border p-3">

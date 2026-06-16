@@ -56,12 +56,19 @@ export default function TerminalPage() {
   );
 
   // Load sessions when the active project changes; create one if none exist.
+  // Guard with a ref so React 18 StrictMode's double-invocation does not
+  // create two terminal sessions on first mount.
+  const initProjectRef = useRef<string | null>(null);
   useEffect(() => {
     if (!projectId) {
       setSessions([]);
       setActiveId(null);
+      initProjectRef.current = null;
       return;
     }
+    if (initProjectRef.current === projectId) return;
+    initProjectRef.current = projectId;
+
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -88,6 +95,8 @@ export default function TerminalPage() {
     })();
     return () => {
       cancelled = true;
+      // Reset the guard when the project actually changes (not on StrictMode
+      // unmount), so a different project triggers a fresh load+create flow.
     };
   }, [projectId]);
 

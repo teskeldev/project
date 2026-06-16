@@ -180,7 +180,16 @@ export default auth(async (req) => {
   // Authenticated users must complete onboarding before accessing the dashboard.
   if (isLoggedIn && isProtected) {
     const onboardingCompleted = req.auth?.onboardingCompleted;
-    if (!onboardingCompleted && pathname !== "/dashboard/onboarding") {
+    // Only block nested dashboard routes. The root /dashboard and the
+    // /dashboard/onboarding page itself are allowed so users always have an
+    // escape hatch (e.g. if the onboarding wizard is broken, the user can
+    // still land on the landing page and the onboarding page to retry).
+    const isDashboardRoot = pathname === "/dashboard";
+    if (
+      !onboardingCompleted &&
+      !isDashboardRoot &&
+      pathname !== "/dashboard/onboarding"
+    ) {
       const response = NextResponse.redirect(new URL("/dashboard/onboarding", nextUrl));
       if (!hasCsrfCookie) {
         response.cookies.set(CSRF_COOKIE_NAME, await generateCsrfToken(), {

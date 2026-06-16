@@ -54,6 +54,7 @@ export const SKILL_CATEGORIES: Record<SkillCategory, { label: string; descriptio
 
 export const SKILLS_REGISTRY: SkillRegistryEntry[] = [
   { slug: "artifacts-builder", name: "Artifacts Builder", description: "Suite of tools for creating elaborate, multi-component HTML artifacts using modern frontend web technologies (React, Tailwind CSS, shadcn/ui)", category: "development", source: "builtin" },
+  { slug: "fusion-panel", name: "Multi-Model Fusion Panel", description: "Orchestrate multi-model panels and synthesis (consensus, contradictions, blind spots) for complex tasks", category: "development", source: "builtin" },
   { slug: "brand-guidelines", name: "Brand Guidelines", description: "Applies official brand colors and typography to artifacts that benefit from brand look-and-feel", category: "design", source: "builtin" },
   { slug: "canvas-design", name: "Canvas Design", description: "Create beautiful visual art in .png and .pdf documents using design philosophy for posters, art, and static pieces", category: "design", source: "builtin" },
   { slug: "changelog-generator", name: "Changelog Generator", description: "Automatically creates user-facing changelogs from git commits by analyzing history and transforming technical commits into customer-friendly release notes", category: "development", source: "builtin" },

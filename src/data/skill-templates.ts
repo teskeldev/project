@@ -239,4 +239,25 @@ export const SKILL_TEMPLATES: SkillTemplate[] = [
 - Scope data access to the authenticated user's permissions.
 `,
   },
+  {
+    name: "Multi-Model Fusion Panel",
+    slug: "fusion-panel",
+    description: "Orchestrate multi-model panels and synthesis (consensus, contradictions, blind spots)",
+    content: `# Multi-Model Fusion Panel
+
+## Philosophy
+- Independence, then synthesis.
+- No personas, lenses, or pre-framed roles (skeptic, optimizer, etc.) to keep panel responses unbiased and truly independent.
+- High-stakes choices, hard research, and complex debugging benefit from model divergence.
+
+## The Tracks
+- **Track A (Code / Artifacts)**: Run all candidates, verify compilation/tests/lints, pick the best candidate as foundation, and graft working pieces. Never Frankenstein. Run and verify the merged code before final output.
+- **Track B (Research / Analysis)**: Synthesize answers into structured sections: Consensus, Contradictions, Partial coverage, Unique insights, and Blind spots. Ground the final answer in this analysis.
+
+## Execution Rules
+- Dispatch the same task verbatim to panelists in parallel.
+- Maintain isolation; panelists must not see other panelists' intermediate outputs.
+- Adjudicate contradictions based on primary sources or actual execution.
+`,
+  },
 ];

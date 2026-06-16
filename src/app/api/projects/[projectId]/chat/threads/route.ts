@@ -19,6 +19,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
     const threads = await prisma.chatThread.findMany({
       where: { projectId },
       orderBy: { updatedAt: "desc" },
+      take: 100, // Limit to recent 100 threads for sidebar rendering performance
       select: {
         id: true,
         title: true,

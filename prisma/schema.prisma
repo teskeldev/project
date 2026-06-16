@@ -178,12 +178,14 @@ model VerificationToken {
 // ----------------------------- Workspace -----------------------------
 
 model Workspace {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  ownerId   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique
+  ownerId         String
+  routingStrategy String   @default("fill-first")
+  stickyLimit     Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   owner             User               @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   members           WorkspaceMember[]
@@ -201,6 +203,9 @@ model Workspace {
   aiPermissions     AIPermission[]
   fusions           Fusion[]
   fusionRequestLogs FusionRequestLog[]
+  combos            Combo[]
+  aiRequestLogs     AiRequestLog[]
+  modelAliases      ModelAlias[]
 
   @@index([ownerId])
 }
@@ -488,21 +493,27 @@ model KnowledgeItem {
 }
 
 model Integration {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   workspaceId     String
   provider        String
   name            String
-  encryptedConfig String   @db.Text
-  enabled         Boolean  @default(true)
+  encryptedConfig String    @db.Text
+  enabled         Boolean   @default(true)
   // Lower = higher priority when multiple connections exist for one provider
   // (key pool / failover). Resolution picks the lowest-priority enabled row.
-  priority        Int      @default(100)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  priority        Int       @default(100)
+  // Error tracking & cooldown
+  errorType       String?
+  lastError       String?   @db.Text
+  lastErrorAt     DateTime?
+  cooldownUntil   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
+  @@index([workspaceId, provider, enabled])
 }
 
 model ApiKey {
@@ -957,4 +968,75 @@ model Embedding {
   @@index([projectId, chunkType])
   @@index([projectId, filePath])
   @@index([projectId, createdAt])
+}
+
+// ----------------------------- Combos (Fallback Chains) -----------------------------
+
+model Combo {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?
+  strategy    String   @default("fallback")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  models    ComboModel[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model ComboModel {
+  id       String @id @default(cuid())
+  comboId  String
+  provider String
+  model    String
+  position Int    @default(0)
+
+  combo Combo @relation(fields: [comboId], references: [id], onDelete: Cascade)
+
+  @@index([comboId])
+}
+
+// ----------------------------- AI Request Logs (Usage + History) ------------------
+
+model AiRequestLog {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  provider     String
+  model        String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  costUsd      Float    @default(0)
+  durationMs   Int      @default(0)
+  status       String   @default("success")
+  errorType    String?
+  errorMessage String?  @db.Text
+  source       String?
+  createdAt    DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, provider])
+  @@index([workspaceId, status])
+}
+
+// ----------------------------- Model Aliases ----------------------------------
+
+model ModelAlias {
+  id          String   @id @default(cuid())
+  workspaceId String
+  alias       String
+  provider    String
+  model       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, alias])
+  @@index([workspaceId])
 }

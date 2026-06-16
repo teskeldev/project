@@ -47,6 +47,7 @@ export default function XtermTerminal({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
+  const mountedRef = useRef<boolean>(true);
 
   // Mutable terminal state held in refs (not React state) for the line editor.
   const cwdRef = useRef<string>(initialCwd);
@@ -83,7 +84,12 @@ export default function XtermTerminal({
     };
 
     term.open(containerRef.current);
-    tryFit();
+    // Defer the first fit until after the DOM is laid out. xterm.js's
+    // Viewport.syncScrollArea reads the parent element's `dimensions` getter
+    // synchronously after `fit()` calls render(), and that getter throws if
+    // the renderer hasn't completed its first measurement yet. requestAnimationFrame
+    // ensures the browser has computed layout and the wrapper has a size.
+    requestAnimationFrame(tryFit);
 
     termRef.current = term;
     fitRef.current = fit;
@@ -217,14 +223,19 @@ export default function XtermTerminal({
     onRegister(sessionId, handle);
 
     const ro = new ResizeObserver(() => {
-      // Use requestAnimationFrame to let browser finish layout before fitting
-      requestAnimationFrame(() => {
-        tryFit();
-      });
+      // Two animation frames: one for the resize to flush, one for xterm's
+      // internal measurement pipeline. This avoids the "Cannot read properties
+      // of undefined (reading 'dimensions')" crash in Viewport.syncScrollArea.
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          if (mountedRef.current) tryFit();
+        })
+      );
     });
     ro.observe(containerRef.current);
 
     return () => {
+      mountedRef.current = false;
       onRegister(sessionId, null);
       dataDisposable.dispose();
       ro.disconnect();

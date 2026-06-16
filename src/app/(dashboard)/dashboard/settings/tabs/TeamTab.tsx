@@ -58,6 +58,7 @@ function StatusMessage({
 
 export default function TeamTab() {
   const { activeWorkspace } = useProject();
+  const workspaceId = activeWorkspace?.id ?? null;
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,23 +69,23 @@ export default function TeamTab() {
   const [inviting, setInviting] = useState(false);
 
   const loadMembers = useCallback(() => {
-    if (!activeWorkspace) return;
+    if (!workspaceId) { setLoading(false); return; }
     setLoading(true);
-    fetchMembers(activeWorkspace.id)
+    fetchMembers(workspaceId)
       .then((r) => setMembers(r.members))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [activeWorkspace]);
+  }, [workspaceId]);
 
   useEffect(() => {
     loadMembers();
   }, [loadMembers]);
 
   const handleInvite = async () => {
-    if (!activeWorkspace || !inviteEmail.trim()) return;
+    if (!workspaceId || !inviteEmail.trim()) return;
     setInviting(true);
     try {
-      await inviteMember(activeWorkspace.id, inviteEmail.trim(), inviteRole);
+      await inviteMember(workspaceId, inviteEmail.trim(), inviteRole);
       setInviteEmail("");
       setShowInvite(false);
       loadMembers();

@@ -5,7 +5,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-const SKILLS_DIR = path.resolve(process.cwd(), "reference/awesome-claude-skills");
+const SKILLS_DIR = path.resolve(/*turbopackIgnore: true*/ process.cwd(), "reference/awesome-claude-skills");
 
 // Strict slug validation: only alphanumerics, dot, underscore, hyphen.
 // Rejects path separators, "..", null bytes, and any other metacharacters
@@ -44,7 +44,7 @@ export async function loadSkillContent(
     let skillPath: string;
 
     if (source === "composio") {
-      skillPath = path.join(SKILLS_DIR, "composio-skills", slug, "SKILL.md");
+      skillPath = path.join(/*turbopackIgnore: true*/ SKILLS_DIR, "composio-skills", slug, "SKILL.md");
     } else {
       // Handle document-skills sub-skills
       if (slug.startsWith("document-skills-")) {
@@ -53,9 +53,9 @@ export async function loadSkillContent(
         // (and additionally must not be empty, i.e. the prefix must be followed
         // by at least one valid character).
         assertValidSlug(subType, "document-skills sub-type");
-        skillPath = path.join(SKILLS_DIR, "document-skills", subType, "SKILL.md");
+        skillPath = path.join(/*turbopackIgnore: true*/ SKILLS_DIR, "document-skills", subType, "SKILL.md");
       } else {
-        skillPath = path.join(SKILLS_DIR, slug, "SKILL.md");
+        skillPath = path.join(/*turbopackIgnore: true*/ SKILLS_DIR, slug, "SKILL.md");
       }
     }
 

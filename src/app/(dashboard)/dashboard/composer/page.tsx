@@ -58,6 +58,7 @@ const CHANGE_TYPE_STYLES: Record<
 
 export default function CodeReviewPage() {
   const { activeProject } = useProject();
+  const projectId = activeProject?.id ?? null;
 
   const [changesets, setChangesets] = useState<ChangeSetSummary[]>([]);
   const [selectedChangeSetId, setSelectedChangeSetId] = useState<string | null>(
@@ -87,12 +88,12 @@ export default function CodeReviewPage() {
   // --- Data loading -------------------------------------------------------
 
   const loadList = useCallback(async () => {
-    if (!activeProject) return;
+    if (!projectId) return;
     setLoadingList(true);
     setError(null);
     try {
       const { changesets: rows } = await listChangeSets(
-        activeProject.id,
+        projectId,
         "PENDING_REVIEW"
       );
       setChangesets(rows);
@@ -107,17 +108,17 @@ export default function CodeReviewPage() {
     } finally {
       setLoadingList(false);
     }
-  }, [activeProject]);
+  }, [projectId]);
 
   const loadApplied = useCallback(async () => {
-    if (!activeProject) return;
+    if (!projectId) return;
     try {
-      const { changesets: rows } = await listChangeSets(activeProject.id, "APPLIED");
+      const { changesets: rows } = await listChangeSets(projectId, "APPLIED");
       setAppliedChangesets(rows);
     } catch {
       /* non-critical */
     }
-  }, [activeProject]);
+  }, [projectId]);
 
   const loadDetail = useCallback(async (id: string) => {
     setLoadingDetail(true);

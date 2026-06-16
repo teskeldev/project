@@ -3,7 +3,7 @@
  * Pricing tiers are defined in lib/stripe.ts (PLAN_CONFIGS).
  */
 import { prisma } from "@/lib/db";
-import { PLAN_CONFIGS, type PlanTier } from "@/lib/stripe";
+import { PLAN_CONFIGS, type PlanTier } from "@/lib/billing-config";
 import { ApiError } from "@/lib/api";
 import type { InputJsonValue } from "@prisma/client/runtime/library";
 

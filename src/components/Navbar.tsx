@@ -2,71 +2,73 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
-import { Button } from "@/components/ui";
-
-const navLinks = [
-  { label: "Product", href: "/#product" },
-  { label: "Enterprise", href: "/enterprise" },
-  { label: "Pricing", href: "/pricing" },
-  { label: "Resources", href: "/docs" },
-];
+import { AnimatePresence, motion, useScroll, useMotionValueEvent } from "framer-motion";
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const { scrollY } = useScroll();
+
+  useMotionValueEvent(scrollY, "change", (latest) => {
+    setScrolled(latest > 50);
+  });
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-surface/80 backdrop-blur-xl dark:bg-surface/80">
-      <nav className="mx-auto flex h-14 max-w-[1100px] items-center justify-between px-6">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
-          <svg width="24" height="24" viewBox="0 0 28 28" fill="none" className="text-foreground">
-            <rect width="28" height="28" rx="6" fill="currentColor" />
-            <path d="M8 8h4v12H8V8zm8 0h4v12h-4V8z" fill="white" className="dark:fill-[#0B0F19]" />
-          </svg>
-          <span className="text-[16px] font-bold tracking-tight text-foreground">Teskel</span>
+    <motion.header
+      initial={{ y: -100 }}
+      animate={{ y: 0 }}
+      transition={{ type: "spring", stiffness: 100, damping: 20 }}
+      className={`fixed top-0 z-50 w-full transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        scrolled 
+          ? "bg-white/60 backdrop-blur-xl border-b border-gray-200/30 shadow-[0_1px_2px_rgba(0,0,0,0.01),0_8px_32px_rgba(0,0,0,0.03)]" 
+          : "bg-transparent border-b border-transparent"
+      }`}
+    >
+      <nav className="mx-auto flex h-16 max-w-[1100px] items-center justify-between px-6">
+        {/* Branding */}
+        <Link href="/" className="group flex items-center gap-2.5 transition-opacity hover:opacity-80">
+          <div className="relative flex h-6 w-6 items-center justify-center rounded-md bg-blue-600 overflow-hidden">
+             <motion.div 
+               className="absolute inset-0 bg-white/20"
+               initial={{ x: "-100%" }}
+               whileHover={{ x: "100%" }}
+               transition={{ duration: 0.5, ease: "easeInOut" }}
+             />
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-white">
+              <path d="M4 4h16v16H4V4zm8 0h4v16h-4V4z" fill="currentColor" />
+            </svg>
+          </div>
+          <span className="text-[17px] font-bold tracking-tight text-slate-900">Teskel</span>
         </Link>
 
-        {/* Desktop links */}
-        <div className="hidden items-center gap-7 md:flex">
-          {navLinks.map((link) => (
-            <Link
-              key={link.label}
-              href={link.href}
-              className="text-[14px] text-text-secondary transition-colors hover:text-foreground"
-            >
-              {link.label}
-            </Link>
-          ))}
+        {/* Hyper-Focused Funnel Links */}
+        <div className="hidden items-center gap-8 md:flex">
+          <Link href="/#features" className="text-[14px] font-medium text-slate-500 transition-colors duration-200 hover:text-slate-900">Features</Link>
+          <Link href="/pricing" className="text-[14px] font-medium text-slate-500 transition-colors duration-200 hover:text-slate-900">Pricing</Link>
+          <Link href="/docs" className="text-[14px] font-medium text-slate-500 transition-colors duration-200 hover:text-slate-900">Docs</Link>
         </div>
 
-        {/* Desktop CTA */}
-        <div className="hidden items-center gap-4 md:flex">
-          <Link href="/login" className="text-[14px] text-text-secondary transition-colors hover:text-foreground">
-            Sign in
+        {/* Action Group */}
+        <div className="hidden items-center gap-5 md:flex">
+          <Link href="/login" className="text-[14px] font-medium text-slate-600 transition-colors hover:text-slate-900">
+            Log in
           </Link>
-          <Button asChild variant="outline" size="sm" className="rounded-full px-4 py-1.5 text-[13px]">
-            <Link href="/enterprise">
-              Contact sales
-            </Link>
-          </Button>
-          <Button asChild size="sm" className="rounded-full px-4 py-1.5 text-[13px]">
-            <Link href="/download">
-              Download
-            </Link>
-          </Button>
+          
+          <Link href="/signup" className="group relative overflow-hidden rounded-full bg-blue-600 px-5 py-2 text-[13px] font-medium text-white shadow-md transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-600/20">
+            {/* Liquid Gradient Sweep */}
+            <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-full" />
+            <span className="relative flex items-center gap-1.5">
+              Get Started <span className="transition-transform duration-300 group-hover:translate-x-0.5">&rarr;</span>
+            </span>
+          </Link>
         </div>
 
         {/* Mobile toggle */}
-        <button className="text-foreground md:hidden" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Toggle menu">
+        <button className="text-slate-600 md:hidden" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Toggle menu">
           {mobileOpen ? (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
           ) : (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 12h18M3 6h18M3 18h18" />
-            </svg>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12h18M3 6h18M3 18h18" /></svg>
           )}
         </button>
       </nav>
@@ -78,36 +80,21 @@ export default function Navbar() {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden border-t border-border/60 bg-surface md:hidden dark:bg-surface"
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden border-t border-gray-100 bg-white/90 backdrop-blur-xl md:hidden"
           >
-            <div className="flex flex-col gap-3 px-6 py-4">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.label}
-                  href={link.href}
-                  className="text-[14px] text-text-secondary hover:text-foreground"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  {link.label}
-                </Link>
-              ))}
-              <hr className="border-border" />
-              <Link href="/login" className="text-[14px] text-text-secondary">Sign in</Link>
-              <Button asChild variant="outline" className="rounded-full text-center text-[13px]">
-                <Link href="/enterprise">
-                  Contact sales
-                </Link>
-              </Button>
-              <Button asChild className="rounded-full text-center text-[13px]">
-                <Link href="/download">
-                  Download
-                </Link>
-              </Button>
+            <div className="flex flex-col gap-4 px-6 py-6">
+              <Link href="/#features" className="text-[15px] font-medium text-slate-600" onClick={() => setMobileOpen(false)}>Features</Link>
+              <Link href="/pricing" className="text-[15px] font-medium text-slate-600" onClick={() => setMobileOpen(false)}>Pricing</Link>
+              <hr className="my-2 border-gray-100" />
+              <Link href="/login" className="text-[15px] font-medium text-slate-600" onClick={() => setMobileOpen(false)}>Log in</Link>
+              <Link href="/signup" onClick={() => setMobileOpen(false)} className="mt-2 block w-full rounded-full bg-blue-600 px-5 py-2.5 text-center text-[14px] font-medium text-white shadow-md">
+                Get Started for Free
+              </Link>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-    </header>
+    </motion.header>
   );
 }

@@ -36,6 +36,7 @@ import {
 } from "@/lib/client/design";
 import { createArtifact } from "@/lib/client/artifacts";
 import { FusionPicker } from "@/components/fusion/FusionPicker";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -71,7 +72,7 @@ function sanitizeHtmlContent(html: string): string {
     ALLOWED_TAGS: ["div", "span", "p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "a", "img", "button", "input", "label", "form", "table", "thead", "tbody", "tr", "td", "th", "br", "hr", "strong", "em", "b", "i", "code", "pre", "blockquote", "section", "article", "nav", "header", "footer", "main", "aside"],
     ALLOWED_ATTR: ["class", "id", "href", "src", "alt", "title", "type", "value", "placeholder", "name", "for", "data-*"],
     ALLOW_DATA_ATTR: true,
-    FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "svg", "math", "form"],
+    FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "svg", "math"],
     FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onfocus", "onblur", "style"],
   });
 }
@@ -98,6 +99,7 @@ function buildSrcdoc(code: string): string {
 
 export default function DesignPage() {
   const { activeProject, activeWorkspace } = useProject();
+  const projectId = activeProject?.id ?? null;
   const [designFusionId, setDesignFusionId] = useState<string | null>(null);
 
   const [viewMode, setViewMode] = useState<ViewMode>("preview");
@@ -136,13 +138,13 @@ export default function DesignPage() {
 
   // Load sessions when project changes
   useEffect(() => {
-    if (!activeProject) return;
+    if (!projectId) return;
 
     let cancelled = false;
 
     async function loadSessions() {
       try {
-        const { sessions: list } = await listDesignSessions(activeProject!.id);
+        const { sessions: list } = await listDesignSessions(projectId!);
         if (cancelled) return;
         setSessions(list);
 
@@ -150,7 +152,7 @@ export default function DesignPage() {
         if (list.length > 0) {
           setActiveSessionId(list[0].id);
         } else {
-          const { session } = await createDesignSession(activeProject!.id, "Design Session");
+          const { session } = await createDesignSession(projectId!, "Design Session");
           if (cancelled) return;
           setSessions([session as DesignSession & { _count: { versions: number } }]);
           setActiveSessionId(session.id);
@@ -164,7 +166,7 @@ export default function DesignPage() {
 
     loadSessions();
     return () => { cancelled = true; };
-  }, [activeProject]);
+  }, [projectId]);
 
   // Load session detail when active session changes
   useEffect(() => {
@@ -380,7 +382,7 @@ export default function DesignPage() {
             To use Teskel Design, you need to configure an AI provider with an API key.
           </p>
           <Button asChild className="mt-4 bg-accent hover:bg-accent-hover text-white">
-            <a href="/dashboard/integrations">Go to Integrations</a>
+            <Link href="/dashboard/integrations">Go to Integrations</Link>
           </Button>
         </div>
       </div>

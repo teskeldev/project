@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Hero from "@/components/Hero";
 import SocialProof from "@/components/SocialProof";
 import EditorDemo from "@/components/EditorDemo";
-import Testimonials from "@/components/Testimonials";
 import Features from "@/components/Features";
+import FAQ from "@/components/FAQ";
 import CTA from "@/components/CTA";
 
 export const metadata: Metadata = {
@@ -32,8 +32,8 @@ export default function Home() {
       <Hero />
       <SocialProof />
       <EditorDemo />
-      <Testimonials />
       <Features />
+      <FAQ />
       <CTA />
     </>
   );
